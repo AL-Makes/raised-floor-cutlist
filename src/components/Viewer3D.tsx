@@ -104,6 +104,8 @@ function findVoids(build: Build): Void[] {
         const y1 = ys[k + 1]
         const gap = y1 - y0
         if (gap < 3) continue
+        const inLift = build.placements.some((q) => q.kind === 'lift' && q.x < col.x + col.w && q.x + q.sx > col.x && q.y < y1 && q.y + q.sy > y0)
+        if (inLift) continue
         const gt = Math.min(T, gap * 0.5)
         out.push({
           id: `c${si}-${ci}-${k}`,
