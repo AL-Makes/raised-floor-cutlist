@@ -1,4 +1,9 @@
-export type FloorShape = 'rect' | 'L'
+export type FloorShape = 'rect' | 'L' | 'poly'
+
+export interface Pt {
+  x: number
+  y: number
+}
 
 export interface FloorSpec {
   shape: FloorShape
@@ -8,6 +13,10 @@ export interface FloorSpec {
   /** L-shape: notch removed from the back-right corner */
   notchW: number
   notchL: number
+  /** poly shape: right-angled outline, corners in order, inches */
+  poly?: Pt[]
+  /** edge i runs from corner i to corner i+1; this edge becomes the front (drawers, joists run away from it) */
+  frontEdge?: number
 }
 
 export interface Rect {
@@ -35,7 +44,7 @@ export interface Reinforce {
   doubleJoists: boolean
 }
 
-export type TatamiPatternId = 'rows' | 'columns' | 'brick' | 'brickV' | 'basket' | 'squares'
+export type TatamiPatternId = 'rows' | 'columns' | 'brick' | 'brickV' | 'basket' | 'squares' | 'pinwheel'
 
 export interface Params {
   floor: FloorSpec
@@ -59,7 +68,12 @@ export interface Params {
   heightOption: number
   designLoadPsf: number
   pointLoadLb: number
-  shimSpacing: number
+  /** bearing points (shim pads) under each joist, end to end; 0 = joists rest continuously on the slab */
+  supportCount: number
+  /** change in the number of main joists vs. the bin-driven count (applies to every section) */
+  joistAdjust: number
+  /** change in the number of cross joists (blocking rows) vs. the bin-driven count */
+  crossAdjust: number
   tatamiPattern: TatamiPatternId
   tatamiLong: number
   tatamiShort: number
@@ -121,4 +135,7 @@ export interface Cell {
   l: number
   type: CellType
   fitsBin: boolean
+  /** how many bins sit side by side (x) and one behind another (y) in this cell */
+  binsX: number
+  binsY: number
 }

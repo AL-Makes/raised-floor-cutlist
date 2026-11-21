@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { InputPanel } from './components/InputPanel'
 import { CutListTab, LoadTab } from './components/Results'
 import { TatamiTab } from './components/TatamiTab'
-import { Viewer3D, type ViewOptions } from './components/Viewer3D'
+import { Viewer3D, LAYER_LABELS, defaultView, type Layer, type LayerKey, type ViewOptions } from './components/Viewer3D'
 import { buildFloor, defaultParams } from './lib/build'
 import { toCsv } from './lib/export'
 import { analyze } from './lib/structural'
@@ -18,7 +18,9 @@ export default function App() {
   const [params, setParams] = useState<Params>(defaultParams)
   const [units, setUnits] = useState<UnitSystem>('imperial')
   const [tab, setTab] = useState<Tab>('3d')
-  const [view, setView] = useState<ViewOptions>({ deck: true, tatami: false, bins: true, loadMap: false })
+  const [view, setView] = useState<ViewOptions>(defaultView)
+  const setLayer = (k: LayerKey, patch: Partial<Layer>) =>
+    setView((v) => ({ ...v, layers: { ...v.layers, [k]: { ...v.layers[k], ...patch } } }))
 
   const build = useMemo(() => buildFloor(params), [params])
   const structural = useMemo(() => analyze(build), [build])
@@ -54,9 +56,9 @@ export default function App() {
           <InputPanel p={params} set={setParams} units={units} build={build} />
         </aside>
         <div className="results">
-          {build.warnings.length > 0 && (
+          {(build.warnings.length > 0 || structural.issues.length > 0) && (
             <ul className="warnings">
-              {build.warnings.map((w) => (
+              {[...build.warnings, ...structural.issues.filter((i) => /recommended|between supports|unbraced|roll/.test(i.text)).map((i) => i.text)].map((w) => (
                 <li key={w}>{w}</li>
               ))}
             </ul>
@@ -71,13 +73,29 @@ export default function App() {
           </nav>
           {tab === '3d' && (
             <div className="viewer">
-              <div className="toggles">
-                {(['deck', 'tatami', 'bins', 'loadMap'] as const).map((k) => (
-                  <label key={k}>
-                    <input type="checkbox" checked={view[k]} onChange={(e) => setView({ ...view, [k]: e.target.checked })} />
-                    {k === 'loadMap' ? 'Load map' : k}
-                  </label>
+              <div className="toggles layers">
+                {(Object.keys(LAYER_LABELS) as LayerKey[]).map((k) => (
+                  <div key={k} className="layerrow">
+                    <label>
+                      <input type="checkbox" checked={view.layers[k].visible} onChange={(e) => setLayer(k, { visible: e.target.checked })} />
+                      {LAYER_LABELS[k]}
+                    </label>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={1}
+                      step={0.05}
+                      value={view.layers[k].opacity}
+                      disabled={!view.layers[k].visible}
+                      title={`Opacity ${Math.round(view.layers[k].opacity * 100)}%`}
+                      onChange={(e) => setLayer(k, { opacity: Number(e.target.value) })}
+                    />
+                  </div>
                 ))}
+                <label>
+                  <input type="checkbox" checked={view.loadMap} onChange={(e) => setView({ ...view, loadMap: e.target.checked })} />
+                  Load map
+                </label>
               </div>
               <Viewer3D build={build} structural={structural} mats={mats} opts={view} />
               <div className="hud">

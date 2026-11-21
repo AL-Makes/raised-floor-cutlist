@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultParams, buildFloor, floorEdges, splitAxis } from './build'
+import { normalizeFloor, setEdgeLength, validatePolygon } from './geometry'
 import { solveHeight } from './height'
 import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
@@ -190,3 +191,49 @@ describe('tatami', () => {
     expect(matSchedule(res[0].mats).reduce((s, r) => s + r.qty, 0)).toBe(res[0].mats.length)
   })
 })
+
+describe('polygon floors, front edge, deck and tatami fit', () => {
+  const U = [
+    { x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 96 }, { x: 72, y: 96 },
+    { x: 72, y: 48 }, { x: 0, y: 48 },
+  ]
+  it('decomposes a polygon and rotates so the chosen edge is the front', () => {
+    const g = normalizeFloor({ shape: 'poly', width: 0, length: 0, notchW: 0, notchL: 0, poly: U, frontEdge: 0 })
+    expect(g.error).toBeUndefined()
+    expect(g.rects.reduce((s, r) => s + r.w * r.l, 0)).toBeCloseTo(120 * 48 + 48 * 48)
+    const g2 = normalizeFloor({ shape: 'poly', width: 0, length: 0, notchW: 0, notchL: 0, poly: U, frontEdge: 1 })
+    expect(g2.front!.x2 - g2.front!.x1).toBeCloseTo(96)
+    expect(g2.area).toBeCloseTo(g.area)
+  })
+  it('rejects slanted shapes and edits edge lengths', () => {
+    expect(validatePolygon([{ x: 0, y: 0 }, { x: 50, y: 10 }, { x: 50, y: 50 }, { x: 0, y: 50 }])).toMatch(/slanted/)
+    const out = setEdgeLength(U, 0, 100)
+    expect(out[1].x).toBe(100)
+    expect(validatePolygon(out)).toBeUndefined()
+  })
+  it('joist/cross adjustments change counts', () => {
+    const base = buildFloor(defaultParams())
+    const more = buildFloor({ ...defaultParams(), joistAdjust: 1, crossAdjust: 1 })
+    expect(more.jointCount.joists).toBeGreaterThan(base.jointCount.joists)
+    expect(more.jointCount.crossJoists).toBeGreaterThan(base.jointCount.crossJoists)
+  })
+  it('uses few deck panels from 4x8 sheets', () => {
+    const b = buildFloor({ ...defaultParams(), floor: { shape: 'rect', width: 96, length: 48, notchW: 0, notchL: 0 } })
+    expect(b.deckPanels).toBeLessThanOrEqual(2)
+    expect(b.heaviestPanelLb).toBeGreaterThan(0)
+  })
+  it('flags floors too small for one tatami mat, and pinwheel avoids grid crossings', () => {
+    const small = buildFloor({ ...defaultParams(), floor: { shape: 'rect', width: 30, length: 30, notchW: 0, notchL: 0 } })
+    expect(small.tatamiFits).toBe(false)
+    expect(small.warnings.join(' ')).toContain('not large enough to accommodate at least one tatami mat')
+    const opts = suggestTatami([{ x: 0, y: 0, w: 216, l: 216 }], { tatamiLong: 72, tatamiShort: 36 })
+    expect(opts.find((o) => o.id === 'pinwheel')!.fourCorner).toBeLessThan(opts.find((o) => o.id === 'squares')!.fourCorner)
+  })
+  it('recommends more support when the structure is weak', () => {
+    const b = buildFloor({ ...defaultParams(), supportCount: 2, floor: { shape: 'rect', width: 120, length: 192, notchW: 0, notchL: 0 } })
+    const s = analyze(b)
+    expect(s.issues.some((i) => /supports are recommended/.test(i.text))).toBe(true)
+  })
+})
+
+

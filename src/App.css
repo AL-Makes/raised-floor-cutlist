@@ -70,3 +70,16 @@ th { background: #f4f1ea; }
   .results { padding: 0; }
   :root { background: #fff; }
 }
+
+.stepper{display:flex;align-items:center;gap:.6rem}
+.stepper button{width:2.2rem;height:2.2rem;font-size:1.2rem}
+.stepper b{min-width:3rem;text-align:center}
+.layers{display:flex;flex-direction:column;gap:.3rem;align-items:stretch}
+.layerrow{display:flex;justify-content:space-between;align-items:center;gap:.6rem}
+.layerrow input[type=range]{width:7rem}
+.shape-plan{max-height:260px;background:#fafafa;border:1px solid #ddd;border-radius:6px}
+.edge-table{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.4rem}
+.edge-row{display:flex;flex-direction:column;gap:.2rem;padding:.3rem;border:1px solid #ddd;border-radius:6px}
+.edge-row.front{border-color:#e67e22;background:#fff4e8}
+.draw-typed .inline{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.draw-typed input{width:5rem}

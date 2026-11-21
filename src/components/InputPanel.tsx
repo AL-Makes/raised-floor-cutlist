@@ -3,6 +3,22 @@ import type { Build } from '../lib/build'
 import type { Params } from '../lib/types'
 import { formatLength, type UnitSystem } from '../lib/units'
 import { Check, LenInput } from './fields'
+import { ShapeEditor } from './ShapeEditor'
+import { floorPolygon } from '../lib/geometry'
+
+function Stepper({ label, value, onChange, hint }: { label: string; value: number; onChange: (v: number) => void; hint?: string }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <div className="stepper">
+        <button onClick={() => onChange(value - 1)}>-</button>
+        <b>{value > 0 ? `+${value}` : value}</b>
+        <button onClick={() => onChange(value + 1)}>+</button>
+      </div>
+      {hint && <small>{hint}</small>}
+    </label>
+  )
+}
 
 export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: Params) => Params) => void; units: UnitSystem; build: Build }) {
   const upd = (patch: Partial<Params>) => set((q) => ({ ...q, ...patch }))
@@ -13,20 +29,24 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
       <section>
         <h3>1. Floor shape</h3>
         <div className="seg">
-          <button className={p.floor.shape === 'rect' ? 'on' : ''} onClick={() => upd({ floor: { ...p.floor, shape: 'rect' } })}>Rectangle</button>
-          <button className={p.floor.shape === 'L' ? 'on' : ''} onClick={() => upd({ floor: { ...p.floor, shape: 'L' } })}>L-shape</button>
+          <button className={p.floor.shape === 'rect' ? 'on' : ''} onClick={() => upd({ floor: { ...p.floor, shape: 'rect', frontEdge: 0 } })}>Rectangle</button>
+          <button className={p.floor.shape === 'L' ? 'on' : ''} onClick={() => upd({ floor: { ...p.floor, shape: 'L', frontEdge: 0 } })}>L-shape</button>
+          <button className={p.floor.shape === 'poly' ? 'on' : ''} onClick={() => upd({ floor: { ...p.floor, shape: 'poly', poly: p.floor.shape === 'poly' ? p.floor.poly : floorPolygon(p.floor) } })}>Polygon</button>
         </div>
-        <div className="grid2">
-          <LenInput label="Width (across joists)" units={units} value={p.floor.width} min={12} onChange={(v) => upd({ floor: { ...p.floor, width: v } })} />
-          <LenInput label="Length (along joists)" units={units} value={p.floor.length} min={12} onChange={(v) => upd({ floor: { ...p.floor, length: v } })} />
-          {p.floor.shape === 'L' && (
-            <>
-              <LenInput label="Notch width (back-right)" units={units} value={p.floor.notchW} min={1} onChange={(v) => upd({ floor: { ...p.floor, notchW: v } })} />
-              <LenInput label="Notch length" units={units} value={p.floor.notchL} min={1} onChange={(v) => upd({ floor: { ...p.floor, notchL: v } })} />
-            </>
-          )}
-        </div>
-        <small>Tip: type 38 1/2 or 3' 2 for inches. L-shape is built as two joined rectangles.</small>
+        {p.floor.shape !== 'poly' && (
+          <div className="grid2">
+            <LenInput label="Width" units={units} value={p.floor.width} min={12} onChange={(v) => upd({ floor: { ...p.floor, width: v } })} />
+            <LenInput label="Length" units={units} value={p.floor.length} min={12} onChange={(v) => upd({ floor: { ...p.floor, length: v } })} />
+            {p.floor.shape === 'L' && (
+              <>
+                <LenInput label="Notch width (back-right)" units={units} value={p.floor.notchW} min={1} onChange={(v) => upd({ floor: { ...p.floor, notchW: v } })} />
+                <LenInput label="Notch length" units={units} value={p.floor.notchL} min={1} onChange={(v) => upd({ floor: { ...p.floor, notchL: v } })} />
+              </>
+            )}
+          </div>
+        )}
+        <ShapeEditor floor={p.floor} units={units} onChange={(f) => upd({ floor: f })} />
+        <small>Tip: type 38 1/2 or 3' 2 for inches. Shapes are right-angled (all walls square to each other), built as joined rectangles.</small>
       </section>
 
       <section>
@@ -104,7 +124,16 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
           <LenInput label="Sheet width" units={units} value={p.sheetW} min={12} onChange={(v) => upd({ sheetW: v })} />
           <LenInput label="Saw kerf" units={units} value={p.kerf} onChange={(v) => upd({ kerf: v })} />
           <LenInput label="Max joist spacing (o.c.)" units={units} value={p.maxSpacing} onChange={(v) => upd({ maxSpacing: v })} />
-          <LenInput label="Joist shim spacing (0 = continuous)" units={units} value={p.shimSpacing} onChange={(v) => upd({ shimSpacing: v })} />
+          <Stepper label="Main joists" value={p.joistAdjust} onChange={(v) => upd({ joistAdjust: v })} hint={`${build.layout.cellMinX ? `Spacing = bin width + clearance (${formatLength(build.layout.cellMinX, units)} clear)` : ''}. + adds, - removes (wider cells hold 2+ bins)`} />
+          <Stepper label="Cross joists (per section)" value={p.crossAdjust} onChange={(v) => upd({ crossAdjust: v })} hint="Relative to the automatic count" />
+          <label className="field">
+            <span>Supports per joist <em>0 = continuous</em></span>
+            <div className="stepper">
+              <button onClick={() => upd({ supportCount: p.supportCount <= 2 ? 0 : p.supportCount - 1 })}>-</button>
+              <b>{p.supportCount < 2 ? 'cont.' : p.supportCount}</b>
+              <button onClick={() => upd({ supportCount: p.supportCount < 2 ? 2 : p.supportCount + 1 })}>+</button>
+            </div>
+          </label>
           <label className="field">
             <span>Design load <em>psf</em></span>
             <input type="number" value={p.designLoadPsf} min={1} onChange={(e) => e.target.valueAsNumber > 0 && upd({ designLoadPsf: e.target.valueAsNumber })} />

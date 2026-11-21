@@ -1,14 +1,15 @@
 import type { Build } from '../lib/build'
-import type { TatamiArrangement } from '../lib/tatami'
+import { TATAMI_FIT_MESSAGE, type TatamiArrangement } from '../lib/tatami'
 import { formatLength, type UnitSystem } from '../lib/units'
 
 const FILL = { full: '#b7c78a', square: '#a9cf9a', cut: '#e6c97a' }
 
 export function TatamiTab({ build, options, selected, onSelect, units }: { build: Build; options: TatamiArrangement[]; selected: string; onSelect: (id: string) => void; units: UnitSystem }) {
-  const f = build.params.floor
+  const f = build.geometry
   const cur = options.find((o) => o.id === selected) ?? options[0]
   const pad = 6
-  if (!cur) return <div className="tab">Enter a floor size to see tatami layouts.</div>
+  if (!build.tatamiFits) return <div className="tab"><p className="warnings">{TATAMI_FIT_MESSAGE}</p></div>
+  if (!cur) return <div className="tab">Enter a valid floor shape to see tatami layouts.</div>
   return (
     <div className="tab">
       <h3>Tatami layout suggestions</h3>
@@ -18,7 +19,7 @@ export function TatamiTab({ build, options, selected, onSelect, units }: { build
             <b>{o.label}</b> {i === 0 && <span className="badge">Best fit</span>}
             <small>{o.description}</small>
             <small>
-              {o.counts.full} full, {o.counts.square} square, {o.counts.cut} cut - {o.fourCorner} four-corner joint{o.fourCorner === 1 ? '' : 's'}
+              {o.counts.full} full, {o.counts.square} square, {o.counts.cut} cut - {o.auspicious ? 'auspicious (shugi-jiki, T-joints only)' : `${o.fourCorner} four-corner joint${o.fourCorner === 1 ? '' : 's'} (grid, fushugi-jiki)`}
             </small>
           </button>
         ))}
@@ -31,6 +32,7 @@ export function TatamiTab({ build, options, selected, onSelect, units }: { build
           {build.layout.cells.map((c) => (
             <rect key={`c${c.index}`} x={c.x} y={c.y} width={c.w} height={c.l} fill="none" stroke={c.type === 'drawer' ? '#2c6fb3' : '#c0392b'} strokeWidth={0.4} strokeDasharray="2 1.5" />
           ))}
+          <polygon points={f.poly.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#222" strokeWidth={1} />
         </g>
       </svg>
       <p className="legend">

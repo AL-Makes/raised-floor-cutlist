@@ -10,6 +10,11 @@ export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiA
   return (
     <div className="tab">
       <h3>Cut list</h3>
+      <div className="stats">
+        <div><b>{build.deckPanels}</b><span>plywood deck panel(s) - fewest pieces, each lifts alone</span></div>
+        <div><b>{Math.round(build.heaviestPanelLb)} lb</b><span>heaviest panel</span></div>
+        <div><b>{build.jointCount.joists} / {build.jointCount.crossJoists}</b><span>joists / cross-joist rows</span></div>
+      </div>
       {groups.map((g) => (
         <div key={g} className="tablewrap">
           <h4>{g}</h4>

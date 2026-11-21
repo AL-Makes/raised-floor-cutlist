@@ -1,3 +1,4 @@
+import { normalizeFloor } from './geometry'
 import type { Cell, Params, Rect } from './types'
 
 export const RIM_T = 1.5
@@ -33,15 +34,7 @@ export interface Layout {
 }
 
 export function floorRects(p: Pick<Params, 'floor'>): Rect[] {
-  const f = p.floor
-  if (f.shape === 'L') {
-    const lowerL = Math.max(0, f.length - f.notchL)
-    return [
-      { x: 0, y: 0, w: f.width, l: lowerL },
-      { x: 0, y: lowerL, w: Math.max(0, f.width - f.notchW), l: f.notchL },
-    ].filter((r) => r.w > 0 && r.l > 0)
-  }
-  return [{ x: 0, y: 0, w: f.width, l: f.length }]
+  return normalizeFloor(p.floor).rects
 }
 
 /** Bin footprint expressed along x (across joists) and y (along joists). */
@@ -51,15 +44,19 @@ export function binAxes(p: Pick<Params, 'bin' | 'binLongAlongJoists'>): { bx: nu
   return p.binLongAlongJoists ? { bx: short, by: long } : { bx: long, by: short }
 }
 
-export function divide(total: number, cellMin: number, dividerT: number, rimT = RIM_T) {
+/** n = bin-driven count (as many cells as fit) plus `adjust`, never below 1. */
+export function divide(total: number, cellMin: number, dividerT: number, rimT = RIM_T, adjust = 0) {
   const interior = total - 2 * rimT
-  const n = Math.max(1, Math.floor((interior + dividerT) / (cellMin + dividerT) + 1e-9))
+  const fit = Math.max(1, Math.floor((interior + dividerT) / (cellMin + dividerT) + 1e-9))
+  const n = Math.max(1, fit + adjust)
   const cell = (interior - (n - 1) * dividerT) / n
-  return { n, cell, fits: cell >= cellMin - 1e-9 }
+  return { n, fit, cell, fits: cell >= cellMin - 1e-9 }
 }
 
 export function buildLayout(p: Params): Layout {
   const warnings: string[] = []
+  const geo = normalizeFloor(p.floor)
+  if (geo.error) warnings.push(`Floor shape: ${geo.error}`)
   const { bx, by } = binAxes(p)
   const drawers = p.features.drawers
   const dividerT = p.reinforce.doubleJoists ? RIM_T * 2 : RIM_T
@@ -67,12 +64,14 @@ export function buildLayout(p: Params): Layout {
   const cellMinX = bx + p.clearance + drawerExtraX
   const cellMinY = by + p.clearance
   const drawerLen = DRAWER_FACE_T + (by + p.clearance + 2 * DRAWER_WALL) + 0.5
+  const binsAcross = (w: number) => Math.max(1, Math.floor((w - drawerExtraX + 1e-6) / (bx + p.clearance)))
+  const binsAlong = (l: number) => Math.max(1, Math.floor((l + 1e-6) / cellMinY))
 
   const sections: Section[] = []
   const cells: Cell[] = []
 
-  floorRects(p).forEach((rect, si) => {
-    const dx = divide(rect.w, cellMinX, dividerT)
+  geo.rects.forEach((rect, si) => {
+    const dx = divide(rect.w, cellMinX, dividerT, RIM_T, p.joistAdjust)
     const cols: Section['cols'] = []
     const joistX: number[] = [rect.x]
     const joistT: number[] = [RIM_T]
@@ -87,13 +86,16 @@ export function buildLayout(p: Params): Layout {
     joistX.push(rect.x + rect.w - RIM_T)
     joistT.push(RIM_T)
 
-    const drawerFront = drawers && rect.y === 0
+    const f = geo.front
+    const drawerFront =
+      drawers && !!f && Math.abs(rect.y - f.y) < 1e-6 && rect.x >= f.x1 - 1e-6 && rect.x + rect.w <= f.x2 + 1e-6
     const rows: Section['rows'] = []
     const blockY: number[] = []
     if (drawerFront) {
       let dLen = drawerLen
       const remaining = rect.l - RIM_T - dLen - RIM_T
-      const nRows = Math.max(0, Math.floor((remaining + RIM_T) / (cellMinY + RIM_T) + 1e-9))
+      const fitRows = Math.max(0, Math.floor((remaining + RIM_T) / (cellMinY + RIM_T) + 1e-9))
+      const nRows = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + p.crossAdjust) : 0
       if (nRows === 0) {
         dLen = rect.l - RIM_T
         rows.push({ y: rect.y, l: dLen, drawer: true })
@@ -108,7 +110,7 @@ export function buildLayout(p: Params): Layout {
         }
       }
     } else {
-      const dy = divide(rect.l, cellMinY, RIM_T)
+      const dy = divide(rect.l, cellMinY, RIM_T, RIM_T, p.crossAdjust)
       for (let j = 0; j < dy.n; j++) {
         const y = rect.y + RIM_T + j * (dy.cell + RIM_T)
         rows.push({ y, l: dy.cell, drawer: false })
@@ -122,10 +124,21 @@ export function buildLayout(p: Params): Layout {
         const type = row.drawer ? 'drawer' : 'bin'
         const needL = row.drawer ? drawerLen - 0.01 : cellMinY
         const fitsBin = col.w >= cellMinX - 1e-6 && row.l >= needL - 1e-6
-        cells.push({ index: cells.length, section: si, x: col.x, y: row.y, w: col.w, l: row.l, type, fitsBin })
+        cells.push({
+          index: cells.length,
+          section: si,
+          x: col.x,
+          y: row.y,
+          w: col.w,
+          l: row.l,
+          type,
+          fitsBin,
+          binsX: binsAcross(col.w),
+          binsY: row.drawer ? 1 : binsAlong(row.l),
+        })
         if (!fitsBin) {
           warnings.push(
-            `Section ${si + 1}: a ${type} cell is ${col.w.toFixed(2)}" x ${row.l.toFixed(2)}" - too small for the bin. Make the floor larger or pick a smaller bin.`,
+            `Section ${si + 1}: a ${type} cell is ${col.w.toFixed(2)}" x ${row.l.toFixed(2)}" - too small for the bin. Remove a joist/cross joist, make the floor larger or pick a smaller bin.`,
           )
         }
       }
@@ -134,3 +147,4 @@ export function buildLayout(p: Params): Layout {
 
   return { sections, cells, binX: bx, binY: by, cellMinX, cellMinY, drawerLen, dividerT, warnings: [...new Set(warnings)] }
 }
+

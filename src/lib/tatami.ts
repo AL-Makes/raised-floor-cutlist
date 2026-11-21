@@ -18,6 +18,8 @@ export interface TatamiArrangement {
   counts: { full: number; square: number; cut: number }
   cutAreaPct: number
   fourCorner: number
+  /** no four-corner crossings: shugi-jiki (auspicious) rather than fushugi-jiki (grid) */
+  auspicious: boolean
   score: number
 }
 
@@ -27,6 +29,7 @@ const PATTERNS: { id: TatamiPatternId; label: string; description: string }[] = 
   { id: 'brick', label: 'Brick (staggered rows)', description: 'Rows alternate, offset with a square mat - T-joints only, the traditional rule.' },
   { id: 'brickV', label: 'Brick (staggered columns)', description: 'Same staggered pattern turned 90 degrees.' },
   { id: 'basket', label: 'Basket weave', description: '72x72 blocks alternating horizontal / vertical pairs.' },
+  { id: 'pinwheel', label: 'Pinwheel (shugi-jiki)', description: 'Four mats spiral round a half (square) mat: only T-junctions, the auspicious layout.' },
   { id: 'squares', label: 'All squares', description: 'Only 36x36 mats on a grid.' },
 ]
 
@@ -74,8 +77,45 @@ function prefFor(id: TatamiPatternId, L: number, S: number): Pref {
       }
     case 'squares':
       return () => [[S, S]]
+    case 'pinwheel': {
+      const T = L + S
+      const starts: [number, number, [number, number]][] = [
+        [0, 0, [L, S]],
+        [L, 0, [S, L]],
+        [S, L, [L, S]],
+        [0, S, [S, L]],
+        [S, S, [S, S]],
+      ]
+      return (x, y) => {
+        const row = Math.floor(y / T + 1e-6)
+        const lx = (((x - (T / 2) * row) % T) + T) % T
+        const ly = y % T
+        const hit = starts.find(([sx, sy]) => Math.abs(sx - lx) < 1e-6 && Math.abs(sy - ly) < 1e-6)
+        return hit ? [hit[2], [L, S], [S, L], [S, S]] : [[L, S], [S, S]]
+      }
+    }
   }
 }
+
+/** True when at least one S x S mat fits entirely inside the floor. */
+export function tatamiFit(rects: Rect[], S: number): boolean {
+  if (!rects.length) return false
+  const g = makeGrid(rects)
+  const k = Math.round(S / RES)
+  const W = g.nx + 1
+  const I = new Int32Array(W * (g.ny + 1))
+  for (let j = 0; j < g.ny; j++)
+    for (let i = 0; i < g.nx; i++)
+      I[(j + 1) * W + i + 1] = g.free[j * g.nx + i] + I[j * W + i + 1] + I[(j + 1) * W + i] - I[j * W + i]
+  for (let j = 0; j + k <= g.ny; j++)
+    for (let i = 0; i + k <= g.nx; i++) {
+      const s = I[(j + k) * W + i + k] - I[j * W + i + k] - I[(j + k) * W + i] + I[j * W + i]
+      if (s === k * k) return true
+    }
+  return false
+}
+
+export const TATAMI_FIT_MESSAGE = 'Flooring size not large enough to accommodate at least one tatami mat.'
 
 function tile(rects: Rect[], id: TatamiPatternId, L: number, S: number): Mat[] {
   const transpose = id === 'columns' || id === 'brickV'
@@ -146,7 +186,7 @@ function countFourCorners(mats: Mat[]): number {
 }
 
 export function suggestTatami(rects: Rect[], p: Pick<Params, 'tatamiLong' | 'tatamiShort'>): TatamiArrangement[] {
-  if (!rects.length) return []
+  if (!rects.length || !tatamiFit(rects, p.tatamiShort)) return []
   const L = p.tatamiLong
   const S = p.tatamiShort
   const total = rects.reduce((s, r) => s + r.w * r.l, 0)
@@ -161,7 +201,7 @@ export function suggestTatami(rects: Rect[], p: Pick<Params, 'tatamiLong' | 'tat
     const fourCorner = countFourCorners(mats)
     const cutAreaPct = (cutArea / total) * 100
     const score = counts.cut * 100 + cutAreaPct + fourCorner * 30
-    return { ...pat, mats, counts, cutAreaPct, fourCorner, score }
+    return { ...pat, mats, counts, cutAreaPct, fourCorner, auspicious: fourCorner === 0, score }
   })
   return out.sort((a, b) => a.score - b.score)
 }
@@ -179,3 +219,8 @@ export function matSchedule(mats: Mat[]): { name: string; w: number; l: number; 
   }
   return [...m.values()].sort((a, b) => a.name.localeCompare(b.name) || b.w * b.l - a.w * a.l)
 }
+
+
+
+
+
