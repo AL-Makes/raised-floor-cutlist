@@ -125,6 +125,25 @@ export function closeOutline(input: Pt[]): Pt[] {
   return pts
 }
 
+export function moveCorner(poly: Pt[], i: number, dx: number, dy: number): Pt[] {
+  const n = poly.length
+  const next = (i + 1) % n
+  const prev = (i + n - 1) % n
+  const out = poly.map((p) => ({ ...p }))
+  const nextHorizontal = Math.abs(poly[next].y - poly[i].y) < EPS
+  out[i].x += dx
+  out[i].y += dy
+  // the neighbour on the horizontal wall follows in y, the one on the vertical wall follows in x
+  if (nextHorizontal) {
+    out[next].y += dy
+    out[prev].x += dx
+  } else {
+    out[next].x += dx
+    out[prev].y += dy
+  }
+  return out
+}
+
 /** Change the length of edge i by sliding the next two corners, so the shape stays right-angled. */
 /** Slide edge i sideways by `d` (inches) - both ends move, the neighbouring walls stretch or shrink. */
 export function moveEdge(poly: Pt[], i: number, d: number): Pt[] {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { closeOutline, floorPolygon, moveEdge, setEdgeLength, validatePolygon } from '../lib/geometry'
+import { closeOutline, floorPolygon, moveCorner, moveEdge, setEdgeLength, validatePolygon } from '../lib/geometry'
 import type { FloorSpec, Pt } from '../lib/types'
 import { parseLength, toInputText, type UnitSystem } from '../lib/units'
 
@@ -41,6 +41,7 @@ interface Drag {
   start: Pt
   poly0: Pt[]
   moved: boolean
+  corner?: boolean
   vb: { x: number; y: number; w: number; h: number }
 }
 
@@ -109,16 +110,31 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
     })
   }
 
-  const startDrag = (e: React.PointerEvent, i: number) => {
+  const startDrag = (e: React.PointerEvent, i: number, corner = false) => {
     e.stopPropagation()
     svgRef.current?.setPointerCapture(e.pointerId)
-    drag.current = { i, start: svgPoint(e), poly0: poly, moved: false, vb }
+    drag.current = { i, start: svgPoint(e), poly0: poly, moved: false, vb, corner }
     setDragVb(vb)
   }
   const onMove = (e: React.PointerEvent) => {
     const d = drag.current
     if (!d) return
     const pt = svgPoint(e)
+    const q = (v: number) => Math.round(v * 4) / 4
+    if (d.corner) {
+      const dx = q(pt.x - d.start.x)
+      const dy = q(pt.y - d.start.y)
+      if (dx === 0 && dy === 0 && !d.moved) return
+      d.moved = true
+      const next = moveCorner(d.poly0, d.i, dx, dy)
+      const sameDirs = next.every((_, k) => {
+        const a = edgeDir(d.poly0, k)
+        const b = edgeDir(next, k)
+        return a.x === b.x && a.y === b.y
+      })
+      if (sameDirs && !validatePolygon(next)) commit(next)
+      return
+    }
     const a = d.poly0[d.i]
     const b = d.poly0[(d.i + 1) % d.poly0.length]
     const horizontal = a.y === b.y
@@ -133,7 +149,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
     drag.current = null
     setDragVb(null)
     if (svgRef.current?.hasPointerCapture(e.pointerId)) svgRef.current.releasePointerCapture(e.pointerId)
-    if (d && !d.moved) onChange({ ...floor, frontEdge: d.i })
+    if (d && !d.moved && !d.corner) onChange({ ...floor, frontEdge: d.i })
   }
 
   const path = shown.map((p) => `${p.x},${-p.y}`).join(' ')
@@ -205,7 +221,16 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
               )
             })}
           {shown.map((p, i) => (
-            <circle key={i} cx={p.x} cy={-p.y} r={Math.max(2, pad * 0.14)} fill={i === 0 ? '#c0392b' : '#222'} pointerEvents="none" />
+            <circle
+              key={i}
+              cx={p.x}
+              cy={-p.y}
+              r={Math.max(2, pad * 0.14)}
+              fill={i === 0 ? '#c0392b' : '#222'}
+              pointerEvents={draft ? 'none' : 'all'}
+              style={{ cursor: 'move', touchAction: 'none' }}
+              onPointerDown={(e) => !draft && startDrag(e, i, true)}
+            />
           ))}
         </svg>
         {!draft &&

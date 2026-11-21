@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultParams, buildFloor, floorEdges, splitAxis } from './build'
-import { closeOutline, moveEdge, normalizeFloor, setEdgeLength, validatePolygon } from './geometry'
+import { closeOutline, moveCorner, moveEdge, normalizeFloor, setEdgeLength, validatePolygon } from './geometry'
 import { solveHeight } from './height'
 import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
@@ -245,6 +245,13 @@ describe('dragging walls and ready-made drawers', () => {
     const out = moveEdge(rect, 1, 12)
     expect(out[1].x).toBe(132)
     expect(out[2].x).toBe(132)
+    expect(validatePolygon(out)).toBeUndefined()
+  })
+  it('moves a corner and keeps every angle at 90 degrees', () => {
+    const out = moveCorner(rect, 2, 10, -6)
+    expect(out[2]).toEqual({ x: 130, y: 90 })
+    expect(out[1]).toEqual({ x: 130, y: 0 })
+    expect(out[3]).toEqual({ x: 0, y: 90 })
     expect(validatePolygon(out)).toBeUndefined()
   })
   it('closes a drawn outline into a valid right-angled shape', () => {
