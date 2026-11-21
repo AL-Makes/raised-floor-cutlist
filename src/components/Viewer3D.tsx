@@ -6,7 +6,7 @@ import type { Structural, Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
 import type { Placement } from '../lib/types'
 
-export type LayerKey = 'joists' | 'cross' | 'frame' | 'side' | 'deck' | 'tatami' | 'bins' | 'drawers'
+export type LayerKey = 'joists' | 'cross' | 'frame' | 'side' | 'deck' | 'tatami' | 'lift' | 'bins' | 'drawers'
 export interface Layer {
   visible: boolean
   opacity: number
@@ -23,6 +23,7 @@ export const LAYER_LABELS: Record<LayerKey, string> = {
   side: 'Side panels / trim / drawer faces',
   deck: 'Plywood layer',
   tatami: 'Tatami layer',
+  lift: 'Motorized lift tables',
   bins: 'Bins',
   drawers: 'Drawer boxes',
 }
@@ -35,6 +36,7 @@ export const defaultView = (): ViewOptions => ({
     side: { visible: true, opacity: 1 },
     deck: { visible: true, opacity: 0.6 },
     tatami: { visible: false, opacity: 1 },
+    lift: { visible: true, opacity: 1 },
     bins: { visible: true, opacity: 1 },
     drawers: { visible: true, opacity: 1 },
   },
@@ -46,6 +48,7 @@ function layerOf(kind: string): LayerKey {
   if (kind === 'trim' || kind === 'drawerFace') return 'side'
   if (kind === 'joist' || kind === 'buildup') return 'joists'
   if (kind === 'block') return 'cross'
+  if (kind === 'lift') return 'lift'
   if (kind === 'bin') return 'bins'
   if (kind === 'drawer') return 'drawers'
   return 'frame'
@@ -63,6 +66,7 @@ const COLORS: Record<string, string> = {
   bin: '#3a7bd5',
   trim: '#6b4f2d',
   backer: '#caa56c',
+  lift: '#e67e22',
 }
 
 const STATUS_COLOR: Record<Status, string> = { ok: '#2ecc71', warn: '#f1c40f', fail: '#e74c3c' }
@@ -93,19 +97,6 @@ function findVoids(build: Build): Void[] {
   build.layout.sections.forEach((sec, si) => {
     const { rect } = sec
     const T = sec.joistT[0] ?? 1.5
-    for (let k = 0; k < sec.joistX.length - 1; k++) {
-      const x0 = sec.joistX[k] + sec.joistT[k]
-      const x1 = sec.joistX[k + 1]
-      const gap = x1 - x0
-      if (gap < 3) continue
-      const gt = Math.min(T, gap * 0.5)
-      out.push({
-        id: `j${si}-${k}`,
-        kind: 'joist',
-        ghost: { kind: 'joist', x: (x0 + x1) / 2 - gt / 2, y: rect.y, z, sx: gt, sy: rect.l, sz },
-        zone: { kind: 'joist', x: (x0 + x1) / 2 - gap * 0.18, y: rect.y, z, sx: gap * 0.36, sy: rect.l, sz },
-      })
-    }
     const ys = [rect.y + T, ...[...sec.blockY].sort((a, b) => a - b).flatMap((y) => [y, y + T]), rect.y + rect.l - T]
     sec.cols.forEach((col, ci) => {
       for (let k = 0; k + 1 < ys.length; k += 2) {
@@ -165,7 +156,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: B
           const st = p.cell !== undefined ? status.get(p.cell) : undefined
           return <Box key={i} p={p} color={opts.loadMap && st ? STATUS_COLOR[st] : COLORS.hatch} opacity={layer.opacity} />
         }
-        const edit = p.kind === 'joist' || p.kind === 'block'
+        const edit = p.kind === 'block'
         const id = `p${i}`
         return (
           <Box
@@ -173,7 +164,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: B
             p={p}
             color={hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'}
             opacity={layer.opacity}
-            onOver={edit ? () => setHover({ id, kind: p.kind as 'joist' | 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined}
+            onOver={edit ? () => setHover({ id, kind: 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined}
             onOut={edit ? leave : undefined}
           />
         )

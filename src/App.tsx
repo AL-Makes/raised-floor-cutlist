@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { InputPanel } from './components/InputPanel'
 import { CutListTab, LoadTab } from './components/Results'
 import { TatamiTab } from './components/TatamiTab'
@@ -27,9 +27,16 @@ export default function App() {
   const tatamiOptions = useMemo(() => suggestTatami(floorRects(build.params), params), [build.params, params])
   const tatami = tatamiOptions.find((o) => o.id === params.tatamiPattern) ?? tatamiOptions[0]
   const mats = tatami?.mats ?? []
+  const isLift = (m: { x: number; y: number }) => params.liftTables.some((l) => Math.abs(l.x - m.x) < 0.01 && Math.abs(l.y - m.y) < 0.01)
+  const matsNoLift = mats.filter((m) => !isLift(m))
+
+  useEffect(() => {
+    const ok = params.liftTables.filter((l) => mats.some((m) => Math.abs(l.x - m.x) < 0.01 && Math.abs(l.y - m.y) < 0.01 && Math.abs(m.w - params.tatamiShort) < 0.01 && Math.abs(m.l - params.tatamiShort) < 0.01))
+    if (ok.length !== params.liftTables.length) setParams((q) => ({ ...q, liftTables: ok }))
+  }, [mats, params.liftTables, params.tatamiShort])
 
   const csv = () => {
-    const blob = new Blob([toCsv(build, mats, units)], { type: 'text/csv' })
+    const blob = new Blob([toCsv(build, matsNoLift, units)], { type: 'text/csv' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = 'raised-floor-cutlist.csv'
@@ -97,16 +104,29 @@ export default function App() {
                   Load map
                 </label>
               </div>
-              <Viewer3D build={build} structural={structural} mats={mats} opts={view} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d } : { ...q, crossAdjust: q.crossAdjust + d }))} />
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d } : { ...q, crossAdjust: q.crossAdjust + d }))} />
               <div className="hud">
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf
               </div>
             </div>
           )}
           {tab === 'tatami' && (
-            <TatamiTab build={build} options={tatamiOptions} selected={tatami?.id ?? ''} onSelect={(id) => setParams({ ...params, tatamiPattern: id as Params['tatamiPattern'] })} units={units} />
+            <TatamiTab
+              build={build}
+              options={tatamiOptions}
+              selected={tatami?.id ?? ''}
+              onSelect={(id) => setParams({ ...params, tatamiPattern: id as Params['tatamiPattern'], liftTables: [] })}
+              units={units}
+              lifts={params.liftTables}
+              onToggleLift={(x, y) =>
+                setParams((q) => {
+                  const has = q.liftTables.some((l) => Math.abs(l.x - x) < 0.01 && Math.abs(l.y - y) < 0.01)
+                  return { ...q, liftTables: has ? q.liftTables.filter((l) => !(Math.abs(l.x - x) < 0.01 && Math.abs(l.y - y) < 0.01)) : [...q.liftTables, { x, y }] }
+                })
+              }
+            />
           )}
-          {tab === 'cut' && <CutListTab build={build} mats={mats} units={units} />}
+          {tab === 'cut' && <CutListTab build={build} mats={matsNoLift} units={units} />}
           {tab === 'load' && (
             <LoadTab
               s={structural}

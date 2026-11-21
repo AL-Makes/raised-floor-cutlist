@@ -284,3 +284,15 @@ describe('built-up joists', () => {
     expect(built.cells.length).toBeLessThanOrEqual(solid.cells.length)
   })
 })
+
+describe('motorized lift tables', () => {
+  it('cuts a pocket: removes bins under the table, frames it and adds hardware', () => {
+    const base = buildFloor({ ...defaultParams(), finalHeight: 15 })
+    const lifted = buildFloor({ ...defaultParams(), finalHeight: 15, liftTables: [{ x: 36, y: 36 }] })
+    expect(lifted.binCount).toBeLessThan(base.binCount)
+    expect(lifted.placements.filter((q) => q.kind === 'lift')).toHaveLength(2)
+    expect(lifted.hardware.some((h) => h.name.includes('Motorized lift table'))).toBe(true)
+    expect(lifted.parts.some((x) => x.name.includes('Lift pocket frame'))).toBe(true)
+    expect(lifted.placements.some((q) => q.kind === 'bin' && q.x < 72 && q.x + q.sx > 36 && q.y < 72 && q.y + q.sy > 36)).toBe(false)
+  })
+})

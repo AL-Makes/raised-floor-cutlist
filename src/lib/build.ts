@@ -4,10 +4,27 @@ import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './
 import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, WEB_OC, rollingAxes, type Layout } from './layout'
 import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
 import { tatamiFit } from './tatami'
-import type { FloorSpec, Params, Part, Placement } from './types'
+import type { FloorSpec, Params, Part, Placement, Rect } from './types'
 
 /** Structural plywood, roughly 34 lb per cubic foot. */
 const PLY_LB_PER_IN3 = 34 / 1728
+const LIFT_DEPTH = 8
+
+function subtractRect(q: Placement, z: Rect): Placement[] {
+  const out: Placement[] = []
+  const add = (x: number, y: number, x2: number, y2: number) => {
+    if (x2 - x > 0.01 && y2 - y > 0.01) out.push({ ...q, x, y, sx: x2 - x, sy: y2 - y })
+  }
+  const qx2 = q.x + q.sx
+  const qy2 = q.y + q.sy
+  const zx2 = z.x + z.w
+  const zy2 = z.y + z.l
+  add(q.x, q.y, qx2, Math.min(qy2, z.y))
+  add(q.x, Math.max(q.y, zy2), qx2, qy2)
+  add(q.x, Math.max(q.y, z.y), Math.min(qx2, z.x), Math.min(qy2, zy2))
+  add(Math.max(q.x, zx2), Math.max(q.y, z.y), qx2, Math.min(qy2, zy2))
+  return out
+}
 
 export function defaultParams(): Params {
   const b = findBin('samla-22')!
@@ -40,6 +57,7 @@ export function defaultParams(): Params {
     tatamiPattern: 'brick',
     tatamiLong: 72,
     tatamiShort: 36,
+    liftTables: [],
   }
 }
 
@@ -299,7 +317,7 @@ export function buildFloor(input: Params): Build {
 
   const binCells = layout.cells.filter((c) => c.type === 'bin')
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
-  const binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY, 0)
+  let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY, 0)
 
   const slotPos = (start: number, size: number, n: number, item: number, k: number) => start + (size / n) * k + (size / n - item) / 2
   layout.cells.forEach((c) => {
@@ -386,6 +404,56 @@ export function buildFloor(input: Params): Build {
     }
   }
 
+  const liftZones = p.liftTables.map((l) => ({ x: l.x, y: l.y, w: p.tatamiShort, l: p.tatamiShort }))
+  if (liftZones.length) {
+    const hit = (q: { x: number; y: number; sx: number; sy: number }, z: Rect) =>
+      q.x < z.x + z.w - 0.01 && q.x + q.sx > z.x + 0.01 && q.y < z.y + z.l - 0.01 && q.y + q.sy > z.y + 0.01
+    const next: Placement[] = []
+    for (const q of placements) {
+      if (q.kind === 'bin') {
+        if (liftZones.some((z) => hit(q, z))) {
+          binCount--
+          continue
+        }
+      } else if (q.kind === 'joist' || q.kind === 'block' || q.kind === 'buildup' || q.kind === 'deck') {
+        let pieces = [q]
+        for (const z of liftZones) pieces = pieces.flatMap((pc) => (hit(pc, z) ? subtractRect(pc, z) : [pc]))
+        next.push(...pieces)
+        continue
+      }
+      next.push(q)
+    }
+    const inFloor = (x: number, y: number) => geometry.rects.some((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.l)
+    let sides = 0
+    let ends = 0
+    for (const z of liftZones) {
+      const frame = [
+        { x: z.x - T, y: z.y, sx: T, sy: z.l, side: true },
+        { x: z.x + z.w, y: z.y, sx: T, sy: z.l, side: true },
+        { x: z.x - T, y: z.y - T, sx: z.w + 2 * T, sy: T, side: false },
+        { x: z.x - T, y: z.y + z.l, sx: z.w + 2 * T, sy: T, side: false },
+      ]
+      for (const m of frame) {
+        if (!inFloor(m.x + m.sx / 2, m.y + m.sy / 2)) continue
+        next.push({ kind: 'rim', x: m.x, y: m.y, z: bu, sx: m.sx, sy: m.sy, sz: depth })
+        if (m.side) sides++
+        else ends++
+      }
+      const bodyBottom = Math.max(0, S - LIFT_DEPTH)
+      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: bodyBottom, sx: z.w - 0.25, sy: z.l - 0.25, sz: S - bodyBottom })
+      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S + p.plyThickness, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.tatamiThickness })
+    }
+    placements.splice(0, placements.length, ...next)
+    member('Lift pocket frame (side, along joists)', sides, p.tatamiShort, 4)
+    member('Lift pocket frame (end, across)', ends, p.tatamiShort + 2 * T, 4)
+    warnings.push(
+      `${liftZones.length} motorized lift table(s): joists, cross blocks and the plywood are cut back around each ${r3(p.tatamiShort)}" opening and framed by the pocket frame; cut the members full length and trim on site. Bins and drawers cannot sit under a table.`,
+    )
+    if (S < LIFT_DEPTH) warnings.push(`Lift tables need about ${LIFT_DEPTH}" below the deck but the frame is only ${r3(S)}" high. Raise the final height.`)
+    const clash = drawerCells.filter((c) => liftZones.some((z) => hit({ x: c.x, y: c.y, sx: c.w, sy: c.l }, z))).length
+    if (clash) warnings.push(`${clash} drawer(s) overlap a lift table. Move the table off the front row or turn drawers off there.`)
+  }
+
   const merged = mergeParts(parts).filter((x) => x.qty > 0 || (x.pockets ?? 0) > 0)
   const finalParts = merged.filter((x) => x.qty > 0)
   const order = ['Frame', 'Deck', 'Access hatches', 'Drawers', 'Edge trim']
@@ -403,6 +471,7 @@ export function buildFloor(input: Params): Build {
     hardware.push({ name: `Ready-made rolling box${rb ? ` - ${rb.name}` : ' (custom size)'}`, qty: drawerCells.length, unit: 'pcs', notes: `${r3(p.rollingBox.w)}" x ${r3(p.rollingBox.d)}" x ${r3(p.rollingBox.h)}"; one per front cell` })
     if (!rb?.casters) hardware.push({ name: 'Swivel casters (kit)', qty: drawerCells.length, unit: 'sets', notes: 'Only if the box has no wheels; box height above includes them' })
   }
+  if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `Needs about ${LIFT_DEPTH}" of depth below the deck for the retracted table and motor, plus a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
   if (p.features.hatches && binCells.length) hardware.push({ name: 'Recessed finger pulls', qty: binCells.length, unit: 'pcs' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })

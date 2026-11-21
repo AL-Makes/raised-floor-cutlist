@@ -82,6 +82,8 @@ export interface Params {
   tatamiPattern: TatamiPatternId
   tatamiLong: number
   tatamiShort: number
+  /** lower-left corners of square tatami mats replaced by motorized lift tables */
+  liftTables: { x: number; y: number }[]
 }
 
 export type MaterialKind = 'lumber' | 'sheet'
@@ -104,6 +106,7 @@ export interface Part {
 }
 
 export type PlacementKind =
+  | 'lift'
   | 'joist'
   | 'rim'
   | 'block'
