@@ -1,32 +1,19 @@
-# React + TypeScript + Vite
+# Raised floor cut list
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Web app (phone, tablet, PC) that generates a cut list, hardware list, tatami layout and 3D view for raised floors with IKEA-bin storage. Pocket-screw joinery, joists on edge, plywood deck, tatami on top.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```
+npm install
+npm run dev      # development
+npm test         # unit tests for the cut-list engine
+npm run build    # production build in dist/
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Engine lives in `src/lib` (pure, tested); UI in `src/components`.
+
+## Notes
+
+- IKEA bin sizes are approximate; verify on ikea.com or use the custom size field.
+- Load and weak-point results are estimates only, not engineered design. Confirm with a professional and your condo board / local code.
