@@ -28,7 +28,7 @@ export function defaultParams(): Params {
     drawerKind: 'ikea',
     rollingBox: { id: 'malm-box', w: 94.9 / 2.54, d: 61.9 / 2.54, h: 28.9 / 2.54 },
     maxSpacing: 24,
-    features: { drawers: false, hatches: true, edgeTrim: false, acousticStrips: false },
+    features: { drawers: false, hatches: false, edgeTrim: false, acousticStrips: false },
     trimSides: { front: true, back: true, left: true, right: true },
     reinforce: { doubleJoists: false },
     heightOption: 0,
@@ -326,8 +326,6 @@ export function buildFloor(input: Params): Build {
       sheet('Access hatches', `Hatch panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, w, l, 'Rests 1/2" on joist/block tops; cut 1/8" clear opening in deck')
       placements.push({ kind: 'hatch', x: c.x - 0.5, y: c.y - 0.5, z: S + 0.02, sx: w, sy: l, sz: p.plyThickness, cell: c.index })
     }
-  } else if (binCells.length) {
-    warnings.push('Hatches are off: bins under the deck will only be reachable by lifting deck panels.')
   }
 
   const boxT = DRAWER_WALL
@@ -424,8 +422,8 @@ export function buildFloor(input: Params): Build {
   for (const lp of lumberPlans) if (lp.unfit.length) warnings.push(`${lp.material}: ${lp.unfit.length} piece(s) are longer than the longest stock length.`)
   for (const sp of sheetPlans) if (sp.unfit.length) warnings.push(`${sp.material}: ${sp.unfit.length} piece(s) do not fit on a sheet.`)
   if (unsupportedSeams.length) warnings.push(`${unsupportedSeams.length} deck seam(s) land between supports - see Load & weak points.`)
-  if (!p.features.hatches && heaviest > 75) {
-    warnings.push(`Without hatches the deck panels are the lids: the heaviest is about ${Math.round(heaviest)} lb. Consider hatches or thinner plywood so one person can lift them.`)
+  if (heaviest > 75) {
+    warnings.push(`The deck panels lift off whole: the heaviest is about ${Math.round(heaviest)} lb. Consider thinner plywood or a smaller sheet size so one person can lift it.`)
   }
   const tatamiFits = geometry.rects.length === 0 || tatamiFit(geometry.rects, p.tatamiShort)
   if (!tatamiFits) warnings.push('Flooring size not large enough to accommodate at least one tatami mat.')

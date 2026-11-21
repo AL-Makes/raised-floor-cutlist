@@ -163,7 +163,6 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
             )}
           </div>
         )}
-        <Check label="Access hatches over bins" checked={p.features.hatches} onChange={(v) => upd({ features: { ...p.features, hatches: v } })} />
         <Check label="Fascia edge trim" checked={p.features.edgeTrim} onChange={(v) => upd({ features: { ...p.features, edgeTrim: v } })} />
         {p.features.edgeTrim && (
           <div className="inline">

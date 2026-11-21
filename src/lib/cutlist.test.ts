@@ -77,14 +77,12 @@ describe('layout', () => {
 })
 
 describe('cut list', () => {
-  it('produces frame, deck and hatch parts', () => {
+  it('produces frame and deck parts, with no access hatches (deck lifts whole)', () => {
     const b = buildFloor(defaultParams())
     const groups = new Set(b.parts.map((x) => x.group))
     expect(groups.has('Frame')).toBe(true)
     expect(groups.has('Deck')).toBe(true)
-    expect(groups.has('Access hatches')).toBe(true)
-    const hatchQty = b.parts.filter((x) => x.group === 'Access hatches').reduce((s, x) => s + x.qty, 0)
-    expect(hatchQty).toBe(b.layout.cells.length)
+    expect(groups.has('Access hatches')).toBe(false)
   })
   it('deck panels cover the floor area', () => {
     const b = buildFloor(defaultParams())
@@ -95,7 +93,7 @@ describe('cut list', () => {
   it('features change the cut list', () => {
     const base = buildFloor(defaultParams())
     const p = defaultParams()
-    p.features = { drawers: true, hatches: true, edgeTrim: true, acousticStrips: true }
+    p.features = { drawers: true, hatches: false, edgeTrim: true, acousticStrips: true }
     p.finalHeight = 14
     p.drawerKind = 'built'
     const b = buildFloor(p)
@@ -104,11 +102,6 @@ describe('cut list', () => {
     expect(b.parts.some((x) => x.name.startsWith('Drawer header'))).toBe(true)
     expect(b.hardware.some((h) => h.name.startsWith('Drawer slides'))).toBe(true)
     expect(base.parts.some((x) => x.group === 'Drawers')).toBe(false)
-  })
-  it('turning hatches off removes hatch panels', () => {
-    const p = defaultParams()
-    p.features.hatches = false
-    expect(buildFloor(p).parts.some((x) => x.group === 'Access hatches')).toBe(false)
   })
   it('doubling joists adds joists', () => {
     const count = (b: ReturnType<typeof buildFloor>) =>
