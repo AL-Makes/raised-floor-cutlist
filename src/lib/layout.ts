@@ -2,6 +2,13 @@ import { normalizeFloor } from './geometry'
 import type { Cell, Params, Rect } from './types'
 
 export const RIM_T = 1.5
+/** Built-up joist: two 2x4 chords laid flat (top + bottom) with vertical 2x4 webs between them, so it is 3-1/2" wide. */
+export const BUILTUP_W = 3.5
+export const WEB_OC = 16
+
+export function joistWidth(p: Pick<Params, 'joistStyle'>): number {
+  return p.joistStyle === 'builtup' ? BUILTUP_W : RIM_T
+}
 export const DRAWER_WALL = 0.5
 export const DRAWER_SLIDE = 0.5
 export const DRAWER_FACE_T = 0.75
@@ -30,6 +37,8 @@ export interface Layout {
   cellMinY: number
   drawerLen: number
   dividerT: number
+  /** thickness of every frame member (rims, joists, cross members) */
+  joistW: number
   warnings: string[]
 }
 
@@ -60,11 +69,12 @@ export function rollingAxes(p: Pick<Params, 'rollingBox'>): { rx: number; ry: nu
 
 export function buildLayout(p: Params): Layout {
   const warnings: string[] = []
+  const T = joistWidth(p)
   const geo = normalizeFloor(p.floor)
   if (geo.error) warnings.push(`Floor shape: ${geo.error}`)
   const { bx, by } = binAxes(p)
   const drawers = p.features.drawers
-  const dividerT = p.reinforce.doubleJoists ? RIM_T * 2 : RIM_T
+  const dividerT = p.reinforce.doubleJoists ? T * 2 : T
   const ready = drawers && p.drawerKind === 'ikea'
   const { rx, ry } = rollingAxes(p)
   const drawerExtraX = drawers && !ready ? 2 * (DRAWER_WALL + DRAWER_SLIDE) : 0
@@ -78,20 +88,20 @@ export function buildLayout(p: Params): Layout {
   const cells: Cell[] = []
 
   geo.rects.forEach((rect, si) => {
-    const dx = divide(rect.w, cellMinX, dividerT, RIM_T, p.joistAdjust)
+    const dx = divide(rect.w, cellMinX, dividerT, T, p.joistAdjust)
     const cols: Section['cols'] = []
     const joistX: number[] = [rect.x]
-    const joistT: number[] = [RIM_T]
+    const joistT: number[] = [T]
     for (let i = 0; i < dx.n; i++) {
-      const x = rect.x + RIM_T + i * (dx.cell + dividerT)
+      const x = rect.x + T + i * (dx.cell + dividerT)
       cols.push({ x, w: dx.cell })
       if (i < dx.n - 1) {
         joistX.push(x + dx.cell)
         joistT.push(dividerT)
       }
     }
-    joistX.push(rect.x + rect.w - RIM_T)
-    joistT.push(RIM_T)
+    joistX.push(rect.x + rect.w - T)
+    joistT.push(T)
 
     const f = geo.front
     const drawerFront =
@@ -100,26 +110,26 @@ export function buildLayout(p: Params): Layout {
     const blockY: number[] = []
     if (drawerFront) {
       let dLen = drawerLen
-      const remaining = rect.l - RIM_T - dLen - RIM_T
-      const fitRows = Math.max(0, Math.floor((remaining + RIM_T) / (cellMinY + RIM_T) + 1e-9))
+      const remaining = rect.l - T - dLen - T
+      const fitRows = Math.max(0, Math.floor((remaining + T) / (cellMinY + T) + 1e-9))
       const nRows = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + p.crossAdjust) : 0
       if (nRows === 0) {
-        dLen = rect.l - RIM_T
+        dLen = rect.l - T
         rows.push({ y: rect.y, l: dLen, drawer: true })
       } else {
         rows.push({ y: rect.y, l: dLen, drawer: true })
         blockY.push(rect.y + dLen)
-        const cellY = (remaining - (nRows - 1) * RIM_T) / nRows
+        const cellY = (remaining - (nRows - 1) * T) / nRows
         for (let j = 0; j < nRows; j++) {
-          const y = rect.y + dLen + RIM_T + j * (cellY + RIM_T)
+          const y = rect.y + dLen + T + j * (cellY + T)
           rows.push({ y, l: cellY, drawer: false })
           if (j < nRows - 1) blockY.push(y + cellY)
         }
       }
     } else {
-      const dy = divide(rect.l, cellMinY, RIM_T, RIM_T, p.crossAdjust)
+      const dy = divide(rect.l, cellMinY, T, T, p.crossAdjust)
       for (let j = 0; j < dy.n; j++) {
-        const y = rect.y + RIM_T + j * (dy.cell + RIM_T)
+        const y = rect.y + T + j * (dy.cell + T)
         rows.push({ y, l: dy.cell, drawer: false })
         if (j < dy.n - 1) blockY.push(y + dy.cell)
       }
@@ -152,6 +162,6 @@ export function buildLayout(p: Params): Layout {
     }
   })
 
-  return { sections, cells, binX: bx, binY: by, cellMinX, cellMinY, drawerLen, dividerT, warnings: [...new Set(warnings)] }
+  return { sections, cells, binX: bx, binY: by, cellMinX, cellMinY, drawerLen, dividerT, joistW: T, warnings: [...new Set(warnings)] }
 }
 

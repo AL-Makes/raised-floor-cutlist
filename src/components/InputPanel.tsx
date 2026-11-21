@@ -90,6 +90,10 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
           Frame height needed: <b>{formatLength(h.target, units)}</b> (bins need {formatLength(h.required, units)}).
           {!h.fits && <> Raise the final height to at least <b>{formatLength(h.minFinalHeight, units)}</b>.</>}
         </div>
+        <div className="seg">
+          <button className={p.joistStyle === 'builtup' ? 'on' : ''} onClick={() => upd({ joistStyle: 'builtup', heightOption: 0 })}>Built-up joists (2x4 top + bottom, 2x4 webs)</button>
+          <button className={p.joistStyle === 'solid' ? 'on' : ''} onClick={() => upd({ joistStyle: 'solid', heightOption: 0 })}>Solid boards on edge</button>
+        </div>
         {h.options.length > 0 && (
           <label className="field">
             <span>How to build that height</span>

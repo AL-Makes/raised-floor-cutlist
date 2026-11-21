@@ -53,6 +53,8 @@ export interface HeightSolution {
   message?: string
 }
 
+/** thickness of each 2x4 chord laid flat */
+export const CHORD_T = 1.5
 export const TOLERANCE = 1 / 16
 
 export const DRAWER_EXTRA = 3.25
@@ -84,6 +86,7 @@ export function solveHeight(input: {
   tatamiThickness: number
   binH: number
   drawers: boolean
+  style?: 'solid' | 'builtup'
 }): HeightSolution {
   const target = input.finalHeight - input.plyThickness - input.tatamiThickness
   const required = requiredSupport(input.binH, input.drawers)
@@ -92,6 +95,23 @@ export function solveHeight(input: {
   const base = { target, required, fits, minFinalHeight }
   if (target < 1) {
     return { ...base, options: [], message: 'Final height is too low for the plywood + tatami layers.' }
+  }
+
+  const msg = fits ? undefined : `Bin + clearance needs ${required.toFixed(2)}" of support height but only ${target.toFixed(2)}" is available. Raise the final height to at least ${minFinalHeight.toFixed(2)}".`
+  if (input.style === 'builtup') {
+    if (target < 2 * CHORD_T + 0.5) return { ...base, options: [], message: 'Final height is too low for a built-up joist (two 2x4 chords plus webs).' }
+    const web = target - 2 * CHORD_T
+    const o: HeightOption = {
+      id: 'builtup',
+      label: `Built-up joist: 2 x 2x4 chords (top + bottom) with ${web.toFixed(2)}" vertical 2x4 webs`,
+      joist: { key: '2x4', t: 1.5, d: 3.5 },
+      depth: target,
+      layers: [],
+      achieved: target,
+      error: 0,
+      exact: true,
+    }
+    return { ...base, options: [o], message: msg }
   }
 
   const options: HeightOption[] = []

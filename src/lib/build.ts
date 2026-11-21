@@ -1,7 +1,7 @@
 import { CUSTOM_BIN_ID, findBin, findRollingBox } from './bins'
 import { normalizeFloor, type FloorGeometry, type PolyEdge } from './geometry'
-import { solveHeight, type HeightOption, type HeightSolution } from './height'
-import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, RIM_T, rollingAxes, type Layout } from './layout'
+import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './height'
+import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, WEB_OC, rollingAxes, type Layout } from './layout'
 import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
 import { tatamiFit } from './tatami'
 import type { FloorSpec, Params, Part, Placement } from './types'
@@ -24,6 +24,7 @@ export function defaultParams(): Params {
     bin: { w: b.w, d: b.d, h: b.h },
     binLongAlongJoists: false,
     clearance: 0.5,
+    joistStyle: 'builtup',
     drawerKind: 'built',
     rollingBox: { id: 'malm-box', w: 94.9 / 2.54, d: 61.9 / 2.54, h: 14.9 / 2.54 },
     maxSpacing: 24,
@@ -170,6 +171,7 @@ export function buildFloor(input: Params): Build {
     tatamiThickness: p.tatamiThickness,
     binH: readyDrawers ? Math.max(p.bin.h, p.rollingBox.h) : p.bin.h,
     drawers: p.features.drawers && !readyDrawers,
+    style: p.joistStyle,
   })
   if (height.message) warnings.push(height.message)
   const option = height.options[Math.min(Math.max(0, p.heightOption), Math.max(0, height.options.length - 1))]
@@ -221,6 +223,16 @@ export function buildFloor(input: Params): Build {
       notes,
     })
   }
+  const T = layout.joistW
+  const builtup = p.joistStyle === 'builtup'
+  /** one frame member: a solid board on edge, or two flat 2x4 chords with vertical 2x4 webs pocket-screwed between them */
+  const member = (name: string, qty: number, length: number, solidPk = 0) => {
+    if (qty <= 0 || length <= 0) return
+    if (!builtup) return lumber('Frame', name, jointKey, qty, length, option?.joist.d ?? depth, 1.5, ripNote, solidPk)
+    const webs = Math.max(2, Math.ceil(length / WEB_OC) + 1)
+    lumber('Frame', `${name} - top & bottom chord (2x4 flat)`, '2x4', qty * 2, length, 3.5, 1.5, 'Run the full length: one on top, one on the bottom')
+    lumber('Frame', `${name} - vertical web (2x4)`, '2x4', qty * webs, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, `Pocket-screw to top and bottom chord, about ${WEB_OC}" apart`, 4)
+  }
   const ripNote = option?.ripTo ? `Rip to ${option.ripTo.toFixed(3)}" wide` : undefined
 
   layout.sections.forEach((sec) => {
@@ -240,38 +252,38 @@ export function buildFloor(input: Params): Build {
     joistCount += rimCount + divTotal * mult
     crossLines += sec.blockY.length
     supportPads += p.supportCount > 1 ? (rimCount + divTotal * mult) * p.supportCount : 0
-    lumber('Frame', `Joist (${jointKey} on edge)`, jointKey, rimCount + divTotal * mult, rect.l, option?.joist.d ?? depth, 1.5, ripNote)
+    member(builtup ? 'Joist' : `Joist (${jointKey} on edge)`, rimCount + divTotal * mult, rect.l)
     for (const l of layers) {
       const qty = rimCount + divTotal * mult
       if (l.material.startsWith('ply-strip')) sheet('Frame', `Build-up strip (${l.name})`, l.t, qty, rect.l, 3.5, 'Glue + screw under each joist')
       else lumber('Frame', `Build-up strip (${l.name})`, l.material, qty, rect.l, 3.5, l.t, 'Glue + screw under each joist')
     }
 
-    const innerW = rect.w - 2 * RIM_T
-    const backY = rect.y + rect.l - RIM_T
-    placements.push({ kind: 'rim', x: rect.x + RIM_T, y: backY, z: bu, sx: innerW, sy: RIM_T, sz: depth })
-    lumber('Frame', 'Back rim (between end joists)', jointKey, 1, innerW, option?.joist.d ?? depth, 1.5, ripNote, 4)
+    const innerW = rect.w - 2 * T
+    const backY = rect.y + rect.l - T
+    placements.push({ kind: 'rim', x: rect.x + T, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
+    member('Back rim (between end joists)', 1, innerW, 4)
     if (sec.drawerFront) {
-      placements.push({ kind: 'header', x: rect.x + RIM_T, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
+      placements.push({ kind: 'header', x: rect.x + T, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
       lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
     } else {
-      placements.push({ kind: 'rim', x: rect.x + RIM_T, y: rect.y, z: bu, sx: innerW, sy: RIM_T, sz: depth })
-      lumber('Frame', 'Front rim (between end joists)', jointKey, 1, innerW, option?.joist.d ?? depth, 1.5, ripNote, 4)
+      placements.push({ kind: 'rim', x: rect.x + T, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
+      member('Front rim (between end joists)', 1, innerW, 4)
     }
 
     for (const by of sec.blockY) {
       for (const col of sec.cols) {
-        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: RIM_T, sz: depth })
-        lumber('Frame', 'Cross block', jointKey, 1, col.w, option?.joist.d ?? depth, 1.5, ripNote, 4)
+        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth })
+        member('Cross member', 1, col.w, 4)
         deckScrewLen += col.w
       }
     }
 
     const joistCenters = sec.joistX.map((x, k) => x + sec.joistT[k] / 2 - rect.x)
     const yCenters = [
-      RIM_T / 2,
-      ...sec.blockY.map((y) => y + RIM_T / 2 - rect.y),
-      rect.l - RIM_T / 2,
+      T / 2,
+      ...sec.blockY.map((y) => y + T / 2 - rect.y),
+      rect.l - T / 2,
     ]
     const plan = planDeck(rect.w, rect.l, joistCenters, yCenters, p.sheetL, p.sheetW)
     plan.unsupported.forEach((u) =>
@@ -422,11 +434,15 @@ export function buildFloor(input: Params): Build {
     geometry.front
       ? `Mark the layout on the slab. The front (drawer / entry side) is edge ${(geometry.edges.find((e) => e.isFront)?.index ?? 0) + 1}; joists run away from it. Frame is ${layout.sections.length} rectangular section(s).`
       : 'Mark the layout on the slab.',
-    `Cut the joists, rims and cross blocks. Drill pocket holes in every block, rim${p.features.drawers ? ' and drawer header' : ''} end (2 per end).`,
+    builtup
+      ? `Cut the 2x4 chords (top and bottom pieces of every joist, rim and cross member, running its full length) and the vertical 2x4 webs (${r3(Math.max(0.5, S - 3))}" long). Drill 2 pocket holes in each end of every web.`
+      : `Cut the joists, rims and cross blocks. Drill pocket holes in every block, rim${p.features.drawers ? ' and drawer header' : ''} end (2 per end).`,
     `Assemble each section on the floor: pocket-screw rims and blocks between the joists, checking square by measuring diagonals.`,
-    layers.length ? 'Glue and screw the build-up strips under each joist before standing the frame up.' : 'No build-up strips needed for this height.',
+    builtup
+      ? 'Build each joist as a ladder: lay the bottom chord flat, pocket-screw the webs upright about 16" apart (one at each end), then pocket-screw the top chord on. Make all joists identical.'
+      : layers.length ? 'Glue and screw the build-up strips under each joist before standing the frame up.' : 'No build-up strips needed for this height.',
     'Set the frame in place, level it with shims, then glue and screw sections together where they meet.',
-    p.features.drawers ? 'Install drawer slides, build drawer boxes (pocket screws), and fit the faces with even 1/8" gaps.' : '',
+    p.features.drawers ? (readyDrawers ? 'Roll the IKEA boxes into the front cells and screw the plywood false fronts on with even 1/8" gaps.' : 'Install drawer slides, build drawer boxes (pocket screws), and fit the faces with even 1/8" gaps.') : '',
     `Lay the ${r3(p.plyThickness)}" plywood deck in ${deckPanels} panel(s), seams on joist/block centres, screws about every 8". Panels are not glued so they can be lifted.`,
     p.features.hatches ? 'Cut access hatch openings and fit the hatch panels; add finger pulls.' : '',
     p.features.edgeTrim ? 'Fit fascia trim on the selected exposed edges.' : '',

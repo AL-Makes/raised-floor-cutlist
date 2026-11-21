@@ -32,9 +32,16 @@ export function plyCapacity(t: number, span: number): PanelCapacity {
 }
 
 /** Joist spanning between shim supports; returns allowable psf over its tributary width. */
-export function joistCapacityPsf(thickness: number, depth: number, span: number, spacing: number): number {
-  const S = (thickness * depth * depth) / 6
-  const I = (thickness * depth ** 3) / 12
+export function joistCapacityPsf(thickness: number, depth: number, span: number, spacing: number, builtup = false): number {
+  let S = (thickness * depth * depth) / 6
+  let I = (thickness * depth ** 3) / 12
+  if (builtup) {
+    // two flat 2x4 chords (3.5 x 1.5) top and bottom; webs only hold them apart. 	hickness is 3.5 per joist (x2 if doubled).
+    const h = 1.5
+    const per = 2 * ((3.5 * h ** 3) / 12 + 3.5 * h * ((depth - h) / 2) ** 2)
+    I = per * (thickness / 3.5)
+    S = I / (depth / 2)
+  }
   const wBend = (8 * FB_LUMBER * S) / (span * span)
   const wDefl = (384 * E_LUMBER * I) / (5 * 360 * span ** 3)
   const lbPerFt = Math.min(wBend, wDefl) * 12
@@ -93,7 +100,7 @@ function joistRatio(b: Build): number {
   if (span === undefined || !b.option) return Infinity
   const p = b.params
   const spacing = b.layout.cellMinX + b.layout.dividerT
-  return joistCapacityPsf(b.layout.dividerT, b.option.depth, span, spacing) / p.designLoadPsf
+  return joistCapacityPsf(b.layout.dividerT, b.option.depth, span, spacing, p.joistStyle === 'builtup') / p.designLoadPsf
 }
 
 function cellAnalysis(b: Build): CellAnalysis[] {
@@ -167,7 +174,7 @@ export function analyze(b: Build): Structural {
   const span = joistSpan(b)
   let joistPsf: number | undefined
   if (span !== undefined && b.option) {
-    joistPsf = joistCapacityPsf(b.layout.dividerT, b.option.depth, span, spacingOC)
+    joistPsf = joistCapacityPsf(b.layout.dividerT, b.option.depth, span, spacingOC, p.joistStyle === 'builtup')
     if (joistPsf < p.designLoadPsf) {
       issues.push({
         severity: joistPsf < p.designLoadPsf * 0.75 ? 'fail' : 'warn',

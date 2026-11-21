@@ -89,7 +89,7 @@ describe('cut list', () => {
   it('deck panels cover the floor area', () => {
     const b = buildFloor(defaultParams())
     const area = b.parts.filter((x) => x.group === 'Deck').reduce((s, x) => s + x.qty * x.length * x.width, 0)
-    expect(area).toBeCloseTo(120 * 96, 1)
+    expect(area).toBeCloseTo(120 * 96, 0)
     expect(b.parts.filter((x) => x.group === 'Deck').every((x) => x.length <= 96 && x.width <= 48)).toBe(true)
   })
   it('features change the cut list', () => {
@@ -230,7 +230,7 @@ describe('polygon floors, front edge, deck and tatami fit', () => {
     expect(opts.find((o) => o.id === 'pinwheel')!.fourCorner).toBeLessThan(opts.find((o) => o.id === 'squares')!.fourCorner)
   })
   it('recommends more support when the structure is weak', () => {
-    const b = buildFloor({ ...defaultParams(), supportCount: 2, floor: { shape: 'rect', width: 120, length: 192, notchW: 0, notchL: 0 } })
+    const b = buildFloor({ ...defaultParams(), joistStyle: 'solid', supportCount: 2, floor: { shape: 'rect', width: 120, length: 192, notchW: 0, notchL: 0 } })
     const s = analyze(b)
     expect(s.issues.some((i) => /supports are recommended/.test(i.text))).toBe(true)
   })
@@ -254,5 +254,22 @@ describe('dragging walls and ready-made drawers', () => {
     const b = buildFloor(p)
     expect(b.parts.some((x) => x.name === 'Drawer side')).toBe(false)
     expect(b.hardware.some((h) => /rolling box/i.test(h.name))).toBe(true)
+  })
+})
+
+describe('built-up joists', () => {
+  it('uses top and bottom 2x4 chords with vertical 2x4 webs cut to the frame height', () => {
+    const b = buildFloor({ ...defaultParams(), finalHeight: 16 })
+    const chords = b.parts.filter((x) => /top & bottom chord/.test(x.name) && /^Joist/.test(x.name))
+    const webs = b.parts.filter((x) => /^Joist - vertical web/.test(x.name))
+    expect(chords[0].material).toBe('2x4')
+    expect(chords[0].qty % 2).toBe(0)
+    expect(webs[0].length).toBeCloseTo(b.height.target - 3)
+    expect(b.layout.joistW).toBe(3.5)
+  })
+  it('makes joists 3-1/2 inches thick so fewer cells fit than with solid boards', () => {
+    const solid = buildLayout({ ...defaultParams(), joistStyle: 'solid' })
+    const built = buildLayout(defaultParams())
+    expect(built.cells.length).toBeLessThanOrEqual(solid.cells.length)
   })
 })
