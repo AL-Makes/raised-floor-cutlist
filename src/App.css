@@ -38,7 +38,9 @@ small { display: block; color: #777; font-size: 0.75rem; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px; background: #999; }
 .dot.ok { background: #2ecc71; } .dot.warn { background: #f1c40f; } .dot.fail { background: #e74c3c; }
 .viewer { position: relative; height: 62vh; min-height: 360px; background: #e8eef2; border-radius: 8px; overflow: hidden; }
-.joist-pop{position:absolute;top:8px;right:8px;z-index:5;display:flex;flex-direction:column;gap:.3rem;background:#fffffff0;border:1px solid #e67e22;border-radius:8px;padding:.5rem;font-size:.85rem}
+.jbtn{min-width:0;min-height:0;box-sizing:border-box;width:30px;height:30px;border-radius:50%;border:2px solid #fff;color:#fff;font-size:20px;font-weight:700;line-height:1;cursor:pointer;padding:0;box-shadow:0 1px 4px #0006}
+.jbtn.add{background:#2ecc71}
+.jbtn.del{background:#e74c3c}
 .toggles { position: absolute; z-index: 2; top: 8px; left: 8px; display: flex; gap: 0.7rem; background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; flex-wrap: wrap; }
 .hud { position: absolute; bottom: 8px; left: 8px; background: rgba(255,255,255,0.85); padding: 3px 8px; border-radius: 6px; font-size: 0.8rem; }
 .warnings { background: #fff6e0; border: 1px solid #f0d890; border-radius: 6px; margin: 0 0 0.6rem; padding: 0.5rem 1.4rem; font-size: 0.85rem; }

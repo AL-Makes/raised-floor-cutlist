@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Edges, OrbitControls } from '@react-three/drei'
+import { Edges, Html, OrbitControls } from '@react-three/drei'
 import type { Build } from '../lib/build'
 import type { Structural, Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
@@ -67,13 +67,15 @@ const COLORS: Record<string, string> = {
 
 const STATUS_COLOR: Record<Status, string> = { ok: '#2ecc71', warn: '#f1c40f', fail: '#e74c3c' }
 
-function Box({ p, color, opacity = 1, onClick }: { p: Placement; color: string; opacity?: number; onClick?: () => void }) {
+interface Hover { id: string; kind: 'joist' | 'block'; delta: 1 | -1; pos: [number, number, number]; ghost?: Placement }
+interface Void { id: string; kind: 'joist' | 'block'; zone: Placement; ghost: Placement }
+
+function Box({ p, color, opacity = 1, onOver, onOut }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void }) {
   return (
     <mesh
       position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}
-      onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
-      onPointerOver={onClick ? () => (document.body.style.cursor = 'pointer') : undefined}
-      onPointerOut={onClick ? () => (document.body.style.cursor = '') : undefined}
+      onPointerOver={onOver ? (e) => { e.stopPropagation(); onOver() } : undefined}
+      onPointerOut={onOut}
     >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
       <meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1} />
@@ -82,11 +84,56 @@ function Box({ p, color, opacity = 1, onClick }: { p: Placement; color: string; 
   )
 }
 
+function findVoids(build: Build): Void[] {
+  const ref = build.placements.find((q) => q.kind === 'joist' || q.kind === 'rim')
+  if (!ref) return []
+  const z = ref.z
+  const sz = ref.sz
+  const out: Void[] = []
+  build.layout.sections.forEach((sec, si) => {
+    const { rect } = sec
+    const T = sec.joistT[0] ?? 1.5
+    for (let k = 0; k < sec.joistX.length - 1; k++) {
+      const x0 = sec.joistX[k] + sec.joistT[k]
+      const x1 = sec.joistX[k + 1]
+      const gap = x1 - x0
+      if (gap < 3) continue
+      const gt = Math.min(T, gap * 0.5)
+      out.push({
+        id: `j${si}-${k}`,
+        kind: 'joist',
+        ghost: { kind: 'joist', x: (x0 + x1) / 2 - gt / 2, y: rect.y, z, sx: gt, sy: rect.l, sz },
+        zone: { kind: 'joist', x: (x0 + x1) / 2 - gap * 0.18, y: rect.y, z, sx: gap * 0.36, sy: rect.l, sz },
+      })
+    }
+    const ys = [rect.y + T, ...[...sec.blockY].sort((a, b) => a - b).flatMap((y) => [y, y + T]), rect.y + rect.l - T]
+    sec.cols.forEach((col, ci) => {
+      for (let k = 0; k + 1 < ys.length; k += 2) {
+        const y0 = ys[k]
+        const y1 = ys[k + 1]
+        const gap = y1 - y0
+        if (gap < 3) continue
+        const gt = Math.min(T, gap * 0.5)
+        out.push({
+          id: `c${si}-${ci}-${k}`,
+          kind: 'block',
+          ghost: { kind: 'block', x: col.x, y: (y0 + y1) / 2 - gt / 2, z, sx: col.w, sy: gt, sz },
+          zone: { kind: 'block', x: col.x, y: (y0 + y1) / 2 - gap * 0.18, z, sx: col.w, sy: gap * 0.36, sz },
+        })
+      }
+    })
+  })
+  return out
+}
+
 export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void }) {
-  const [sel, setSel] = useState<number | null>(null)
-  const selected = sel !== null ? build.placements[sel] : undefined
-  const selKind = selected && (selected.kind === 'joist' || selected.kind === 'block') ? selected.kind : null
-  const count = (k: string) => build.placements.filter((q) => q.kind === k).length
+  const [hover, setHoverState] = useState<Hover | null>(null)
+  const timer = useRef<number | undefined>(undefined)
+  const setHover = (h: Hover) => { window.clearTimeout(timer.current); setHoverState(h) }
+  const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHoverState(null), 250) }
+  const keep = () => window.clearTimeout(timer.current)
+  const voids = useMemo(() => findVoids(build), [build])
+  const act = (h: Hover) => { onAdjust(h.kind, h.delta); setHoverState(null) }
   const g = build.geometry
   const cx = g.width / 2
   const cz = -g.length / 2
@@ -99,15 +146,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: B
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-    {selKind && (
-      <div className="joist-pop">
-        <b>{selKind === 'joist' ? 'Main joist' : 'Cross joist'}</b>
-        <button onClick={() => { onAdjust(selKind, 1); setSel(null) }}>+ Add one</button>
-        <button onClick={() => { onAdjust(selKind, -1); setSel(null) }} disabled={count(selKind) <= 0}>- Delete one</button>
-        <small>Spacing is re-evened automatically</small>
-      </div>
-    )}
-    <Canvas camera={{ position: [cx + span * 0.3, span * 0.9, span * 1.1], fov: 45, near: 1, far: 5000 }} style={{ touchAction: 'none' }} onPointerMissed={() => setSel(null)}>
+    <Canvas camera={{ position: [cx + span * 0.3, span * 0.9, span * 1.1], fov: 45, near: 1, far: 5000 }} style={{ touchAction: 'none' }}>
       <ambientLight intensity={0.7} />
       <directionalLight position={[cx + 100, 250, 150]} intensity={1.1} />
       <OrbitControls target={[cx, S / 2, cz]} makeDefault />
@@ -126,16 +165,49 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: B
           const st = p.cell !== undefined ? status.get(p.cell) : undefined
           return <Box key={i} p={p} color={opts.loadMap && st ? STATUS_COLOR[st] : COLORS.hatch} opacity={layer.opacity} />
         }
+        const edit = p.kind === 'joist' || p.kind === 'block'
+        const id = `p${i}`
         return (
           <Box
             key={i}
             p={p}
-            color={sel === i ? '#e67e22' : COLORS[p.kind] ?? '#999'}
+            color={hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'}
             opacity={layer.opacity}
-            onClick={p.kind === 'joist' || p.kind === 'block' ? () => setSel(i) : undefined}
+            onOver={edit ? () => setHover({ id, kind: p.kind as 'joist' | 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined}
+            onOut={edit ? leave : undefined}
           />
         )
       })}
+      {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
+        <mesh
+          key={v.id}
+          position={[v.zone.x + v.zone.sx / 2, v.zone.z + v.zone.sz / 2, -(v.zone.y + v.zone.sy / 2)]}
+          onPointerOver={(e) => { e.stopPropagation(); setHover({ id: v.id, kind: v.kind, delta: 1, ghost: v.ghost, pos: [v.ghost.x + v.ghost.sx / 2, v.ghost.z + v.ghost.sz + 0.5, -(v.ghost.y + v.ghost.sy / 2)] }) }}
+          onPointerOut={leave}
+        >
+          <boxGeometry args={[v.zone.sx, v.zone.sz, v.zone.sy]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      ))}
+      {hover?.ghost && (
+        <mesh position={[hover.ghost.x + hover.ghost.sx / 2, hover.ghost.z + hover.ghost.sz / 2, -(hover.ghost.y + hover.ghost.sy / 2)]} raycast={() => null}>
+          <boxGeometry args={[hover.ghost.sx, hover.ghost.sz, hover.ghost.sy]} />
+          <meshStandardMaterial color="#2ecc71" transparent opacity={0.5} depthWrite={false} />
+        </mesh>
+      )}
+      {hover && (
+        <Html position={hover.pos} center zIndexRange={[20, 0]}>
+          <button
+            className={hover.delta > 0 ? 'jbtn add' : 'jbtn del'}
+            title={hover.delta > 0 ? 'Add support here' : 'Delete this support'}
+            onPointerEnter={keep}
+            onPointerLeave={leave}
+            onClick={() => act(hover)}
+          >
+            {hover.delta > 0 ? '+' : '−'}
+          </button>
+        </Html>
+      )}
       {opts.loadMap &&
         L.deck.visible &&
         build.layout.cells.map((c) => {
