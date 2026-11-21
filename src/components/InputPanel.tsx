@@ -46,7 +46,25 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
             )}
           </div>
         )}
-        <ShapeEditor floor={p.floor} units={units} onChange={(f) => upd({ floor: f })} />
+        <div className="shape-row">
+          <div className="shape-main">
+            <ShapeEditor floor={p.floor} units={units} onChange={(f) => upd({ floor: f })} />
+          </div>
+          <div className="height-ctl">
+            <span>Height</span>
+            <input
+              className="vslider"
+              type="range"
+              min={4}
+              max={36}
+              step={0.25}
+              value={Math.min(36, Math.max(4, p.finalHeight))}
+              onChange={(e) => upd({ finalHeight: e.target.valueAsNumber, heightOption: 0 })}
+              aria-label="Final height"
+            />
+            <LenInput label="" units={units} value={p.finalHeight} min={2} onChange={(v) => upd({ finalHeight: v, heightOption: 0 })} />
+          </div>
+        </div>
         <small>Tip: type 38 1/2 or 3' 2 for inches. Shapes are right-angled (all walls square to each other), built as joined rectangles.</small>
       </section>
 
