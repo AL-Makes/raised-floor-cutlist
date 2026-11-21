@@ -67,7 +67,7 @@ function rolling(id: string, name: string, q: string, wCm: number, dCm: number, 
  * Sizes are approximate (cm, outer, wheels included) - confirm on ikea.com or enter your own.
  */
 export const IKEA_ROLLING_BOXES: RollingBoxSpec[] = [
-  rolling('malm-box', 'MALM bed storage box (on castors)', 'MALM bed storage box', 94.9, 61.9, 14.9, true),
+  { ...rolling('malm-box', 'MALM underbed box for high bed 37 3/8 x 24 3/8 x 11 3/8 (2 pack)', 'MALM underbed storage box high bed', 94.9, 61.9, 28.9, true), url: 'https://www.ikea.com/us/en/p/malm-underbed-storage-box-for-high-bed-dark-brown-veneer-70599439/' },
   rolling('smyga', 'SMYGA bed storage box', 'SMYGA bed storage box', 99, 91, 29, false),
   rolling('stuk-71', 'STUK storage case 71x51x18 (add castors)', 'STUK storage case', 71, 51, 18, false),
   rolling('skubb-65', 'SKUBB storage case 65x53x19 (add castors)', 'SKUBB storage case', 65, 53, 19, false),
