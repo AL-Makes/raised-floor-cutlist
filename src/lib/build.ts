@@ -13,7 +13,7 @@ export function defaultParams(): Params {
   const b = findBin('samla-22')!
   return {
     floor: { shape: 'rect', width: 120, length: 96, notchW: 36, notchL: 36, frontEdge: 0 },
-    finalHeight: 12,
+    finalHeight: 15,
     plyThickness: 0.75,
     tatamiThickness: 2,
     sheetW: 48,
