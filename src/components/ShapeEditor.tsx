@@ -69,7 +69,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
   const addPoint = (pt: Pt) => {
     const d = draft ?? []
     const last = d[d.length - 1]
-    let q = { x: Math.round(pt.x), y: Math.round(pt.y) }
+    let q = { x: Math.round(pt.x * 4) / 4, y: Math.round(pt.y * 4) / 4 }
     if (last) q = Math.abs(q.x - last.x) >= Math.abs(q.y - last.y) ? { x: q.x, y: last.y } : { x: last.x, y: q.y }
     if (last && q.x === last.x && q.y === last.y) return
     setDraft([...d, q])
@@ -122,7 +122,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
     const a = d.poly0[d.i]
     const b = d.poly0[(d.i + 1) % d.poly0.length]
     const horizontal = a.y === b.y
-    const delta = Math.round(horizontal ? pt.y - d.start.y : pt.x - d.start.x)
+    const delta = Math.round((horizontal ? pt.y - d.start.y : pt.x - d.start.x) * 4) / 4
     if (delta === 0 && !d.moved) return
     d.moved = true
     const next = moveEdge(d.poly0, d.i, delta)
@@ -154,7 +154,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
       </div>
       {draft && (
         <div className="draw-typed">
-          <small>Click the plan to add corners (snaps to 1" and right angles), or type each wall:</small>
+          <small>Click the plan to add corners (snaps to 1/4" and right angles), or type each wall:</small>
           <div className="inline">
             <select value={dir} onChange={(e) => setDir(e.target.value as Dir)}>
               <option value="right">Right</option>
