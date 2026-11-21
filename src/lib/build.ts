@@ -373,8 +373,8 @@ export function buildFloor(input: Params): Build {
     for (const e of floorEdges(p.floor)) {
       if (!p.trimSides[e.side]) continue
       if (e.isFront && p.features.drawers) continue
-      const th = 0.5
-      sheet('Edge trim', `Fascia trim - ${e.side}`, th, 1, e.length, S + p.plyThickness, 'Ripped to cover frame + deck edge')
+      const th = 0.75
+      sheet('Edge trim', `Side panel - ${e.side}`, th, 1, e.length, S + p.plyThickness, '3/4" plywood, ripped to cover frame + deck edge')
       const horiz = e.y1 === e.y2
       placements.push({
         kind: 'trim',
