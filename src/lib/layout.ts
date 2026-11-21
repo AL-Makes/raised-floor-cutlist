@@ -87,7 +87,28 @@ export function buildLayout(p: Params): Layout {
   const sections: Section[] = []
   const cells: Cell[] = []
 
-  geo.rects.forEach((rect, si) => {
+  // A lift table on the front drawer row takes priority: the drawers share only the front width left on either side of it.
+  const liftZones = p.liftTables.map((l) => ({ x: l.x, y: l.y, w: p.tatamiShort, l: p.tatamiShort }))
+  const f0 = geo.front
+  const pieces: { rect: Rect; plain: boolean }[] = geo.rects.flatMap((rect) => {
+    const onFront = drawers && !!f0 && Math.abs(rect.y - f0.y) < 1e-6 && rect.x >= f0.x1 - 1e-6 && rect.x + rect.w <= f0.x2 + 1e-6
+    const zs = liftZones
+      .filter((z) => z.x >= rect.x - 0.01 && z.x + z.w <= rect.x + rect.w + 0.01 && z.y < rect.y + drawerLen && z.y + z.l > rect.y)
+      .sort((a, b) => a.x - b.x)
+    if (!onFront || !zs.length) return [{ rect, plain: false }]
+    const out: { rect: Rect; plain: boolean }[] = []
+    let cursor = rect.x
+    for (const z of zs) {
+      if (z.x - cursor > 0.5) out.push({ rect: { ...rect, x: cursor, w: z.x - cursor }, plain: false })
+      const x0 = Math.max(z.x, cursor)
+      out.push({ rect: { ...rect, x: x0, w: z.x + z.w - x0 }, plain: true })
+      cursor = z.x + z.w
+    }
+    if (rect.x + rect.w - cursor > 0.5) out.push({ rect: { ...rect, x: cursor, w: rect.x + rect.w - cursor }, plain: false })
+    return out
+  })
+
+  pieces.forEach(({ rect, plain }, si) => {
     const dx = divide(rect.w, cellMinX, dividerT, T, p.joistAdjust)
     const cols: Section['cols'] = []
     const joistX: number[] = [rect.x]
@@ -105,7 +126,7 @@ export function buildLayout(p: Params): Layout {
 
     const f = geo.front
     const drawerFront =
-      drawers && !!f && Math.abs(rect.y - f.y) < 1e-6 && rect.x >= f.x1 - 1e-6 && rect.x + rect.w <= f.x2 + 1e-6
+      drawers && !plain && !!f && Math.abs(rect.y - f.y) < 1e-6 && rect.x >= f.x1 - 1e-6 && rect.x + rect.w <= f.x2 + 1e-6
     const rows: Section['rows'] = []
     const blockY: number[] = []
     if (drawerFront) {

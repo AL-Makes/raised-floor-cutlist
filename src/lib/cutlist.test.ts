@@ -309,4 +309,11 @@ describe('motorized lift tables', () => {
     expect(lifted.parts.some((x) => x.name.includes('Lift pocket frame'))).toBe(true)
     expect(lifted.placements.some((q) => q.kind === 'bin' && q.x < 72 && q.x + q.sx > 36 && q.y < 72 && q.y + q.sy > 36)).toBe(false)
   })
+  it('lets the table take the front row and shares the remaining front width among drawers', () => {
+    const p = { ...defaultParams(), finalHeight: 15, features: { ...defaultParams().features, drawers: true } }
+    const b = buildFloor({ ...p, liftTables: [{ x: 36, y: 0 }] })
+    const drawers = b.layout.cells.filter((c) => c.type === 'drawer')
+    expect(drawers.length).toBeGreaterThan(0)
+    expect(drawers.every((c) => c.x + c.w <= 36.01 || c.x >= 71.99)).toBe(true)
+  })
 })

@@ -43,7 +43,7 @@ export function defaultParams(): Params {
     clearance: 0.5,
     joistStyle: 'builtup',
     drawerKind: 'ikea',
-    rollingBox: { id: 'malm-box', w: 94.9 / 2.54, d: 61.9 / 2.54, h: 28.9 / 2.54 },
+    rollingBox: { id: 'malm-box', w: 37.375, d: 24.375, h: 11.375 },
     maxSpacing: 24,
     features: { drawers: false, hatches: false, edgeTrim: false, acousticStrips: false },
     trimSides: { front: true, back: true, left: true, right: true },
@@ -416,7 +416,7 @@ export function buildFloor(input: Params): Build {
           binCount--
           continue
         }
-      } else if (q.kind === 'joist' || q.kind === 'block' || q.kind === 'buildup' || q.kind === 'deck') {
+      } else if (q.kind === 'joist' || q.kind === 'block' || q.kind === 'buildup' || q.kind === 'deck' || q.kind === 'rim') {
         let pieces = [q]
         for (const z of liftZones) pieces = pieces.flatMap((pc) => (hit(pc, z) ? subtractRect(pc, z) : [pc]))
         next.push(...pieces)
@@ -429,13 +429,13 @@ export function buildFloor(input: Params): Build {
     let ends = 0
     for (const z of liftZones) {
       const frame = [
-        { x: z.x - T, y: z.y, sx: T, sy: z.l, side: true },
-        { x: z.x + z.w, y: z.y, sx: T, sy: z.l, side: true },
-        { x: z.x - T, y: z.y - T, sx: z.w + 2 * T, sy: T, side: false },
-        { x: z.x - T, y: z.y + z.l, sx: z.w + 2 * T, sy: T, side: false },
+        { x: z.x - T, y: z.y, sx: T, sy: z.l, side: true, skip: layout.sections.some((s) => Math.abs(s.rect.x + s.rect.w - z.x) < 0.01 && s.rect.y <= z.y + 0.01 && s.rect.y + s.rect.l >= z.y + z.l - 0.01) },
+        { x: z.x + z.w, y: z.y, sx: T, sy: z.l, side: true, skip: layout.sections.some((s) => Math.abs(s.rect.x - (z.x + z.w)) < 0.01 && s.rect.y <= z.y + 0.01 && s.rect.y + s.rect.l >= z.y + z.l - 0.01) },
+        { x: z.x - T, y: z.y - T, sx: z.w + 2 * T, sy: T, side: false, skip: false },
+        { x: z.x - T, y: z.y + z.l, sx: z.w + 2 * T, sy: T, side: false, skip: false },
       ]
       for (const m of frame) {
-        if (!inFloor(m.x + m.sx / 2, m.y + m.sy / 2)) continue
+        if (m.skip || !inFloor(m.x + m.sx / 2, m.y + m.sy / 2)) continue
         next.push({ kind: 'rim', x: m.x, y: m.y, z: bu, sx: m.sx, sy: m.sy, sz: depth })
         if (m.side) sides++
         else ends++
@@ -448,7 +448,7 @@ export function buildFloor(input: Params): Build {
     member('Lift pocket frame (side, along joists)', sides, p.tatamiShort, 4)
     member('Lift pocket frame (end, across)', ends, p.tatamiShort + 2 * T, 4)
     warnings.push(
-      `${liftZones.length} motorized lift table(s): joists, cross blocks and the plywood are cut back around each ${r3(p.tatamiShort)}" opening and framed by the pocket frame; cut the members full length and trim on site. Bins and drawers cannot sit under a table.`,
+      `${liftZones.length} motorized lift table(s): joists, cross blocks and the plywood are cut back around each ${r3(p.tatamiShort)}" opening and framed by the pocket frame; cut the members full length and trim on site. Bins cannot sit under a table, and front drawers are laid out across the front width left beside it.`,
     )
     if (S < LIFT_DEPTH) warnings.push(`Lift tables need about ${LIFT_DEPTH}" below the deck but the frame is only ${r3(S)}" high. Raise the final height.`)
     const clash = drawerCells.filter((c) => liftZones.some((z) => hit({ x: c.x, y: c.y, sx: c.w, sy: c.l }, z))).length
