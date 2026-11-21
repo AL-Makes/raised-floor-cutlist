@@ -41,6 +41,7 @@ interface Drag {
   start: Pt
   poly0: Pt[]
   moved: boolean
+  vb: { x: number; y: number; w: number; h: number }
 }
 
 /** Draw / edit a right-angled floor outline: drag walls, type lengths on them, tap a wall to make it the front. */
@@ -48,6 +49,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
   const poly = floorPolygon(floor)
   const front = floor.frontEdge ?? 0
   const [draft, setDraft] = useState<Pt[] | null>(null)
+  const [dragVb, setDragVb] = useState<Drag['vb'] | null>(null)
   const [dir, setDir] = useState<Dir>('right')
   const [len, setLen] = useState(36)
   const drag = useRef<Drag | null>(null)
@@ -62,7 +64,9 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
   const maxX = Math.max(...xs, 0)
   const maxY = Math.max(...ys, 0)
   const pad = Math.max(12, Math.max(maxX - minX, maxY - minY) * 0.12)
-  const vb = { x: minX - pad, y: minY - pad, w: Math.max(maxX - minX, 24) + pad * 2, h: Math.max(maxY - minY, 24) + pad * 2 }
+  const live = { x: minX - pad, y: minY - pad, w: Math.max(maxX - minX, 24) + pad * 2, h: Math.max(maxY - minY, 24) + pad * 2 }
+  // Freeze the frame while dragging so the pointer maps to a fixed plan and the drawing doesn't rescale under the cursor
+  const vb = dragVb ?? live
 
   const commit = (pts: Pt[]) => onChange({ ...floor, shape: 'poly', poly: pts, frontEdge: Math.min(front, pts.length - 1) })
 
@@ -113,7 +117,8 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
   const startDrag = (e: React.PointerEvent, i: number) => {
     e.stopPropagation()
     svgRef.current?.setPointerCapture(e.pointerId)
-    drag.current = { i, start: svgPoint(e), poly0: poly, moved: false }
+    drag.current = { i, start: svgPoint(e), poly0: poly, moved: false, vb }
+    setDragVb(vb)
   }
   const onMove = (e: React.PointerEvent) => {
     const d = drag.current
@@ -131,6 +136,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
   const endDrag = (e: React.PointerEvent) => {
     const d = drag.current
     drag.current = null
+    setDragVb(null)
     if (svgRef.current?.hasPointerCapture(e.pointerId)) svgRef.current.releasePointerCapture(e.pointerId)
     if (d && !d.moved) onChange({ ...floor, frontEdge: d.i })
   }
