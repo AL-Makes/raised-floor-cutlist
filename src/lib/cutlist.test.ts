@@ -184,11 +184,25 @@ describe('tatami', () => {
     }
     expect(matSchedule(res[0].mats).reduce((s, r) => s + r.qty, 0)).toBe(res[0].mats.length)
   })
+  it('anchors the layout to a corner or centers it, always covering the floor', () => {
+    const l = [{ x: 0, y: 0, w: 100, l: 50 }, { x: 0, y: 50, w: 60, l: 40 }]
+    for (const tatamiAnchor of ['bl', 'br', 'tl', 'tr', 'center'] as const) {
+      for (const a of suggestTatami(l, { tatamiLong: 72, tatamiShort: 36, tatamiAnchor }))
+        expect(a.mats.reduce((s, m) => s + m.w * m.l, 0)).toBeCloseTo(100 * 50 + 60 * 40, 1)
+    }
+    const c = suggestTatami([{ x: 0, y: 0, w: 100, l: 72 }], { tatamiLong: 72, tatamiShort: 36, tatamiAnchor: 'center' }).find((r) => r.id === 'rows')!
+    const xs = c.mats.map((m) => m.x)
+    expect(Math.min(...xs)).toBe(0)
+    const left = c.mats.find((m) => m.x === 0)!.w
+    const right = c.mats.reduce((s, m) => (m.x + m.w > 99.9 ? m.w : s), 0)
+    expect(left).toBeCloseTo(right, 1)
+    const br = suggestTatami([{ x: 0, y: 0, w: 100, l: 72 }], { tatamiLong: 72, tatamiShort: 36, tatamiAnchor: 'br' }).find((r) => r.id === 'rows')!
+    expect(br.mats.find((m) => m.x + m.w > 99.9)!.w).toBe(72)
+  })
 })
 
 describe('polygon floors, front edge, deck and tatami fit', () => {
-  const U = [
-    { x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 96 }, { x: 72, y: 96 },
+  const U = [    { x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 96 }, { x: 72, y: 96 },
     { x: 72, y: 48 }, { x: 0, y: 48 },
   ]
   it('decomposes a polygon and rotates so the chosen edge is the front', () => {

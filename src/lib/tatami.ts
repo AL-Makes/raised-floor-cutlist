@@ -117,7 +117,40 @@ export function tatamiFit(rects: Rect[], S: number): boolean {
 
 export const TATAMI_FIT_MESSAGE = 'Flooring size not large enough to accommodate at least one tatami mat.'
 
-function tile(rects: Rect[], id: TatamiPatternId, L: number, S: number): Mat[] {
+export type TatamiAnchor = 'bl' | 'br' | 'tl' | 'tr' | 'center'
+
+function tile(rects: Rect[], id: TatamiPatternId, L: number, S: number, anchor: TatamiAnchor = 'bl'): Mat[] {
+  if (anchor === 'bl') return tileRaw(rects, id, L, S)
+  const W = Math.max(...rects.map((r) => r.x + r.w))
+  const H = Math.max(...rects.map((r) => r.y + r.l))
+  if (anchor === 'center') {
+    const rx = W % S
+    const ry = H % S
+    const sx = rx < 0.01 || S - rx < 0.01 ? 0 : S - rx / 2
+    const sy = ry < 0.01 || S - ry < 0.01 ? 0 : S - ry / 2
+    const shifted = rects.map((r) => ({ x: r.x + sx, y: r.y + sy, w: r.w, l: r.l }))
+    const box: Rect = { x: 0, y: 0, w: W + sx + L, l: H + sy + L }
+    const out: Mat[] = []
+    for (const m of tileRaw([box], id, L, S)) {
+      for (const r of shifted) {
+        const x0 = Math.max(m.x, r.x)
+        const y0 = Math.max(m.y, r.y)
+        const x1 = Math.min(m.x + m.w, r.x + r.w)
+        const y1 = Math.min(m.y + m.l, r.y + r.l)
+        if (x1 - x0 < RES / 2 || y1 - y0 < RES / 2) continue
+        const whole = Math.abs(x1 - x0 - m.w) < 0.01 && Math.abs(y1 - y0 - m.l) < 0.01
+        out.push({ x: x0 - sx, y: y0 - sy, w: x1 - x0, l: y1 - y0, kind: whole ? m.kind : 'cut' })
+      }
+    }
+    return out
+  }
+  const fx = anchor === 'br' || anchor === 'tr'
+  const fy = anchor === 'tl' || anchor === 'tr'
+  const mirrored = rects.map((r) => ({ x: fx ? W - r.x - r.w : r.x, y: fy ? H - r.y - r.l : r.y, w: r.w, l: r.l }))
+  return tileRaw(mirrored, id, L, S).map((m) => ({ ...m, x: fx ? W - m.x - m.w : m.x, y: fy ? H - m.y - m.l : m.y }))
+}
+
+function tileRaw(rects: Rect[], id: TatamiPatternId, L: number, S: number): Mat[] {
   const transpose = id === 'columns' || id === 'brickV'
   const useRects = transpose ? transposeRects(rects) : rects
   const g = makeGrid(useRects)
@@ -185,13 +218,13 @@ function countFourCorners(mats: Mat[]): number {
   return n
 }
 
-export function suggestTatami(rects: Rect[], p: Pick<Params, 'tatamiLong' | 'tatamiShort'>): TatamiArrangement[] {
+export function suggestTatami(rects: Rect[], p: Pick<Params, 'tatamiLong' | 'tatamiShort'> & { tatamiAnchor?: TatamiAnchor }): TatamiArrangement[] {
   if (!rects.length || !tatamiFit(rects, p.tatamiShort)) return []
   const L = p.tatamiLong
   const S = p.tatamiShort
   const total = rects.reduce((s, r) => s + r.w * r.l, 0)
   const out: TatamiArrangement[] = PATTERNS.map((pat) => {
-    const mats = tile(rects, pat.id, L, S)
+    const mats =     tile(rects, pat.id, L, S, p.tatamiAnchor ?? 'bl')
     const counts = { full: 0, square: 0, cut: 0 }
     let cutArea = 0
     for (const m of mats) {

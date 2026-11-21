@@ -116,6 +116,8 @@ export default function App() {
               options={tatamiOptions}
               selected={tatami?.id ?? ''}
               onSelect={(id) => setParams({ ...params, tatamiPattern: id as Params['tatamiPattern'], liftTables: [] })}
+              anchor={params.tatamiAnchor}
+              onAnchor={(a) => setParams({ ...params, tatamiAnchor: a, liftTables: [] })}
               units={units}
               lifts={params.liftTables}
               onToggleLift={(x, y) =>

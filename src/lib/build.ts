@@ -55,6 +55,7 @@ export function defaultParams(): Params {
     joistAdjust: 0,
     crossAdjust: 0,
     tatamiPattern: 'brick',
+    tatamiAnchor: 'bl',
     tatamiLong: 72,
     tatamiShort: 36,
     liftTables: [],

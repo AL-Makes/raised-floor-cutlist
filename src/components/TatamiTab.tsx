@@ -1,10 +1,18 @@
 import type { Build } from '../lib/build'
-import { TATAMI_FIT_MESSAGE, type TatamiArrangement } from '../lib/tatami'
+import { TATAMI_FIT_MESSAGE, type TatamiAnchor, type TatamiArrangement } from '../lib/tatami'
 import { formatLength, type UnitSystem } from '../lib/units'
+
+const ANCHORS: { id: TatamiAnchor; label: string }[] = [
+  { id: 'tl', label: 'Back-left' },
+  { id: 'tr', label: 'Back-right' },
+  { id: 'bl', label: 'Front-left' },
+  { id: 'br', label: 'Front-right' },
+  { id: 'center', label: 'Centered' },
+]
 
 const FILL = { full: '#b7c78a', square: '#a9cf9a', cut: '#e6c97a' }
 
-export function TatamiTab({ build, options, selected, onSelect, units, lifts, onToggleLift }: { build: Build; options: TatamiArrangement[]; selected: string; onSelect: (id: string) => void; units: UnitSystem; lifts: { x: number; y: number }[]; onToggleLift: (x: number, y: number) => void }) {
+export function TatamiTab({ build, options, selected, onSelect, units, lifts, onToggleLift, anchor, onAnchor }: { build: Build; options: TatamiArrangement[]; selected: string; onSelect: (id: string) => void; units: UnitSystem; lifts: { x: number; y: number }[]; onToggleLift: (x: number, y: number) => void; anchor: TatamiAnchor; onAnchor: (a: TatamiAnchor) => void }) {
   const f = build.geometry
   const cur = options.find((o) => o.id === selected) ?? options[0]
   const pad = 6
@@ -13,6 +21,14 @@ export function TatamiTab({ build, options, selected, onSelect, units, lifts, on
   return (
     <div className="tab">
       <h3>Tatami layout suggestions</h3>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, margin: '8px 0' }}>
+        <span className="legend">Start layout from:</span>
+        <div className="seg" role="group" aria-label="Layout starts from" style={{ flexWrap: 'wrap' }}>
+          {ANCHORS.map((a) => (
+            <button key={a.id} className={anchor === a.id ? 'on' : ''} onClick={() => onAnchor(a.id)}>{a.label}</button>
+          ))}
+        </div>
+      </div>
       <div className="cards">
         {options.map((o, i) => (
           <button key={o.id} className={`card ${o.id === cur.id ? 'on' : ''}`} onClick={() => onSelect(o.id)}>

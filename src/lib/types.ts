@@ -80,6 +80,8 @@ export interface Params {
   /** change in the number of cross joists (blocking rows) vs. the bin-driven count */
   crossAdjust: number
   tatamiPattern: TatamiPatternId
+  /** which corner the tatami layout starts from, or centered (cuts split evenly on both sides) */
+  tatamiAnchor: 'bl' | 'br' | 'tl' | 'tr' | 'center'
   tatamiLong: number
   tatamiShort: number
   /** lower-left corners of square tatami mats replaced by motorized lift tables */
