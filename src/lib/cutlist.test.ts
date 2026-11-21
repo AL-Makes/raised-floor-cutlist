@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultParams, buildFloor, floorEdges, splitAxis } from './build'
-import { moveEdge, normalizeFloor, setEdgeLength, validatePolygon } from './geometry'
+import { closeOutline, moveEdge, normalizeFloor, setEdgeLength, validatePolygon } from './geometry'
 import { solveHeight } from './height'
 import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
@@ -246,6 +246,16 @@ describe('dragging walls and ready-made drawers', () => {
     expect(out[1].x).toBe(132)
     expect(out[2].x).toBe(132)
     expect(validatePolygon(out)).toBeUndefined()
+  })
+  it('closes a drawn outline into a valid right-angled shape', () => {
+    // split walls (collinear points) and a last point that is not aligned with the start
+    const open = [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 96 }, { x: 40, y: 96 }]
+    const closed = closeOutline(open)
+    expect(validatePolygon(closed)).toBeUndefined()
+    expect(closed).toHaveLength(4)
+    const L = closeOutline([{ x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 48 }, { x: 60, y: 48 }, { x: 60, y: 96 }])
+    expect(validatePolygon(L)).toBeUndefined()
+    expect(L).toHaveLength(6)
   })
   it('sizes joist spacing from an IKEA rolling box and drops the drawer cut parts', () => {
     const base = defaultParams()

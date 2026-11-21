@@ -99,6 +99,32 @@ export function validatePolygon(poly: Pt[]): string | undefined {
   return undefined
 }
 
+/** Close an open outline with right angles: drops repeats/collinear points and adds the corner(s) needed to return to the start. */
+export function closeOutline(input: Pt[]): Pt[] {
+  const same = (a: Pt, b: Pt) => Math.abs(a.x - b.x) < EPS && Math.abs(a.y - b.y) < EPS
+  let pts = input.filter((p, i) => i === 0 || !same(p, input[i - 1]))
+  if (pts.length > 1 && same(pts[0], pts[pts.length - 1])) pts.pop()
+  if (pts.length < 2) return pts
+  const first = pts[0]
+  const last = pts[pts.length - 1]
+  const sx = Math.abs(last.x - first.x) < EPS
+  const sy = Math.abs(last.y - first.y) < EPS
+  if (!sx && !sy) {
+    const prev = pts[pts.length - 2]
+    // keep the closing leg perpendicular to the last drawn wall
+    const lastHorizontal = Math.abs(last.y - prev.y) < EPS
+    pts.push(lastHorizontal ? { x: last.x, y: first.y } : { x: first.x, y: last.y })
+  }
+  const dropCollinear = (arr: Pt[]) =>
+    arr.filter((p, i) => {
+      const a = arr[(i + arr.length - 1) % arr.length]
+      const b = arr[(i + 1) % arr.length]
+      return !((Math.abs(a.x - p.x) < EPS && Math.abs(p.x - b.x) < EPS) || (Math.abs(a.y - p.y) < EPS && Math.abs(p.y - b.y) < EPS))
+    })
+  pts = dropCollinear(pts)
+  return pts
+}
+
 /** Change the length of edge i by sliding the next two corners, so the shape stays right-angled. */
 /** Slide edge i sideways by `d` (inches) - both ends move, the neighbouring walls stretch or shrink. */
 export function moveEdge(poly: Pt[], i: number, d: number): Pt[] {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { floorPolygon, moveEdge, setEdgeLength, validatePolygon } from '../lib/geometry'
+import { closeOutline, floorPolygon, moveEdge, setEdgeLength, validatePolygon } from '../lib/geometry'
 import type { FloorSpec, Pt } from '../lib/types'
 import { parseLength, toInputText, type UnitSystem } from '../lib/units'
 
@@ -86,12 +86,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
   }
   const finish = () => {
     if (!draft || draft.length < 2) return
-    const pts = [...draft]
-    const first = pts[0]
-    const last = pts[pts.length - 1]
-    if (last.x !== first.x && last.y !== first.y) pts.push({ x: first.x, y: last.y })
-    else if (pts.length >= 2 && last.x === first.x && last.y === first.y) pts.pop()
-    commit(pts)
+    commit(closeOutline(draft))
     setDraft(null)
   }
   const svgPoint = (e: { clientX: number; clientY: number }): Pt => {
