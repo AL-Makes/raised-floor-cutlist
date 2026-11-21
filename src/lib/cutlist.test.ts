@@ -99,7 +99,8 @@ describe('cut list', () => {
     p.finalHeight = 14
     p.drawerKind = 'built'
     const b = buildFloor(p)
-    expect(b.parts.some((x) => x.group === 'Drawers')).toBe(true)    expect(b.parts.some((x) => x.group === 'Edge trim')).toBe(true)
+    expect(b.parts.some((x) => x.group === 'Drawers')).toBe(true)
+    expect(b.parts.some((x) => x.group === 'Edge trim')).toBe(true)
     expect(b.parts.some((x) => x.name.startsWith('Drawer header'))).toBe(true)
     expect(b.hardware.some((h) => h.name.startsWith('Drawer slides'))).toBe(true)
     expect(base.parts.some((x) => x.group === 'Drawers')).toBe(false)
