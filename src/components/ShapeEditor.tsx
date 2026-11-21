@@ -174,7 +174,7 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
           </div>
         </div>
       )}
-      <div className="shape-wrap" style={{ width: `min(100%, ${(300 * vb.w) / vb.h}px)`, aspectRatio: `${vb.w} / ${vb.h}` }}>
+      <div className="shape-wrap" style={{ width: `min(100%, ${(480 * vb.w) / vb.h}px)`, aspectRatio: `${vb.w} / ${vb.h}` }}>
         <svg
           ref={svgRef}
           viewBox={`${vb.x} ${-(vb.y + vb.h)} ${vb.w} ${vb.h}`}

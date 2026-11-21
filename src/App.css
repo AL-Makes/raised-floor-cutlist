@@ -18,7 +18,7 @@ header { display: flex; justify-content: space-between; align-items: center; pad
 .seg button { border-radius: 0; }
 .seg button:first-child { border-radius: 6px 0 0 6px; }
 .seg button:last-child { border-radius: 0 6px 6px 0; }
-main { display: grid; grid-template-columns: 360px 1fr; gap: 1rem; padding: 1rem; align-items: start; }
+main { display: grid; grid-template-columns: clamp(360px, 40vw, 620px) 1fr; gap: 1rem; padding: 1rem; align-items: start; }
 aside { background: #fff; border-radius: 10px; padding: 0.5rem 1rem 1rem; max-height: calc(100vh - 90px); overflow: auto; position: sticky; top: 70px; }
 .results { background: #fff; border-radius: 10px; padding: 0.6rem 1rem 1rem; min-width: 0; }
 .inputs section { border-bottom: 1px solid #eee; padding-bottom: 0.8rem; }
@@ -84,7 +84,7 @@ th { background: #f4f1ea; }
 .height-ctl{display:flex;flex-direction:column;align-items:center;gap:.3rem;width:4rem;font-size:.8rem}
 .height-ctl .field{width:100%}
 .height-ctl input:not([type=range]){width:100%;box-sizing:border-box;text-align:center}
-.vslider{writing-mode:vertical-lr;direction:rtl;height:120px;min-height:0;width:1.2rem;flex:none}
+.vslider{writing-mode:vertical-lr;direction:rtl;height:160px;min-height:0;width:1.2rem;flex:none}
 .edge-input{position:absolute;transform:translate(-50%,-50%);width:4.6rem;padding:.15rem .2rem;font-size:.8rem;text-align:center;border:1px solid #888;border-radius:4px;background:#fffffff0}
 .edge-input.front{border-color:#e67e22;background:#fff4e8;font-weight:600}
 .edge-input.bad{border-color:#c0392b}
