@@ -97,7 +97,7 @@ export default function App() {
                   Load map
                 </label>
               </div>
-              <Viewer3D build={build} structural={structural} mats={mats} opts={view} />
+              <Viewer3D build={build} structural={structural} mats={mats} opts={view} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d } : { ...q, crossAdjust: q.crossAdjust + d }))} />
               <div className="hud">
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf
               </div>

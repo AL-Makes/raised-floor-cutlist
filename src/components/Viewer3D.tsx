@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Edges, OrbitControls } from '@react-three/drei'
 import type { Build } from '../lib/build'
@@ -5,7 +6,7 @@ import type { Structural, Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
 import type { Placement } from '../lib/types'
 
-export type LayerKey = 'frame' | 'side' | 'deck' | 'tatami' | 'bins' | 'drawers'
+export type LayerKey = 'joists' | 'cross' | 'frame' | 'side' | 'deck' | 'tatami' | 'bins' | 'drawers'
 export interface Layer {
   visible: boolean
   opacity: number
@@ -16,7 +17,9 @@ export interface ViewOptions {
 }
 
 export const LAYER_LABELS: Record<LayerKey, string> = {
-  frame: 'Joists & supports',
+  joists: 'Main joists (front to back)',
+  cross: 'Cross joists (side to side)',
+  frame: 'Rims & headers',
   side: 'Side panels / trim / drawer faces',
   deck: 'Plywood layer',
   tatami: 'Tatami layer',
@@ -26,6 +29,8 @@ export const LAYER_LABELS: Record<LayerKey, string> = {
 
 export const defaultView = (): ViewOptions => ({
   layers: {
+    joists: { visible: true, opacity: 1 },
+    cross: { visible: true, opacity: 1 },
     frame: { visible: true, opacity: 1 },
     side: { visible: true, opacity: 1 },
     deck: { visible: true, opacity: 0.6 },
@@ -39,6 +44,8 @@ export const defaultView = (): ViewOptions => ({
 function layerOf(kind: string): LayerKey {
   if (kind === 'deck' || kind === 'hatch') return 'deck'
   if (kind === 'trim' || kind === 'drawerFace') return 'side'
+  if (kind === 'joist' || kind === 'buildup') return 'joists'
+  if (kind === 'block') return 'cross'
   if (kind === 'bin') return 'bins'
   if (kind === 'drawer') return 'drawers'
   return 'frame'
@@ -60,9 +67,14 @@ const COLORS: Record<string, string> = {
 
 const STATUS_COLOR: Record<Status, string> = { ok: '#2ecc71', warn: '#f1c40f', fail: '#e74c3c' }
 
-function Box({ p, color, opacity = 1 }: { p: Placement; color: string; opacity?: number }) {
+function Box({ p, color, opacity = 1, onClick }: { p: Placement; color: string; opacity?: number; onClick?: () => void }) {
   return (
-    <mesh position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}>
+    <mesh
+      position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
+      onPointerOver={onClick ? () => (document.body.style.cursor = 'pointer') : undefined}
+      onPointerOut={onClick ? () => (document.body.style.cursor = '') : undefined}
+    >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
       <meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1} />
       <Edges color="#3b2a14" threshold={15} />
@@ -70,7 +82,11 @@ function Box({ p, color, opacity = 1 }: { p: Placement; color: string; opacity?:
   )
 }
 
-export function Viewer3D({ build, structural, mats, opts }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions }) {
+export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void }) {
+  const [sel, setSel] = useState<number | null>(null)
+  const selected = sel !== null ? build.placements[sel] : undefined
+  const selKind = selected && (selected.kind === 'joist' || selected.kind === 'block') ? selected.kind : null
+  const count = (k: string) => build.placements.filter((q) => q.kind === k).length
   const g = build.geometry
   const cx = g.width / 2
   const cz = -g.length / 2
@@ -82,7 +98,16 @@ export function Viewer3D({ build, structural, mats, opts }: { build: Build; stru
   const front = g.front
 
   return (
-    <Canvas camera={{ position: [cx + span * 0.3, span * 0.9, span * 1.1], fov: 45, near: 1, far: 5000 }} style={{ touchAction: 'none' }}>
+    <div style={{ position: 'absolute', inset: 0 }}>
+    {selKind && (
+      <div className="joist-pop">
+        <b>{selKind === 'joist' ? 'Main joist' : 'Cross joist'}</b>
+        <button onClick={() => { onAdjust(selKind, 1); setSel(null) }}>+ Add one</button>
+        <button onClick={() => { onAdjust(selKind, -1); setSel(null) }} disabled={count(selKind) <= 0}>- Delete one</button>
+        <small>Spacing is re-evened automatically</small>
+      </div>
+    )}
+    <Canvas camera={{ position: [cx + span * 0.3, span * 0.9, span * 1.1], fov: 45, near: 1, far: 5000 }} style={{ touchAction: 'none' }} onPointerMissed={() => setSel(null)}>
       <ambientLight intensity={0.7} />
       <directionalLight position={[cx + 100, 250, 150]} intensity={1.1} />
       <OrbitControls target={[cx, S / 2, cz]} makeDefault />
@@ -101,7 +126,15 @@ export function Viewer3D({ build, structural, mats, opts }: { build: Build; stru
           const st = p.cell !== undefined ? status.get(p.cell) : undefined
           return <Box key={i} p={p} color={opts.loadMap && st ? STATUS_COLOR[st] : COLORS.hatch} opacity={layer.opacity} />
         }
-        return <Box key={i} p={p} color={COLORS[p.kind] ?? '#999'} opacity={layer.opacity} />
+        return (
+          <Box
+            key={i}
+            p={p}
+            color={sel === i ? '#e67e22' : COLORS[p.kind] ?? '#999'}
+            opacity={layer.opacity}
+            onClick={p.kind === 'joist' || p.kind === 'block' ? () => setSel(i) : undefined}
+          />
+        )
       })}
       {opts.loadMap &&
         L.deck.visible &&
@@ -117,5 +150,6 @@ export function Viewer3D({ build, structural, mats, opts }: { build: Build; stru
           return <Box key={`m${i}`} p={pl} color={m.kind === 'cut' ? '#d9c27a' : '#b7c78a'} opacity={L.tatami.opacity} />
         })}
     </Canvas>
+    </div>
   )
 }
