@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultParams, buildFloor, floorEdges, splitAxis } from './build'
-import { normalizeFloor, setEdgeLength, validatePolygon } from './geometry'
+import { moveEdge, normalizeFloor, setEdgeLength, validatePolygon } from './geometry'
 import { solveHeight } from './height'
 import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
@@ -237,3 +237,22 @@ describe('polygon floors, front edge, deck and tatami fit', () => {
 })
 
 
+
+describe('dragging walls and ready-made drawers', () => {
+  const rect = [{ x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 96 }, { x: 0, y: 96 }]
+  it('moves a wall sideways and stretches its neighbours', () => {
+    const out = moveEdge(rect, 1, 12)
+    expect(out[1].x).toBe(132)
+    expect(out[2].x).toBe(132)
+    expect(validatePolygon(out)).toBeUndefined()
+  })
+  it('sizes joist spacing from an IKEA rolling box and drops the drawer cut parts', () => {
+    const base = defaultParams()
+    const p = { ...base, finalHeight: 20, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const, rollingBox: { id: 'x', w: 24, d: 36, h: 8 } }
+    const lay = buildLayout(p)
+    expect(lay.cellMinX).toBeCloseTo(24 + p.clearance)
+    const b = buildFloor(p)
+    expect(b.parts.some((x) => x.name === 'Drawer side')).toBe(false)
+    expect(b.hardware.some((h) => /rolling box/i.test(h.name))).toBe(true)
+  })
+})

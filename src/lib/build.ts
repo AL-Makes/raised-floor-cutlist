@@ -1,7 +1,7 @@
-import { CUSTOM_BIN_ID, findBin } from './bins'
+import { CUSTOM_BIN_ID, findBin, findRollingBox } from './bins'
 import { normalizeFloor, type FloorGeometry, type PolyEdge } from './geometry'
 import { solveHeight, type HeightOption, type HeightSolution } from './height'
-import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, RIM_T, type Layout } from './layout'
+import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, RIM_T, rollingAxes, type Layout } from './layout'
 import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
 import { tatamiFit } from './tatami'
 import type { FloorSpec, Params, Part, Placement } from './types'
@@ -24,6 +24,8 @@ export function defaultParams(): Params {
     bin: { w: b.w, d: b.d, h: b.h },
     binLongAlongJoists: false,
     clearance: 0.5,
+    drawerKind: 'built',
+    rollingBox: { id: 'malm-box', w: 94.9 / 2.54, d: 61.9 / 2.54, h: 14.9 / 2.54 },
     maxSpacing: 24,
     features: { drawers: false, hatches: true, edgeTrim: false, acousticStrips: false },
     trimSides: { front: true, back: true, left: true, right: true },
@@ -161,12 +163,13 @@ export function buildFloor(input: Params): Build {
   if (geometry.error) warnings.push(`Floor shape problem: ${geometry.error}`)
   const layout = buildLayout(p)
   warnings.push(...layout.warnings)
+  const readyDrawers = p.features.drawers && p.drawerKind === 'ikea'
   const height = solveHeight({
     finalHeight: p.finalHeight,
     plyThickness: p.plyThickness,
     tatamiThickness: p.tatamiThickness,
-    binH: p.bin.h,
-    drawers: p.features.drawers,
+    binH: readyDrawers ? Math.max(p.bin.h, p.rollingBox.h) : p.bin.h,
+    drawers: p.features.drawers && !readyDrawers,
   })
   if (height.message) warnings.push(height.message)
   const option = height.options[Math.min(Math.max(0, p.heightOption), Math.max(0, height.options.length - 1))]
@@ -317,7 +320,15 @@ export function buildFloor(input: Params): Build {
 
   const boxT = DRAWER_WALL
   let slides = 0
-  if (p.features.drawers) {
+  if (readyDrawers) {
+    const { rx, ry } = rollingAxes(p)
+    const faceH = S - 1.5 - 0.375
+    for (const c of drawerCells) {
+      sheet('Drawers', 'Drawer false front (screws to the IKEA box)', DRAWER_FACE_T, 1, c.w - 0.25, Math.min(faceH, S - 0.5), 'Screw from inside of the IKEA box front')
+      placements.push({ kind: 'drawer', x: c.x + (c.w - rx) / 2, y: c.y + DRAWER_FACE_T, z: 0.25, sx: rx, sy: ry, sz: p.rollingBox.h, cell: c.index })
+      placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
+    }
+  } else if (p.features.drawers) {
     const faceH = S - 1.5 - 0.375
     const boxH = faceH - 0.75
     for (const c of drawerCells) {
@@ -377,6 +388,11 @@ export function buildFloor(input: Params): Build {
   if (deckScrewLen) hardware.push({ name: 'Deck screws 1-5/8" (plywood to frame)', qty: Math.ceil(deckScrewLen / 8), unit: 'pcs', notes: 'About every 8" along joists and blocks' })
   if (joistLf) hardware.push({ name: 'Construction adhesive tubes', qty: Math.max(1, Math.ceil(joistLf / 25)), unit: 'tubes' })
   if (slides) hardware.push({ name: 'Drawer slides (side mount, pairs)', qty: drawerCells.length, unit: 'pairs', notes: `Total slide length about ${slides}"; choose the nearest even length` })
+  if (readyDrawers && drawerCells.length) {
+    const rb = findRollingBox(p.rollingBox.id)
+    hardware.push({ name: `Ready-made rolling box${rb ? ` - ${rb.name}` : ' (custom size)'}`, qty: drawerCells.length, unit: 'pcs', notes: `${r3(p.rollingBox.w)}" x ${r3(p.rollingBox.d)}" x ${r3(p.rollingBox.h)}"; one per front cell` })
+    if (!rb?.casters) hardware.push({ name: 'Swivel casters (kit)', qty: drawerCells.length, unit: 'sets', notes: 'Only if the box has no wheels; box height above includes them' })
+  }
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
   if (p.features.hatches && binCells.length) hardware.push({ name: 'Recessed finger pulls', qty: binCells.length, unit: 'pcs' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })

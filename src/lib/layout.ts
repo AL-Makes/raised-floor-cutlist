@@ -53,6 +53,11 @@ export function divide(total: number, cellMin: number, dividerT: number, rimT = 
   return { n, fit, cell, fits: cell >= cellMin - 1e-9 }
 }
 
+/** Ready-made rolling box: long side runs along the joists so it pulls out toward the front. */
+export function rollingAxes(p: Pick<Params, 'rollingBox'>): { rx: number; ry: number } {
+  return { rx: Math.min(p.rollingBox.w, p.rollingBox.d), ry: Math.max(p.rollingBox.w, p.rollingBox.d) }
+}
+
 export function buildLayout(p: Params): Layout {
   const warnings: string[] = []
   const geo = normalizeFloor(p.floor)
@@ -60,10 +65,12 @@ export function buildLayout(p: Params): Layout {
   const { bx, by } = binAxes(p)
   const drawers = p.features.drawers
   const dividerT = p.reinforce.doubleJoists ? RIM_T * 2 : RIM_T
-  const drawerExtraX = drawers ? 2 * (DRAWER_WALL + DRAWER_SLIDE) : 0
-  const cellMinX = bx + p.clearance + drawerExtraX
+  const ready = drawers && p.drawerKind === 'ikea'
+  const { rx, ry } = rollingAxes(p)
+  const drawerExtraX = drawers && !ready ? 2 * (DRAWER_WALL + DRAWER_SLIDE) : 0
+  const cellMinX = ready ? Math.max(bx, rx) + p.clearance : bx + p.clearance + drawerExtraX
   const cellMinY = by + p.clearance
-  const drawerLen = DRAWER_FACE_T + (by + p.clearance + 2 * DRAWER_WALL) + 0.5
+  const drawerLen = ready ? DRAWER_FACE_T + ry + p.clearance : DRAWER_FACE_T + (by + p.clearance + 2 * DRAWER_WALL) + 0.5
   const binsAcross = (w: number) => Math.max(1, Math.floor((w - drawerExtraX + 1e-6) / (bx + p.clearance)))
   const binsAlong = (l: number) => Math.max(1, Math.floor((l + 1e-6) / cellMinY))
 

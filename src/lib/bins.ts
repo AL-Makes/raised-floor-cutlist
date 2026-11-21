@@ -47,6 +47,39 @@ export const IKEA_BINS: BinSpec[] = [
   bin('stuk', 'STUK box w/ lid 34x51x18', 'STUK', 34, 51, 18),
 ]
 
+export interface RollingBoxSpec {
+  id: string
+  name: string
+  w: number
+  d: number
+  h: number
+  /** true when IKEA sells it with wheels already fitted */
+  casters: boolean
+  url: string
+}
+
+function rolling(id: string, name: string, q: string, wCm: number, dCm: number, hCm: number, casters: boolean): RollingBoxSpec {
+  return { id, name, w: mmToIn(wCm * 10), d: mmToIn(dCm * 10), h: mmToIn(hCm * 10), casters, url: search(q) }
+}
+
+/**
+ * Ready-made IKEA under-bed boxes that can be used as drawers instead of building them.
+ * Sizes are approximate (cm, outer, wheels included) - confirm on ikea.com or enter your own.
+ */
+export const IKEA_ROLLING_BOXES: RollingBoxSpec[] = [
+  rolling('malm-box', 'MALM bed storage box (on castors)', 'MALM bed storage box', 94.9, 61.9, 14.9, true),
+  rolling('smyga', 'SMYGA bed storage box', 'SMYGA bed storage box', 99, 91, 29, false),
+  rolling('stuk-71', 'STUK storage case 71x51x18 (add castors)', 'STUK storage case', 71, 51, 18, false),
+  rolling('skubb-65', 'SKUBB storage case 65x53x19 (add castors)', 'SKUBB storage case', 65, 53, 19, false),
+  rolling('skubb-90', 'SKUBB storage case 90x53x19 (add castors)', 'SKUBB storage case', 90, 53, 19, false),
+]
+
+export const CUSTOM_ROLLING_ID = 'custom'
+
+export function findRollingBox(id: string): RollingBoxSpec | undefined {
+  return IKEA_ROLLING_BOXES.find((b) => b.id === id)
+}
+
 export const CUSTOM_BIN_ID = 'custom'
 
 export function findBin(id: string): BinSpec | undefined {

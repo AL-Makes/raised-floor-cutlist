@@ -100,6 +100,20 @@ export function validatePolygon(poly: Pt[]): string | undefined {
 }
 
 /** Change the length of edge i by sliding the next two corners, so the shape stays right-angled. */
+/** Slide edge i sideways by `d` (inches) - both ends move, the neighbouring walls stretch or shrink. */
+export function moveEdge(poly: Pt[], i: number, d: number): Pt[] {
+  const n = poly.length
+  const a = poly[i]
+  const b = poly[(i + 1) % n]
+  const horizontal = Math.abs(b.y - a.y) < EPS
+  const out = poly.map((p) => ({ ...p }))
+  for (const k of [i, (i + 1) % n]) {
+    if (horizontal) out[k].y += d
+    else out[k].x += d
+  }
+  return out
+}
+
 export function setEdgeLength(poly: Pt[], i: number, len: number): Pt[] {
   const n = poly.length
   const a = poly[i]

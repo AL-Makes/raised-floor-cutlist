@@ -1,4 +1,4 @@
-import { CUSTOM_BIN_ID, IKEA_BINS, findBin } from '../lib/bins'
+import { CUSTOM_BIN_ID, CUSTOM_ROLLING_ID, IKEA_BINS, IKEA_ROLLING_BOXES, findBin, findRollingBox } from '../lib/bins'
 import type { Build } from '../lib/build'
 import type { Params } from '../lib/types'
 import { formatLength, type UnitSystem } from '../lib/units'
@@ -23,6 +23,7 @@ function Stepper({ label, value, onChange, hint }: { label: string; value: numbe
 export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: Params) => Params) => void; units: UnitSystem; build: Build }) {
   const upd = (patch: Partial<Params>) => set((q) => ({ ...q, ...patch }))
   const bin = findBin(p.binId)
+  const rolling = findRollingBox(p.rollingBox.id)
   const h = build.height
   return (
     <div className="inputs">
@@ -103,7 +104,43 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
 
       <section>
         <h3>4. Features</h3>
-        <Check label="Drawers on the front row" checked={p.features.drawers} onChange={(v) => upd({ features: { ...p.features, drawers: v }, heightOption: 0 })} hint="Bin sits in a slide-out drawer; needs more height" />
+        <Check label="Drawers on the front row" checked={p.features.drawers} onChange={(v) => upd({ features: { ...p.features, drawers: v }, heightOption: 0 })} hint="Slide-out or rolling drawers along the front; needs more height" />
+        {p.features.drawers && (
+          <div className="subopts">
+            <div className="seg">
+              <button className={p.drawerKind === 'built' ? 'on' : ''} onClick={() => upd({ drawerKind: 'built', heightOption: 0 })}>Build drawers (bin inside)</button>
+              <button className={p.drawerKind === 'ikea' ? 'on' : ''} onClick={() => upd({ drawerKind: 'ikea', heightOption: 0 })}>Ready-made IKEA rolling box</button>
+            </div>
+            {p.drawerKind === 'ikea' && (
+              <>
+                <label className="field">
+                  <span>Rolling drawer / box</span>
+                  <select value={p.rollingBox.id} onChange={(e) => {
+                    const id = e.target.value
+                    const b = findRollingBox(id)
+                    upd(b ? { rollingBox: { id, w: b.w, d: b.d, h: b.h }, heightOption: 0 } : { rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID } })
+                  }}>
+                    {IKEA_ROLLING_BOXES.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name} - {formatLength(b.w, units)} x {formatLength(b.d, units)} x {formatLength(b.h, units)}</option>
+                    ))}
+                    <option value={CUSTOM_ROLLING_ID}>Custom size...</option>
+                  </select>
+                </label>
+                {rolling && (
+                  <small>
+                    <a href={rolling.url} target="_blank" rel="noreferrer">Open on ikea.com</a> to confirm the size{rolling.casters ? '' : '; this one has no wheels, so add casters (height included below)'}. Joist spacing follows the box width + clearance.
+                  </small>
+                )}
+                <div className="grid2">
+                  <LenInput label="Box width" units={units} value={p.rollingBox.w} min={1} onChange={(v) => upd({ rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID, w: v }, heightOption: 0 })} />
+                  <LenInput label="Box depth" units={units} value={p.rollingBox.d} min={1} onChange={(v) => upd({ rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID, d: v }, heightOption: 0 })} />
+                  <LenInput label="Height incl. wheels" units={units} value={p.rollingBox.h} min={1} onChange={(v) => upd({ rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID, h: v }, heightOption: 0 })} />
+                </div>
+                <small>The box's short side goes across the joists; its long side pulls out toward the front.</small>
+              </>
+            )}
+          </div>
+        )}
         <Check label="Access hatches over bins" checked={p.features.hatches} onChange={(v) => upd({ features: { ...p.features, hatches: v } })} />
         <Check label="Fascia edge trim" checked={p.features.edgeTrim} onChange={(v) => upd({ features: { ...p.features, edgeTrim: v } })} />
         {p.features.edgeTrim && (
