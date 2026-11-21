@@ -1,0 +1,367 @@
+import { CUSTOM_BIN_ID, findBin } from './bins'
+import { solveHeight, type HeightOption, type HeightSolution } from './height'
+import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, RIM_T, type Layout } from './layout'
+import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
+import type { FloorSpec, Params, Part, Placement } from './types'
+
+export function defaultParams(): Params {
+  const b = findBin('samla-22')!
+  return {
+    floor: { shape: 'rect', width: 120, length: 96, notchW: 36, notchL: 36 },
+    finalHeight: 12,
+    plyThickness: 0.75,
+    tatamiThickness: 2,
+    sheetW: 48,
+    sheetL: 96,
+    lumberLengths: [96, 120, 144],
+    kerf: 0.125,
+    binId: b.id,
+    bin: { w: b.w, d: b.d, h: b.h },
+    binLongAlongJoists: false,
+    clearance: 0.5,
+    maxSpacing: 24,
+    features: { drawers: false, hatches: true, edgeTrim: false, acousticStrips: false },
+    trimSides: { front: true, back: true, left: true, right: true },
+    reinforce: { doubleJoists: false },
+    heightOption: 0,
+    designLoadPsf: 40,
+    pointLoadLb: 300,
+    shimSpacing: 0,
+    tatamiPattern: 'brick',
+    tatamiLong: 72,
+    tatamiShort: 36,
+  }
+}
+
+export function resolveBin(p: Params) {
+  if (p.binId === CUSTOM_BIN_ID) return p.bin
+  const b = findBin(p.binId)
+  return b ? { w: b.w, d: b.d, h: b.h } : p.bin
+}
+
+export interface Edge {
+  side: 'front' | 'back' | 'left' | 'right'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  length: number
+}
+
+export function floorEdges(f: FloorSpec): Edge[] {
+  const e = (side: Edge['side'], x1: number, y1: number, x2: number, y2: number): Edge => ({
+    side,
+    x1,
+    y1,
+    x2,
+    y2,
+    length: Math.abs(x2 - x1) + Math.abs(y2 - y1),
+  })
+  if (f.shape === 'L' && f.notchW > 0 && f.notchL > 0 && f.notchW < f.width && f.notchL < f.length) {
+    const lowerL = f.length - f.notchL
+    const upperW = f.width - f.notchW
+    return [
+      e('front', 0, 0, f.width, 0),
+      e('right', f.width, 0, f.width, lowerL),
+      e('back', upperW, lowerL, f.width, lowerL),
+      e('right', upperW, lowerL, upperW, f.length),
+      e('back', 0, f.length, upperW, f.length),
+      e('left', 0, 0, 0, f.length),
+    ]
+  }
+  return [
+    e('front', 0, 0, f.width, 0),
+    e('back', 0, f.length, f.width, f.length),
+    e('left', 0, 0, 0, f.length),
+    e('right', f.width, 0, f.width, f.length),
+  ]
+}
+
+/** Split [0,length] into spans <= max, preferring cuts that land on a support centre. */
+export function splitAxis(length: number, centers: number[], first: number, max: number) {
+  const cuts: number[] = []
+  const unsupported: number[] = []
+  let pos = 0
+  let limit = first
+  let guard = 0
+  while (guard++ < 1000) {
+    if (length - pos <= limit + 1e-9) {
+      cuts.push(length)
+      break
+    }
+    const target = pos + limit
+    const cands = centers.filter((c) => c > pos + 6 && c <= target + 1e-9)
+    let cut = target
+    if (cands.length) cut = Math.max(...cands)
+    else unsupported.push(cut)
+    cuts.push(cut)
+    pos = cut
+    limit = max
+  }
+  return { cuts, unsupported }
+}
+
+export interface Build {
+  params: Params
+  layout: Layout
+  height: HeightSolution
+  option?: HeightOption
+  supportHeight: number
+  parts: Part[]
+  hardware: { name: string; qty: number; unit: string; notes?: string }[]
+  placements: Placement[]
+  unsupportedSeams: { axis: 'x' | 'y'; pos: number; section: number }[]
+  lumberPlans: LumberPlan[]
+  sheetPlans: SheetPlan[]
+  warnings: string[]
+  assembly: string[]
+  pockets: number
+  binCount: number
+}
+
+const r3 = (v: number) => Math.round(v * 1000) / 1000
+const sheetKey = (t: number) => `ply-${r3(t)}`
+
+export function mergeParts(parts: Part[]): Part[] {
+  const m = new Map<string, Part>()
+  for (const p of parts) {
+    const k = [p.group, p.name, p.material, r3(p.length), r3(p.width), r3(p.thickness), p.notes ?? ''].join('|')
+    const e = m.get(k)
+    if (e) {
+      e.qty += p.qty
+      e.pockets = (e.pockets ?? 0) + (p.pockets ?? 0)
+    } else m.set(k, { ...p, length: r3(p.length), width: r3(p.width), pockets: p.pockets })
+  }
+  return [...m.values()]
+}
+
+export function buildFloor(input: Params): Build {
+  const p: Params = { ...input, bin: resolveBin(input) }
+  const warnings: string[] = []
+  const layout = buildLayout(p)
+  warnings.push(...layout.warnings)
+  const height = solveHeight({
+    finalHeight: p.finalHeight,
+    plyThickness: p.plyThickness,
+    tatamiThickness: p.tatamiThickness,
+    binH: p.bin.h,
+    drawers: p.features.drawers,
+  })
+  if (height.message) warnings.push(height.message)
+  const option = height.options[Math.min(Math.max(0, p.heightOption), Math.max(0, height.options.length - 1))]
+  const S = option?.achieved ?? Math.max(0, height.target)
+  const depth = option?.depth ?? S
+  const layers = option?.layers ?? []
+  const bu = layers.reduce((s, l) => s + l.t, 0)
+  const jointKey = option?.joist.key ?? '2x4'
+
+  const parts: Part[] = []
+  const placements: Placement[] = []
+  const unsupportedSeams: Build['unsupportedSeams'] = []
+  let pockets = 0
+  let joistLf = 0
+  let deckScrewLen = 0
+
+  const lumber = (
+    group: string,
+    name: string,
+    material: string,
+    qty: number,
+    length: number,
+    width: number,
+    thickness: number,
+    notes?: string,
+    pk = 0,
+  ) => {
+    if (qty <= 0 || length <= 0) return
+    parts.push({ id: '', group, name, kind: 'lumber', material, qty, length, width, thickness, notes, pockets: pk * qty })
+    pockets += pk * qty
+  }
+  const sheet = (group: string, name: string, t: number, qty: number, a: number, b: number, notes?: string) => {
+    if (qty <= 0 || a <= 0 || b <= 0) return
+    parts.push({
+      id: '',
+      group,
+      name,
+      kind: 'sheet',
+      material: sheetKey(t),
+      qty,
+      length: Math.max(a, b),
+      width: Math.min(a, b),
+      thickness: t,
+      notes,
+    })
+  }
+  const ripNote = option?.ripTo ? `Rip to ${option.ripTo.toFixed(3)}" wide` : undefined
+
+  layout.sections.forEach((sec) => {
+    const { rect } = sec
+    const n = sec.joistX.length
+    sec.joistX.forEach((jx, k) => {
+      const rim = k === 0 || k === n - 1
+      const t = sec.joistT[k]
+      placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: rect.y, z: bu, sx: t, sy: rect.l, sz: depth })
+      if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: rect.y, z: 0, sx: t, sy: rect.l, sz: bu })
+      joistLf += rect.l / 12
+      deckScrewLen += rect.l
+    })
+    const rimCount = 2
+    const divTotal = sec.joistX.length - 2
+    const mult = p.reinforce.doubleJoists ? 2 : 1
+    lumber('Frame', `Joist (${jointKey} on edge)`, jointKey, rimCount + divTotal * mult, rect.l, option?.joist.d ?? depth, 1.5, ripNote)
+    for (const l of layers) {
+      const qty = rimCount + divTotal * mult
+      if (l.material.startsWith('ply-strip')) sheet('Frame', `Build-up strip (${l.name})`, l.t, qty, rect.l, 3.5, 'Glue + screw under each joist')
+      else lumber('Frame', `Build-up strip (${l.name})`, l.material, qty, rect.l, 3.5, l.t, 'Glue + screw under each joist')
+    }
+
+    const innerW = rect.w - 2 * RIM_T
+    const backY = rect.y + rect.l - RIM_T
+    placements.push({ kind: 'rim', x: rect.x + RIM_T, y: backY, z: bu, sx: innerW, sy: RIM_T, sz: depth })
+    lumber('Frame', 'Back rim (between end joists)', jointKey, 1, innerW, option?.joist.d ?? depth, 1.5, ripNote, 4)
+    if (sec.drawerFront) {
+      placements.push({ kind: 'header', x: rect.x + RIM_T, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
+      lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
+    } else {
+      placements.push({ kind: 'rim', x: rect.x + RIM_T, y: rect.y, z: bu, sx: innerW, sy: RIM_T, sz: depth })
+      lumber('Frame', 'Front rim (between end joists)', jointKey, 1, innerW, option?.joist.d ?? depth, 1.5, ripNote, 4)
+    }
+
+    for (const by of sec.blockY) {
+      for (const col of sec.cols) {
+        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: RIM_T, sz: depth })
+        lumber('Frame', 'Cross block', jointKey, 1, col.w, option?.joist.d ?? depth, 1.5, ripNote, 4)
+        deckScrewLen += col.w
+      }
+    }
+
+    const joistCenters = sec.joistX.map((x, k) => x + sec.joistT[k] / 2 - rect.x)
+    const yCenters = [
+      RIM_T / 2,
+      ...sec.blockY.map((y) => y + RIM_T / 2 - rect.y),
+      rect.l - RIM_T / 2,
+    ]
+    const rowsY = splitAxis(rect.l, yCenters, p.sheetW, p.sheetW)
+    rowsY.unsupported.forEach((pos) => unsupportedSeams.push({ axis: 'y', pos: rect.y + pos, section: sec.index }))
+    let y0 = 0
+    rowsY.cuts.forEach((y1, ri) => {
+      const first = ri % 2 === 1 ? p.sheetL / 2 : p.sheetL
+      const rx = splitAxis(rect.w, joistCenters, first, p.sheetL)
+      rx.unsupported.forEach((pos) => unsupportedSeams.push({ axis: 'x', pos: rect.x + pos, section: sec.index }))
+      let x0 = 0
+      for (const x1 of rx.cuts) {
+        const w = x1 - x0
+        const l = y1 - y0
+        sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, w, l)
+        placements.push({ kind: 'deck', x: rect.x + x0, y: rect.y + y0, z: S, sx: w, sy: l, sz: p.plyThickness })
+        x0 = x1
+      }
+      y0 = y1
+    })
+  })
+
+  const binCells = layout.cells.filter((c) => c.type === 'bin')
+  const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
+  const binCount = layout.cells.length
+
+  layout.cells.forEach((c) => {
+    if (c.type === 'bin') {
+      placements.push({ kind: 'bin', x: c.x + (c.w - layout.binX) / 2, y: c.y + (c.l - layout.binY) / 2, z: 0, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index })
+    }
+  })
+
+  if (p.features.hatches) {
+    for (const c of binCells) {
+      const w = c.w + 1
+      const l = c.l + 1
+      sheet('Access hatches', `Hatch panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, w, l, 'Rests 1/2" on joist/block tops; cut 1/8" clear opening in deck')
+      placements.push({ kind: 'hatch', x: c.x - 0.5, y: c.y - 0.5, z: S + 0.02, sx: w, sy: l, sz: p.plyThickness, cell: c.index })
+    }
+  } else if (binCells.length) {
+    warnings.push('Hatches are off: bins under the deck will only be reachable by lifting deck panels.')
+  }
+
+  const boxT = DRAWER_WALL
+  let slides = 0
+  if (p.features.drawers) {
+    const faceH = S - 1.5 - 0.375
+    const boxH = faceH - 0.75
+    for (const c of drawerCells) {
+      const boxW = c.w - 2 * DRAWER_SLIDE
+      const boxL = layout.binY + p.clearance + 2 * boxT
+      const boxLen = Math.min(boxL, c.l - DRAWER_FACE_T - 0.25)
+      sheet('Drawers', 'Drawer side', boxT, 2, boxLen, boxH, 'Pocket-screw to front/back')
+      sheet('Drawers', 'Drawer front/back', boxT, 2, boxW - 2 * boxT, boxH, 'Pocket-screw to sides')
+      sheet('Drawers', 'Drawer bottom', boxT, 1, boxW, boxLen, 'Screw + glue to box')
+      sheet('Drawers', 'Drawer face', DRAWER_FACE_T, 1, c.w - 0.25, faceH, 'Screw from inside of box')
+      pockets += 8
+      slides += Math.floor(Math.max(0, boxLen) / 2) * 2
+      placements.push({ kind: 'drawer', x: c.x + DRAWER_SLIDE, y: c.y + DRAWER_FACE_T, z: 0.5, sx: boxW, sy: boxLen, sz: boxH, cell: c.index })
+      placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
+      placements.push({ kind: 'bin', x: c.x + (c.w - layout.binX) / 2, y: c.y + DRAWER_FACE_T + (boxLen - layout.binY) / 2, z: 0.5 + boxT, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index })
+    }
+  }
+
+  if (p.features.edgeTrim) {
+    for (const e of floorEdges(p.floor)) {
+      if (!p.trimSides[e.side]) continue
+      if (e.side === 'front' && p.features.drawers) continue
+      const th = 0.5
+      sheet('Edge trim', `Fascia trim - ${e.side}`, th, 1, e.length, S + p.plyThickness, 'Ripped to cover frame + deck edge')
+      const horiz = e.y1 === e.y2
+      placements.push({
+        kind: 'trim',
+        x: horiz ? Math.min(e.x1, e.x2) : e.side === 'left' ? e.x1 - th : e.x1,
+        y: horiz ? (e.side === 'front' ? e.y1 - th : e.y1) : Math.min(e.y1, e.y2),
+        z: 0,
+        sx: horiz ? e.length : th,
+        sy: horiz ? th : e.length,
+        sz: S + p.plyThickness,
+      })
+    }
+  }
+
+  const merged = mergeParts(parts).filter((x) => x.qty > 0 || (x.pockets ?? 0) > 0)
+  const finalParts = merged.filter((x) => x.qty > 0)
+  const order = ['Frame', 'Deck', 'Access hatches', 'Drawers', 'Edge trim']
+  finalParts.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || b.length - a.length)
+  finalParts.forEach((x, i) => (x.id = String(i + 1)))
+
+  const hardware: Build['hardware'] = []
+  const pocketCount = pockets
+  if (pocketCount) hardware.push({ name: 'Pocket screws 2-1/2" coarse thread', qty: Math.ceil(pocketCount * 1.15), unit: 'pcs', notes: `${pocketCount} pocket holes + 15% spare` })
+  if (deckScrewLen) hardware.push({ name: 'Deck screws 1-5/8" (plywood to frame)', qty: Math.ceil(deckScrewLen / 8), unit: 'pcs', notes: 'About every 8" along joists and blocks' })
+  if (joistLf) hardware.push({ name: 'Construction adhesive tubes', qty: Math.max(1, Math.ceil(joistLf / 25)), unit: 'tubes' })
+  if (slides) hardware.push({ name: 'Drawer slides (side mount, pairs)', qty: drawerCells.length, unit: 'pairs', notes: `Total slide length about ${slides}"; choose the nearest even length` })
+  if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
+  if (p.features.hatches && binCells.length) hardware.push({ name: 'Recessed finger pulls', qty: binCells.length, unit: 'pcs' })
+  if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })
+  if (height.options.length) hardware.push({ name: 'Cedar leveling shims', qty: Math.ceil(joistLf / 2), unit: 'pcs', notes: 'Estimate for uneven slab' })
+
+  const lumberMats = [...new Set(finalParts.filter((x) => x.kind === 'lumber').map((x) => x.material))]
+  const sheetMats = [...new Set(finalParts.filter((x) => x.kind === 'sheet').map((x) => x.material))]
+  const lumberPlans = lumberMats.map((m) =>
+    planLumber(m, finalParts.filter((x) => x.kind === 'lumber' && x.material === m), p.lumberLengths, p.kerf),
+  )
+  const sheetPlans = sheetMats.map((m) =>
+    planSheets(m, finalParts.filter((x) => x.kind === 'sheet' && x.material === m), p.sheetL, p.sheetW, p.kerf),
+  )
+  for (const lp of lumberPlans) if (lp.unfit.length) warnings.push(`${lp.material}: ${lp.unfit.length} piece(s) are longer than the longest stock length.`)
+  for (const sp of sheetPlans) if (sp.unfit.length) warnings.push(`${sp.material}: ${sp.unfit.length} piece(s) do not fit on a sheet.`)
+  if (unsupportedSeams.length) warnings.push(`${unsupportedSeams.length} deck seam(s) land between supports - see Load & weak points.`)
+
+  const assembly = [
+    `Mark the layout on the slab. Frame is ${layout.sections.length} rectangular section(s).`,
+    `Cut the joists, rims and cross blocks. Drill pocket holes in every block, rim${p.features.drawers ? ' and drawer header' : ''} end (2 per end).`,
+    `Assemble each section on the floor: pocket-screw rims and blocks between the joists, checking square by measuring diagonals.`,
+    layers.length ? 'Glue and screw the build-up strips under each joist before standing the frame up.' : 'No build-up strips needed for this height.',
+    'Set the frame in place, level it with shims, then glue and screw sections together where they meet.',
+    p.features.drawers ? 'Install drawer slides, build drawer boxes (pocket screws), and fit the faces with even 1/8" gaps.' : '',
+    `Lay the ${r3(p.plyThickness)}" plywood deck, long edge across the joists, seams on joist/block centres, screws about every 8".`,
+    p.features.hatches ? 'Cut access hatch openings and fit the hatch panels; add finger pulls.' : '',
+    p.features.edgeTrim ? 'Fit fascia trim on the selected exposed edges.' : '',
+    'Lay the tatami mats following the chosen arrangement.',
+  ].filter(Boolean)
+
+  return { params: p, layout, height, option, supportHeight: S, parts: finalParts, hardware, placements, unsupportedSeams, lumberPlans, sheetPlans, warnings: [...new Set(warnings)], assembly, pockets: pocketCount, binCount }
+}
