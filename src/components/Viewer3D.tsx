@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { CanvasTexture } from 'three'
 import { Edges, Html, OrbitControls } from '@react-three/drei'
 import type { Build } from '../lib/build'
 import type { Structural, Status } from '../lib/structural'
@@ -109,6 +110,42 @@ function builtUp(p: Placement): { chord: Placement[]; web: Placement[] } {
   return { chord, web }
 }
 
+/** Dimensions printed flat on the surface, as a transparent canvas texture lying over the object's footprint. */
+function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem }) {
+  const tex = useMemo(() => {
+    const W = 512
+    const H = Math.max(96, Math.min(1024, Math.round((W * p.sy) / p.sx)))
+    const c = document.createElement('canvas')
+    c.width = W
+    c.height = H
+    const g = c.getContext('2d')!
+    const lines = [p.kind === 'drawer' ? 'DRAWER' : 'BIN', `W ${formatLength(p.sx, units)}`, `D ${formatLength(p.sy, units)}`, `H ${formatLength(p.sz, units)}`]
+    const fs = Math.min(H / 4.6, W / 6.5)
+    g.font = `bold ${fs}px sans-serif`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.lineJoin = 'round'
+    g.lineWidth = fs / 5
+    g.strokeStyle = '#000'
+    g.fillStyle = '#fff'
+    lines.forEach((t, k) => {
+      const yy = H / 2 + (k - (lines.length - 1) / 2) * fs * 1.15
+      g.strokeText(t, W / 2, yy)
+      g.fillStyle = k === 0 ? '#ffd27a' : '#fff'
+      g.fillText(t, W / 2, yy)
+    })
+    const t = new CanvasTexture(c)
+    t.anisotropy = 4
+    return t
+  }, [p.kind, p.sx, p.sy, p.sz, units])
+  return (
+    <mesh position={[p.x + p.sx / 2, y, -(p.y + p.sy / 2)]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+      <planeGeometry args={[p.sx, p.sy]} />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  )
+}
+
 function findVoids(build: Build): Void[] {
   const ref = build.placements.find((q) => q.kind === 'joist' || q.kind === 'rim')
   if (!ref) return []
@@ -156,6 +193,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
   const ply = build.params.plyThickness
   const status = new Map(structural.cells.map((c) => [c.cell, c.status]))
   const L = opts.layers
+  const deckTop = Math.max(S, ...build.placements.filter((q) => q.kind === 'deck').map((q) => q.z + q.sz))
   const front = g.front
 
   return (
@@ -205,16 +243,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
       })}
       {build.placements.map((p, i) => {
         if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
-        return (
-          <Html key={`dim${i}`} position={[p.x + p.sx / 2, p.z + p.sz + 0.3, -(p.y + p.sy / 2)]} center zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
-            <div className="dimtag">
-              <b>{p.kind === 'drawer' ? 'Drawer' : 'Bin'}</b>
-              <span>W {formatLength(p.sx, units)}</span>
-              <span>D {formatLength(p.sy, units)}</span>
-              <span>H {formatLength(p.sz, units)}</span>
-            </div>
-          </Html>
-        )
+        return <DimPlane key={`dim${i}`} p={p} y={(L.deck.visible ? deckTop : p.z + p.sz) + 0.04} units={units} />
       })}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
