@@ -93,7 +93,7 @@ describe('cut list', () => {
   it('features change the cut list', () => {
     const base = buildFloor(defaultParams())
     const p = defaultParams()
-    p.features = { drawers: true, hatches: false, edgeTrim: true, acousticStrips: true }
+    p.features = { drawers: true, hatches: false, edgeTrim: true,     acousticStrips: true, underlay: false }
     p.finalHeight = 14
     p.drawerKind = 'built'
     const b = buildFloor(p)
@@ -102,6 +102,16 @@ describe('cut list', () => {
     expect(b.parts.some((x) => x.name.startsWith('Drawer header'))).toBe(true)
     expect(b.hardware.some((h) => h.name.startsWith('Drawer slides'))).toBe(true)
     expect(base.parts.some((x) => x.group === 'Drawers')).toBe(false)
+  })
+  it('underlay adds a sheet layer and lowers the frame', () => {
+    const base = buildFloor(defaultParams())
+    const p = defaultParams()
+    p.features = { ...p.features, underlay: true }
+    const b = buildFloor(p)
+    expect(b.placements.some((q) => q.kind === 'underlay')).toBe(true)
+    expect(b.hardware.some((h) => h.name.startsWith('Acoustic underlay'))).toBe(true)
+    const top = (x: typeof b) => Math.max(...x.placements.filter((q) => q.kind !== 'underlay').map((q) => q.z + q.sz))
+    expect(top(b)).toBeCloseTo(top(base), 1)
   })
   it('doubling joists adds joists', () => {
     const count = (b: ReturnType<typeof buildFloor>) =>

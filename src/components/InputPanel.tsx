@@ -171,6 +171,8 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
             ))}
           </div>
         )}
+        <Check label="Acoustic underlay sheet (protects the existing floor)" checked={p.features.underlay} onChange={(v) => upd({ features: { ...p.features, underlay: v }, heightOption: 0 })} hint={'1/4" (6 mm) natural cork roll, e.g. QEP; it counts toward the final height'} />
+        {p.features.underlay && <LenInput label="Underlay thickness" units={units} value={p.underlayThickness} min={0.05} onChange={(v) => upd({ underlayThickness: v, heightOption: 0 })} />}
         <Check label="Acoustic isolation strips under joists" checked={p.features.acousticStrips} onChange={(v) => upd({ features: { ...p.features, acousticStrips: v } })} />
         <Check label="Double the interior joists" checked={p.reinforce.doubleJoists} onChange={(v) => upd({ reinforce: { doubleJoists: v } })} hint="Reinforcement; narrows nothing, adds strength" />
       </section>

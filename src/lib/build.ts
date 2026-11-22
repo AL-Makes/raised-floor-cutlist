@@ -45,7 +45,8 @@ export function defaultParams(): Params {
     drawerKind: 'ikea',
     rollingBox: { id: 'malm-box', w: 37.375, d: 24.375, h: 11.375 },
     maxSpacing: 24,
-    features: { drawers: false, hatches: false, edgeTrim: false, acousticStrips: false },
+    features: { drawers: false, hatches: false, edgeTrim: false, acousticStrips: false, underlay: false },
+    underlayThickness: 0.25,
     trimSides: { front: true, back: true, left: true, right: true },
     reinforce: { doubleJoists: false },
     heightOption: 0,
@@ -184,8 +185,9 @@ export function buildFloor(input: Params): Build {
   const layout = buildLayout(p)
   warnings.push(...layout.warnings)
   const readyDrawers = p.features.drawers && p.drawerKind === 'ikea'
+  const ul = p.features.underlay ? p.underlayThickness : 0
   const height = solveHeight({
-    finalHeight: p.finalHeight,
+    finalHeight: p.finalHeight - ul,
     plyThickness: p.plyThickness,
     tatamiThickness: p.tatamiThickness,
     binH: readyDrawers ? Math.max(p.bin.h, p.rollingBox.h) : p.bin.h,
@@ -455,6 +457,11 @@ export function buildFloor(input: Params): Build {
     if (clash) warnings.push(`${clash} drawer(s) overlap a lift table. Move the table off the front row or turn drawers off there.`)
   }
 
+  if (ul > 0) {
+    for (const q of placements) q.z += ul
+    for (const r of geometry.rects) placements.push({ kind: 'underlay', x: r.x, y: r.y, z: 0, sx: r.w, sy: r.l, sz: ul })
+  }
+
   const merged = mergeParts(parts).filter((x) => x.qty > 0 || (x.pockets ?? 0) > 0)
   const finalParts = merged.filter((x) => x.qty > 0)
   const order = ['Frame', 'Deck', 'Access hatches', 'Drawers', 'Edge trim']
@@ -465,6 +472,15 @@ export function buildFloor(input: Params): Build {
   const pocketCount = pockets
   if (pocketCount) hardware.push({ name: 'Pocket screws 2-1/2" coarse thread', qty: Math.ceil(pocketCount * 1.15), unit: 'pcs', notes: `${pocketCount} pocket holes + 15% spare` })
   if (deckScrewLen) hardware.push({ name: 'Deck screws 1-5/8" (plywood to frame)', qty: Math.ceil(deckScrewLen / 8), unit: 'pcs', notes: 'About every 8" along joists and blocks' })
+  if (ul > 0) {
+    const area = geometry.rects.reduce((s, r) => s + r.w * r.l, 0) / 144
+    hardware.push({
+      name: `Acoustic underlay, ${r3(ul)}" (6 mm) cork or rubber roll`,
+      qty: Math.ceil(area * 1.1),
+      unit: 'sq ft',
+      notes: 'Laid wall to wall under the whole frame (10% waste); e.g. QEP natural cork 6 mm. The frame is built that much shorter to keep the final height.',
+    })
+  }
   if (joistLf) hardware.push({ name: 'Construction adhesive tubes', qty: Math.max(1, Math.ceil(joistLf / 25)), unit: 'tubes' })
   if (slides) hardware.push({ name: 'Drawer slides (side mount, pairs)', qty: drawerCells.length, unit: 'pairs', notes: `Total slide length about ${slides}"; choose the nearest even length` })
   if (readyDrawers && drawerCells.length) {
@@ -510,6 +526,7 @@ export function buildFloor(input: Params): Build {
       ? 'Build each joist as a ladder: lay the bottom chord flat, pocket-screw the webs upright about 16" apart (one at each end), then pocket-screw the top chord on. Make all joists identical.'
       : layers.length ? 'Glue and screw the build-up strips under each joist before standing the frame up.' : 'No build-up strips needed for this height.',
     'Set the frame in place, level it with shims, then glue and screw sections together where they meet.',
+    ul > 0 ? `Before the frame goes down, roll out the ${r3(ul)}" acoustic underlay wall to wall, seams butted and taped.` : '',
     p.features.drawers ? (readyDrawers ? 'Roll the IKEA boxes into the front cells and screw the plywood false fronts on with even 1/8" gaps.' : 'Install drawer slides, build drawer boxes (pocket screws), and fit the faces with even 1/8" gaps.') : '',
     `Lay the ${r3(p.plyThickness)}" plywood deck in ${deckPanels} panel(s), seams on joist/block centres, screws about every 8". Panels are not glued so they can be lifted.`,
     p.features.hatches ? 'Cut access hatch openings and fit the hatch panels; add finger pulls.' : '',

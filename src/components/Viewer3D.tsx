@@ -6,7 +6,7 @@ import type { Structural, Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
 import type { Placement } from '../lib/types'
 
-export type LayerKey = 'joists' | 'cross' | 'frame' | 'side' | 'deck' | 'tatami' | 'lift' | 'bins' | 'drawers'
+export type LayerKey = 'joists' | 'cross' | 'frame' | 'side' | 'deck' | 'tatami' | 'lift' | 'bins' | 'drawers' | 'underlay'
 export interface Layer {
   visible: boolean
   opacity: number
@@ -26,6 +26,7 @@ export const LAYER_LABELS: Record<LayerKey, string> = {
   lift: 'Motorized lift tables',
   bins: 'Bins',
   drawers: 'Drawer boxes',
+  underlay: 'Acoustic underlay',
 }
 
 export const defaultView = (): ViewOptions => ({
@@ -39,6 +40,7 @@ export const defaultView = (): ViewOptions => ({
     lift: { visible: true, opacity: 1 },
     bins: { visible: true, opacity: 1 },
     drawers: { visible: true, opacity: 1 },
+    underlay: { visible: true, opacity: 1 },
   },
   loadMap: false,
 })
@@ -51,6 +53,7 @@ function layerOf(kind: string): LayerKey {
   if (kind === 'lift') return 'lift'
   if (kind === 'bin') return 'bins'
   if (kind === 'drawer') return 'drawers'
+  if (kind === 'underlay') return 'underlay'
   return 'frame'
 }
 const COLORS: Record<string, string> = {
@@ -67,6 +70,8 @@ const COLORS: Record<string, string> = {
   trim: '#6b4f2d',
   backer: '#caa56c',
   lift: '#e67e22',
+  underlay: '#7a8f5a',
+  web: '#a88454',
 }
 
 const STATUS_COLOR: Record<Status, string> = { ok: '#2ecc71', warn: '#f1c40f', fail: '#e74c3c' }
@@ -86,6 +91,19 @@ function Box({ p, color, opacity = 1, onOver, onOut }: { p: Placement; color: st
       <Edges color="#3b2a14" threshold={15} />
     </mesh>
   )
+}
+
+function builtUp(p: Placement): { chord: Placement[]; web: Placement[] } {
+  const c = 1.5
+  const alongY = p.sy >= p.sx
+  const len = alongY ? p.sy : p.sx
+  const chord = [p.z, p.z + p.sz - c].map((z) => ({ ...p, z, sz: c }))
+  const n = Math.max(2, Math.ceil(len / 16) + 1)
+  const web = Array.from({ length: n }, (_, i) => {
+    const o = (i * Math.max(0, len - c)) / (n - 1)
+    return alongY ? { ...p, y: p.y + o, sy: Math.min(c, len), z: p.z + c, sz: p.sz - 2 * c } : { ...p, x: p.x + o, sx: Math.min(c, len), z: p.z + c, sz: p.sz - 2 * c }
+  })
+  return { chord, web }
 }
 
 function findVoids(build: Build): Void[] {
@@ -160,13 +178,24 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: B
         }
         const edit = p.kind === 'block'
         const id = `p${i}`
+        const color = hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'
+        const over = edit ? () => setHover({ id, kind: 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
+        if (build.params.joistStyle === 'builtup' && (p.kind === 'joist' || p.kind === 'rim' || p.kind === 'block') && p.sz >= 3.2) {
+          const bu = builtUp(p)
+          return (
+            <group key={i}>
+              {bu.chord.map((c, k) => <Box key={`c${k}`} p={c} color={color} opacity={layer.opacity} onOver={over} onOut={edit ? leave : undefined} />)}
+              {bu.web.map((w, k) => <Box key={`w${k}`} p={w} color={hover?.id === id ? '#e57373' : COLORS.web} opacity={layer.opacity} onOver={over} onOut={edit ? leave : undefined} />)}
+            </group>
+          )
+        }
         return (
           <Box
             key={i}
             p={p}
-            color={hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'}
+            color={color}
             opacity={layer.opacity}
-            onOver={edit ? () => setHover({ id, kind: 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined}
+            onOver={over}
             onOut={edit ? leave : undefined}
           />
         )

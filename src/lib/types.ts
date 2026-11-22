@@ -31,6 +31,8 @@ export interface Features {
   hatches: boolean
   edgeTrim: boolean
   acousticStrips: boolean
+  /** full-coverage acoustic / protective underlay sheet laid on the slab under the whole frame */
+  underlay: boolean
 }
 
 export interface TrimSides {
@@ -80,6 +82,8 @@ export interface Params {
   /** change in the number of cross joists (blocking rows) vs. the bin-driven count */
   crossAdjust: number
   tatamiPattern: TatamiPatternId
+  /** thickness of the acoustic underlay (QEP natural cork is 6 mm, about 1/4") */
+  underlayThickness: number
   /** which corner the tatami layout starts from, or centered (cuts split evenly on both sides) */
   tatamiAnchor: 'bl' | 'br' | 'tl' | 'tr' | 'center'
   tatamiLong: number
@@ -113,6 +117,7 @@ export type PlacementKind =
   | 'rim'
   | 'block'
   | 'buildup'
+  | 'underlay'
   | 'header'
   | 'deck'
   | 'hatch'
