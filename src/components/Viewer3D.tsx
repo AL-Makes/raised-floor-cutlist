@@ -21,16 +21,18 @@ export interface ViewOptions {
 
 export const LAYER_LABELS: Record<LayerKey, string> = {
   tatami: 'Tatami layer',
-  side: 'Side panels / trim / drawer faces',
   deck: 'Plywood layer',
-  lift: 'Motorized lift tables',
+  side: 'Side panels / trim / drawer faces',
   cross: 'Cross joists (side to side)',
   joists: 'Main joists (front to back)',
   frame: 'Rims & headers',
+  underlay: 'Acoustic underlay',
+  lift: 'Motorized lift tables',
   drawers: 'Drawer boxes',
   bins: 'Bins',
-  underlay: 'Acoustic underlay',
 }
+
+export const FEATURE_KEYS: LayerKey[] = ['lift', 'drawers', 'bins']
 
 export const defaultView = (): ViewOptions => ({
   layers: {

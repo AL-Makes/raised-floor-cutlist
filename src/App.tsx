@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputPanel } from './components/InputPanel'
 import { CutListTab, LoadTab } from './components/Results'
 import { TatamiTab } from './components/TatamiTab'
-import { Viewer3D, LAYER_LABELS, defaultView, type Layer, type LayerKey, type ViewOptions } from './components/Viewer3D'
+import { Viewer3D, LAYER_LABELS, FEATURE_KEYS, defaultView, type Layer, type LayerKey, type ViewOptions } from './components/Viewer3D'
 import { buildFloor, defaultParams } from './lib/build'
 import { toCsv } from './lib/export'
 import { analyze } from './lib/structural'
@@ -55,6 +55,24 @@ export default function App() {
   }, [params, units, tab, view])
   const setLayer = (k: LayerKey, patch: Partial<Layer>) =>
     setView((v) => ({ ...v, layers: { ...v.layers, [k]: { ...v.layers[k], ...patch } } }))
+  const layerRow = (k: LayerKey) => (
+    <div key={k} className="layerrow">
+      <label>
+        <input type="checkbox" checked={view.layers[k].visible} onChange={(e) => setLayer(k, { visible: e.target.checked })} />
+        {LAYER_LABELS[k]}
+      </label>
+      <input
+        type="range"
+        min={0.1}
+        max={1}
+        step={0.05}
+        value={view.layers[k].opacity}
+        disabled={!view.layers[k].visible}
+        title={`Opacity ${Math.round(view.layers[k].opacity * 100)}%`}
+        onChange={(e) => setLayer(k, { opacity: Number(e.target.value) })}
+      />
+    </div>
+  )
 
   const build = useMemo(() => buildFloor(params), [params])
   const structural = useMemo(() => analyze(build), [build])
@@ -119,24 +137,9 @@ export default function App() {
                   {layersOpen ? '▾ Layers' : '▸ Layers'}
                 </button>
                 {layersOpen && (<>
-                {(Object.keys(LAYER_LABELS) as LayerKey[]).map((k) => (
-                  <div key={k} className="layerrow">
-                    <label>
-                      <input type="checkbox" checked={view.layers[k].visible} onChange={(e) => setLayer(k, { visible: e.target.checked })} />
-                      {LAYER_LABELS[k]}
-                    </label>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={1}
-                      step={0.05}
-                      value={view.layers[k].opacity}
-                      disabled={!view.layers[k].visible}
-                      title={`Opacity ${Math.round(view.layers[k].opacity * 100)}%`}
-                      onChange={(e) => setLayer(k, { opacity: Number(e.target.value) })}
-                    />
-                  </div>
-                ))}
+                {(Object.keys(LAYER_LABELS) as LayerKey[]).filter((k) => !FEATURE_KEYS.includes(k)).map(layerRow)}
+                <div className="layerhead">Features</div>
+                {FEATURE_KEYS.map(layerRow)}
                 <label>
                   <input type="checkbox" checked={view.loadMap} onChange={(e) => setView({ ...view, loadMap: e.target.checked })} />
                   Load map
