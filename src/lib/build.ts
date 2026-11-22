@@ -122,7 +122,7 @@ export function mergeParts(parts: Part[]): Part[] {
   return [...m.values()]
 }
 
-const DRAWER_CLEAR = 3 // drawer box top sits this far below the top of the supports (header + working clearance)
+const DRAWER_CLEAR = 6 // drawer box top sits this far below the top of the supports (header + working clearance)
 const DRAWER_TOP_EXTRA = DRAWER_CLEAR - 0.5 + 0.25 // plus 1/4" spare, less the 1/2" hatch allowance
 
 export function buildFloor(input: Params): Build {
