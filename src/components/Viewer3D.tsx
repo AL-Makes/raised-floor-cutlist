@@ -20,15 +20,15 @@ export interface ViewOptions {
 }
 
 export const LAYER_LABELS: Record<LayerKey, string> = {
-  joists: 'Main joists (front to back)',
-  cross: 'Cross joists (side to side)',
-  frame: 'Rims & headers',
+  tatami: 'Tatami layer',
   side: 'Side panels / trim / drawer faces',
   deck: 'Plywood layer',
-  tatami: 'Tatami layer',
   lift: 'Motorized lift tables',
-  bins: 'Bins',
+  cross: 'Cross joists (side to side)',
+  joists: 'Main joists (front to back)',
+  frame: 'Rims & headers',
   drawers: 'Drawer boxes',
+  bins: 'Bins',
   underlay: 'Acoustic underlay',
 }
 
