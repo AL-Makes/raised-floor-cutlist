@@ -118,10 +118,31 @@ function DragController({ drag, onMove, onEnd }: { drag: Drag | null; onMove: (k
   return null
 }
 
-function Box({ p, color, opacity = 1, onOver, onOut, onDown, onClick }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void; onClick?: () => void }) {
+function CamCmd({ cmd, target, span }: { cmd: { current: ((v: string) => void) | null }; target: [number, number, number]; span: number }) {
+  const { camera, controls } = useThree() as { camera: { position: { set: (x: number, y: number, z: number) => void } }; controls: { target: { set: (x: number, y: number, z: number) => void }; update: () => void } | null }
+  cmd.current = (v) => {
+    const [x, y, z] = target
+    const d = span * 1.6
+    const pos: Record<string, [number, number, number]> = {
+      reset: [x + span * 0.3, span * 0.9, span * 1.1],
+      top: [x, d + y, z + 0.01],
+      front: [x, y, z + d],
+      side: [x + d, y, z],
+    }
+    const q = pos[v]
+    if (!q) return
+    camera.position.set(q[0], q[1], q[2])
+    controls?.target.set(x, y, z)
+    controls?.update()
+  }
+  return null
+}
+
+function Box({ p, color, opacity = 1, onOver, onOut, onDown, onClick, onContext }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void; onClick?: () => void; onContext?: () => void }) {
   return (
     <mesh
       position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}
+      onContextMenu={onContext ? (e) => { e.stopPropagation(); onContext() } : undefined}
       onPointerOver={onOver ? (e) => { e.stopPropagation(); onOver() } : undefined}
       onPointerOut={onOut}
       onPointerDown={onDown ? (e) => { e.stopPropagation(); onDown(e.point) } : undefined}
@@ -220,6 +241,9 @@ function findVoids(build: Build): Void[] {
 
 export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSplit, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; units?: UnitSystem }) {
   const [binSel, setBinSel] = useState<{ cell: number; split?: 'x' | 'y'; pos: [number, number, number] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; bin?: { cell: number; split?: 'x' | 'y' } } | null>(null)
+  const ctxBin = useRef<{ cell: number; split?: 'x' | 'y' } | undefined>(undefined)
+  const camCmd = useRef<((v: string) => void) | null>(null)
   const [hover, setHoverState] = useState<Hover | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const endDrag = useMemo(() => () => setDrag(null), [])
@@ -240,11 +264,18 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
   const front = g.front
 
   return (
-    <div style={{ position: 'absolute', inset: 0 }}>
+    <div style={{ position: 'absolute', inset: 0 }} onContextMenu={(e) => {
+      e.preventDefault()
+      const r = e.currentTarget.getBoundingClientRect()
+      const x = e.clientX - r.left
+      const y = e.clientY - r.top
+      window.setTimeout(() => { setMenu({ x, y, bin: ctxBin.current }); ctxBin.current = undefined }, 0)
+    }} onPointerDown={() => menu && setMenu(null)}>
     <Canvas camera={{ position: [cx + span * 0.3, span * 0.9, span * 1.1], fov: 45, near: 1, far: 5000 }} style={{ touchAction: 'none' }}>
       <ambientLight intensity={0.7} />
       <directionalLight position={[cx + 100, 250, 150]} intensity={1.1} />
-      <OrbitControls target={[cx, S / 2, cz]} makeDefault />
+      <OrbitControls target={[cx, S / 2, cz]} makeDefault mouseButtons={{ LEFT: 0, MIDDLE: 2 }} />
+      <CamCmd cmd={camCmd} target={[cx, S / 2, cz]} span={span} />
       <DragController drag={drag} onMove={onMove} onEnd={endDrag} />
       <gridHelper args={[span * 2.5, 20, '#888', '#ccc']} position={[cx, -0.05, cz]} />
       {front && (
@@ -288,6 +319,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
             onOut={edit ? leave : undefined}
             onDown={down}
             onClick={p.kind === 'bin' && p.cell !== undefined ? () => setBinSel({ cell: p.cell!, split: p.split, pos: [p.x + p.sx / 2, p.z + p.sz + 1, -(p.y + p.sy / 2)] }) : undefined}
+            onContext={p.kind === 'bin' && p.cell !== undefined ? () => { ctxBin.current = { cell: p.cell!, split: p.split } } : undefined}
           />
         )
       })}
@@ -358,6 +390,26 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
           return <Box key={`m${i}`} p={pl} color={m.kind === 'cut' ? '#c9a66b' : '#b7c78a'} opacity={L.tatami.opacity} />
         })}
     </Canvas>
+    {menu && (
+      <div className="ctxmenu" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
+        {menu.bin && (
+          <>
+            {menu.bin.split ? (
+              <button onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, null); setMenu(null) }}>Recombine bins</button>
+            ) : (
+              <>
+                <button disabled={(build.layout.binX - 0.5) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'x'); setMenu(null) }}>Split bins ↔</button>
+                <button disabled={(build.layout.binY - 0.5) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'y'); setMenu(null) }}>Split bins ↕</button>
+              </>
+            )}
+            <hr />
+          </>
+        )}
+        {[['reset', 'Reset view'], ['top', 'Top view'], ['front', 'Front view'], ['side', 'Side view']].map(([k, label]) => (
+          <button key={k} onClick={() => { camCmd.current?.(k); setMenu(null) }}>{label}</button>
+        ))}
+      </div>
+    )}
     </div>
   )
 }

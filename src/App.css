@@ -45,6 +45,11 @@ small { display: block; color: #777; font-size: 0.75rem; }
 .binpop{display:flex;gap:4px;background:#fff;border:1px solid #888;border-radius:8px;padding:4px;box-shadow:0 2px 8px #0005;white-space:nowrap}
 .binpop button{min-width:0;min-height:0;padding:6px 10px;font-size:14px;cursor:pointer}
 .binpop button:disabled{opacity:.4;cursor:not-allowed}
+.ctxmenu{position:absolute;z-index:30;display:flex;flex-direction:column;min-width:150px;background:#fff;border:1px solid #888;border-radius:8px;padding:4px;box-shadow:0 2px 10px #0006}
+.ctxmenu button{min-width:0;min-height:0;text-align:left;border:0;background:none;padding:8px 12px;font-size:14px;cursor:pointer;border-radius:4px}
+.ctxmenu button:hover:not(:disabled){background:#eee}
+.ctxmenu button:disabled{opacity:.4;cursor:not-allowed}
+.ctxmenu hr{width:100%;border:0;border-top:1px solid #ddd;margin:3px 0}
 .dimtag{display:flex;flex-direction:column;align-items:center;gap:0;padding:2px 5px;border-radius:4px;background:#000b;color:#fff;font-size:10px;line-height:1.25;white-space:nowrap;pointer-events:none}
 .dimtag b{font-size:10px;color:#ffd27a}
 .toggles { position: absolute; z-index: 2; top: 8px; left: 8px; display: flex; gap: 0.7rem; background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; flex-wrap: wrap; }
