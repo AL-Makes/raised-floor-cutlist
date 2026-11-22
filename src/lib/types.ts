@@ -141,8 +141,6 @@ export interface Placement {
   sy: number
   sz: number
   cell?: number
-  /** deck panel id `${section}:${x}:${y}` (min corner) */
-  panel?: string
   /** movable joist: section, axis the joist is moved along, and index within the section */
   ref?: { s: number; axis: 'x' | 'y'; k: number }
 }
