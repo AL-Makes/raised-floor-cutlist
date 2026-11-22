@@ -29,6 +29,8 @@ export interface Section {
   drawerFront: boolean
   /** true when main joist positions are dictated by drawer widths */
   exact: boolean
+  /** plywood filler section: joists only at the filler edges, fixed deck */
+  fixed: boolean
   /** joist offsets actually applied after clamping, keyed like Params.moves */
   applied: Record<string, number>
 }
@@ -216,11 +218,44 @@ export function buildLayout(p: Params): Layout {
       }
     }
 
+    if (fixed) {
+      // under inaccessible filler: exactly one joist along each filler edge (running front to back), cross blocks only where panels meet
+      const fs = fillers.filter((f) => Math.min(f.x + f.w, rect.x + rect.w) - Math.max(f.x, rect.x) > 0.5 && Math.min(f.y + f.l, rect.y + rect.l) - Math.max(f.y, rect.y) > 0.5)
+      const lines = (lo: number, hi: number, edges: number[], max: number) => {
+        const pts = [...new Set(edges.map((e) => Math.round(e * 1000) / 1000))].filter((v) => v > lo + 2 * T && v < hi - 2 * T).sort((a, b) => a - b)
+        const out: number[] = []
+        const all = [lo, ...pts, hi]
+        for (let i = 0; i < all.length - 1; i++) {
+          const gap = all[i + 1] - all[i]
+          const n = Math.ceil(gap / max - 1e-9)
+          for (let k = 1; k < n; k++) out.push(all[i] + (gap * k) / n)
+          if (i + 1 < all.length - 1) out.push(all[i + 1])
+        }
+        return out
+      }
+      const xl = lines(rect.x, rect.x + rect.w, fs.flatMap((f) => [f.x, f.x + f.w]), p.sheetL)
+      const yl = lines(rect.y, rect.y + rect.l, fs.flatMap((f) => [f.y, f.y + f.l]), p.sheetL)
+      joistX.length = 0
+      joistT.length = 0
+      joistX.push(rect.x, ...xl.map((x) => x - T / 2), rect.x + rect.w - T)
+      joistT.push(...joistX.map(() => T))
+      cols.length = 0
+      for (let k = 0; k < joistX.length - 1; k++) cols.push({ x: joistX[k] + T, w: joistX[k + 1] - joistX[k] - T })
+      blockY.length = 0
+      blockY.push(...yl.map((y) => y - T / 2))
+      rows.length = 0
+      let start = rect.y + T
+      for (const by of blockY) {
+        rows.push({ y: start, l: by - start, drawer: false })
+        start = by + T
+      }
+      rows.push({ y: start, l: rect.y + rect.l - T - start, drawer: false })
+    }
     const mv = p.moves ?? {}
     const applied: Record<string, number> = {}
     // manual joist moves: shift a joist, clamp so neighbours keep a full cell, then rebuild the cells between joists
     const lowK = drawerFront ? 1 : 0
-    if (blockY.some((_, k) => k >= lowK && mv[`${si}:y:${k}`])) {
+    if (!fixed && blockY.some((_, k) => k >= lowK && mv[`${si}:y:${k}`])) {
       const end = rect.y + rect.l - T
       const base = [...blockY]
       for (let k = lowK; k < blockY.length; k++) {
@@ -242,7 +277,7 @@ export function buildLayout(p: Params): Layout {
         start = stop + T
       }
     }
-    if (!exact && joistX.some((_, k) => k > 0 && k < joistX.length - 1 && mv[`${si}:x:${k}`])) {
+    if (!exact && !fixed && joistX.some((_, k) => k > 0 && k < joistX.length - 1 && mv[`${si}:x:${k}`])) {
       const last = joistX.length - 1
       const end = rect.x + rect.w - T
       const base = [...joistX]
@@ -260,7 +295,7 @@ export function buildLayout(p: Params): Layout {
       }
     }
 
-    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact, applied })
+    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact, fixed: !!fixed, applied })
     rows.forEach((row, ri) => {
       cols.forEach((col, ci) => {
         const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer ? 'drawer' : 'bin'

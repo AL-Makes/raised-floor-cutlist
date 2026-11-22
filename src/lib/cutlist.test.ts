@@ -388,6 +388,31 @@ describe('filler service zones', () => {
     expect(acc.parts.some((x) => x.name.startsWith('Maintenance lift-out'))).toBe(true)
     expect(base.parts.some((x) => x.name.startsWith('Accessible deck panel'))).toBe(true)
   })
+  it('filler sections have joists only at the filler edges and plywood seams on joist centrelines', () => {
+    const b = buildFloor(defaultParams())
+    const back = b.layout.sections.find((s) => s.fixed && s.rect.y > 0)!
+    expect(back.joistX.length).toBe(3)
+    const T = b.layout.joistW
+    const cx = new Set<number>()
+    const cy = new Set<number>()
+    for (const s of b.layout.sections) {
+      s.joistX.forEach((x, k) => cx.add(Math.round((x + s.joistT[k] / 2) * 100)))
+      s.blockY.forEach((y) => cy.add(Math.round((y + T / 2) * 100)))
+      cx.add(Math.round(s.rect.x * 100)); cx.add(Math.round((s.rect.x + s.rect.w) * 100))
+      cy.add(Math.round(s.rect.y * 100)); cy.add(Math.round((s.rect.y + s.rect.l) * 100))
+    }
+    for (const q of b.placements.filter((x) => x.kind === 'deck')) {
+      for (const x of [q.x, q.x + q.sx]) expect(cx.has(Math.round(x * 100))).toBe(true)
+      for (const y of [q.y, q.y + q.sy]) expect(cy.has(Math.round(y * 100))).toBe(true)
+    }
+  })
+  it('a service filler lifts out whole, edge to edge on its joists', () => {
+    const b = buildFloor({ ...defaultParams(), fillerAccess: [2] })
+    const hatch = b.placements.filter((q) => q.kind === 'hatch')
+    expect(hatch.length).toBe(1)
+    expect(hatch[0].sx).toBeGreaterThan(60)
+    expect(hatch[0].sy).toBeGreaterThan(20)
+  })
   it('filler strip is unaffected by joist adjust', () => {
     const b = buildFloor({ ...defaultParams(), joistAdjust: 1 })
     for (const f of b.layout.fillers) {

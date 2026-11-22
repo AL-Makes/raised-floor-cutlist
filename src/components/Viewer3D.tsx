@@ -85,6 +85,8 @@ const STATUS_COLOR: Record<Status, string> = { ok: '#2ecc71', warn: '#f1c40f', f
 interface Hover { id: string; kind: 'joist' | 'block'; delta: 1 | -1; s: number; pos: [number, number, number]; ghost?: Placement }
 interface Void { id: string; kind: 'joist' | 'block'; s: number; zone: Placement; ghost: Placement }
 
+/** joist click-and-drag is switched off while the plywood layer is reworked */
+const DRAG_ENABLED = false
 interface Drag { ref: NonNullable<Placement['ref']>; start: number; base: number; planeY: number }
 
 function DragController({ drag, onMove, onEnd }: { drag: Drag | null; onMove: (key: string, v: number) => void; onEnd: () => void }) {
@@ -256,7 +258,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
         const dragging = !!drag && !!p.ref && drag.ref.s === p.ref.s && drag.ref.axis === p.ref.axis && drag.ref.k === p.ref.k
         const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'
         const over = edit && !drag ? () => setHover({ id, kind: 'block', delta: -1, s: p.ref!.s, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
-        const down = p.ref
+        const down = DRAG_ENABLED && p.ref
           ? (pt: { x: number; y: number; z: number }) => {
               setHoverState(null)
               const r = p.ref!
