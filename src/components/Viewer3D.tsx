@@ -85,7 +85,7 @@ const COLORS: Record<string, string> = {
 
 const STATUS_COLOR: Record<Status, string> = { ok: '#2ecc71', warn: '#f1c40f', fail: '#e74c3c' }
 
-interface Hover { id: string; kind: 'joist' | 'block'; delta: 1 | -1; s: number; c: number; pos: [number, number, number]; ghost?: Placement }
+interface Hover { y?: number; id: string; kind: 'joist' | 'block'; delta: 1 | -1; s: number; c: number; pos: [number, number, number]; ghost?: Placement }
 interface Void { id: string; kind: 'joist' | 'block'; s: number; c: number; zone: Placement; ghost: Placement }
 
 /** joist click-and-drag is switched off while the plywood layer is reworked */
@@ -306,7 +306,7 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawer, units = 'imperial' }: { build: Build; structural?: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; onDrawer: (key: string, on: boolean) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawer, units = 'imperial' }: { build: Build; structural?: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number, y?: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; onDrawer: (key: string, on: boolean) => void; units?: UnitSystem }) {
   const [binSel, setBinSel] = useState<{ cell: number; split?: 'x' | 'y'; pos: [number, number, number] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; bin?: { cell: number; split?: 'x' | 'y' } } | null>(null)
   const ctxBin = useRef<{ cell: number; split?: 'x' | 'y' } | undefined>(undefined)
@@ -331,7 +331,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
   const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHoverState(null), 700) }
   const keep = () => window.clearTimeout(timer.current)
   const voids = useMemo(() => findVoids(build), [build])
-  const act = (h: Hover) => { onAdjust(h.kind, h.delta, h.s, h.c); setHoverState(null) }
+  const act = (h: Hover) => { onAdjust(h.kind, h.delta, h.s, h.c, h.y); setHoverState(null) }
   const g = build.geometry
   const cx = g.width / 2
   const cz = -g.length / 2
@@ -405,7 +405,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         const mem = memberOf.get(i)
         const pk = pullKey(p)
         const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : mem ? STATUS_COLOR[mem.status] : COLORS[p.kind] ?? '#999'
-        const over = edit && !drag ? () => setHover({ id, kind: 'block', delta: -1, s: p.ref!.s, c: p.ref!.c ?? 0, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
+        const over = edit && !drag ? () => setHover({ y: p.y + p.sy / 2, id, kind: 'block', delta: -1, s: p.ref!.s, c: p.ref!.c ?? 0, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
         const down = DRAG_ENABLED && p.ref
           ? (pt: { x: number; y: number; z: number }) => {
               setHoverState(null)
@@ -445,7 +445,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         <mesh
           key={v.id}
           position={[v.zone.x + v.zone.sx / 2, v.zone.z + v.zone.sz / 2, -(v.zone.y + v.zone.sy / 2)]}
-          onPointerOver={(e) => { if (e.intersections.some((h) => h.object.userData.bin)) { setHoverState(null); return } e.stopPropagation(); setHover({ id: v.id, kind: v.kind, delta: 1, s: v.s, c: v.c, ghost: v.ghost, pos: [v.ghost.x + v.ghost.sx / 2, v.ghost.z + v.ghost.sz + 0.5, -(v.ghost.y + v.ghost.sy / 2)] }) }}
+          onPointerOver={(e) => { if (e.intersections.some((h) => h.object.userData.bin)) { setHoverState(null); return } e.stopPropagation(); setHover({ y: v.ghost.y + v.ghost.sy / 2, id: v.id, kind: v.kind, delta: 1, s: v.s, c: v.c, ghost: v.ghost, pos: [v.ghost.x + v.ghost.sx / 2, v.ghost.z + v.ghost.sz + 0.5, -(v.ghost.y + v.ghost.sy / 2)] }) }}
           onPointerOut={leave}
         >
           <boxGeometry args={[v.zone.sx, v.zone.sz, v.zone.sy]} />

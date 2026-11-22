@@ -155,13 +155,21 @@ export default function App() {
                 if (mode) next[key] = mode
                 else delete next[key]
                 return { ...q, binSplit: next }
-              })} onAdjust={(kind, d, s, c) => setParams((q) => {
+              })} onAdjust={(kind, d, s, c, y) => setParams((q) => {
                 if (kind === 'joist') {
                   const cur = q.secAdjust?.[s] ?? { x: 0, y: 0 }
                   return { ...q, secAdjust: { ...q.secAdjust, [s]: { ...cur, x: cur.x + d } }, moves: {} }
                 }
                 const key = `${s}:${c}`
-                return { ...q, colAdjust: { ...q.colAdjust, [key]: Math.max(build.layout.sections[s]?.colMin?.[c] ?? -99, (q.colAdjust?.[key] ?? 0) + d) }, moves: {} }
+                const st = build.layout.sections[s]?.colStretches?.[c]
+                if (st) {
+                  const i = st.findIndex((r) => r.ok && (y ?? 0) >= r.y - 0.01 && (y ?? 0) <= r.y + r.l + 0.01)
+                  if (i < 0 || (d < 0 && st[i].n <= 0)) return q
+                  const ns = st.map((r) => r.n)
+                  ns[i] += d
+                  return { ...q, fixedCounts: { ...q.fixedCounts, [key]: ns }, moves: {} }
+                }
+                return { ...q, colAdjust: { ...q.colAdjust, [key]: (q.colAdjust?.[key] ?? 0) + d }, moves: {} }
               })}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))} />
               <div className="hud">
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf

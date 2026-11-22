@@ -88,6 +88,7 @@ export interface Params {
   secAdjust?: Record<number, { x: number; y: number }>
   /** per-bay extra cross joists, keyed section:column; main joists stay continuous */
   colAdjust?: Record<string, number>
+  fixedCounts?: Record<string, number[]>
   /** bin cells split into two smaller bins, keyed by cell key; x = side by side, y = one behind the other */
   binSplit?: Record<string, 'x' | 'y'>
   drawerOff?: Record<string, boolean>

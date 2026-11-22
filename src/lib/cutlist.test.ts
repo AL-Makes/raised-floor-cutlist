@@ -473,12 +473,19 @@ describe('filler service zones', () => {
     const base = buildFloor(defaultParams())
     const si = base.layout.sections.findIndex((x) => x.fixed)
     expect(si).toBeGreaterThanOrEqual(0)
-    const mid = (b: ReturnType<typeof buildFloor>) => b.placements.filter((q) => q.kind === 'block' && q.x === base.layout.sections[si].cols[0].x && q.y > base.layout.sections[si].rect.y && q.y < base.layout.sections[si].rect.y + base.layout.sections[si].rect.l).length
-    const cnt = (k: number) => mid(buildFloor({ ...defaultParams(), colAdjust: { [si + ':0']: k } }))
-    expect(cnt(1)).toBe(cnt(0) + 1)
-    expect(cnt(2)).toBe(cnt(0) + 2)
-    expect(cnt(-1)).toBe(cnt(0) - 1)
-    expect(cnt(-2)).toBe(cnt(-1))
+    const sec = base.layout.sections[si]
+    const st = sec.colStretches![0]
+    const blocks = (ns: number[]) => buildFloor({ ...defaultParams(), fixedCounts: { [si + ':0']: ns } }).layout.sections[si].colBlocks[0]
+    const dflt = blocks(st.map((r) => r.n))
+    expect(dflt.length).toBe(st.length - 1 + st.filter((r) => r.n > 0).reduce((a, r) => a + r.n, 0))
+    const i = st.findIndex((r) => r.ok)
+    const two = blocks(st.map((r, k) => (k === i ? 2 : r.n)))
+    expect(two.length).toBe(dflt.length + 1)
+    const none = blocks(st.map((r, k) => (k === i ? 0 : r.n)))
+    expect(none.length).toBe(dflt.length - 1)
+    const inside = two.filter((y) => y > st[i].y && y < st[i].y + st[i].l)
+    expect(inside.length).toBe(2)
+    expect(Math.abs((inside[0] - st[i].y) - (st[i].y + st[i].l - inside[1])) < inside[1] - inside[0]).toBe(true)
   })
   it('deck under filler pieces matches them, is fixed and cannot be an access panel', () => {
     const b = buildFloor(defaultParams())
