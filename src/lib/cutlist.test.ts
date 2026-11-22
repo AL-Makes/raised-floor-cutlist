@@ -95,12 +95,11 @@ describe('cut list', () => {
     const p = defaultParams()
     p.features = { drawers: true, hatches: false, edgeTrim: true,     acousticStrips: true, underlay: false }
     p.finalHeight = 14
-    p.drawerKind = 'built'
-    const b = buildFloor(p)
+        const b = buildFloor(p)
     expect(b.parts.some((x) => x.group === 'Drawers')).toBe(true)
     expect(b.parts.some((x) => x.group === 'Edge trim')).toBe(true)
     expect(b.parts.some((x) => x.name.startsWith('Drawer header'))).toBe(true)
-    expect(b.hardware.some((h) => h.name.startsWith('Drawer slides'))).toBe(true)
+    expect(b.hardware.some((h) => h.name.startsWith('Caster'))).toBe(true)
     expect(base.parts.some((x) => x.group === 'Drawers')).toBe(false)
   })
   it('underlay adds a sheet layer and lowers the frame', () => {
@@ -256,7 +255,7 @@ describe('polygon floors, front edge, deck and tatami fit', () => {
 
 
 
-describe('dragging walls and ready-made drawers', () => {
+describe('dragging walls and plywood drawers', () => {
   const rect = [{ x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 96 }, { x: 0, y: 96 }]
   it('moves a wall sideways and stretches its neighbours', () => {
     const out = moveEdge(rect, 1, 12)
@@ -281,26 +280,32 @@ describe('dragging walls and ready-made drawers', () => {
     expect(validatePolygon(L)).toBeUndefined()
     expect(L).toHaveLength(6)
   })
-  it('ready-made drawers sit 1/4" off each joist and the deck over them stops at the middle of the next cross joist', () => {
+  const drawerP = () => {
     const base = defaultParams()
-    const p = { ...base, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const }
-    const b = buildFloor(p)
+    return { ...base, features: { ...base.features, drawers: true, edgeTrim: true } }
+  }
+  it('plywood drawers fill the joist bay with 1" clear at each side and the back, front flush', () => {
+    const b = buildFloor(drawerP())
     const sec = b.layout.sections[0]
     const dr = b.placements.filter((q) => q.kind === 'drawer')
     expect(dr.length).toBeGreaterThan(0)
     for (const d of dr) {
-      const left = sec.joistX.findIndex((jx, k) => Math.abs(jx + sec.joistT[k] - (d.x - 0.25)) < 1e-6)
+      const left = sec.joistX.findIndex((jx, k) => Math.abs(jx + sec.joistT[k] - (d.x - 1)) < 1e-6)
       expect(left).toBeGreaterThanOrEqual(0)
-      expect(sec.joistX[left + 1]).toBeCloseTo(d.x + d.sx + 0.25)
+      expect(sec.joistX[left + 1]).toBeCloseTo(d.x + d.sx + 1)
+      const cell = b.layout.cells.find((c) => c.type === 'drawer' && Math.abs(c.x + 1 - d.x) < 1e-6)!
+      expect(cell.y + cell.l - (d.y + d.sy)).toBeCloseTo(1)
+      expect(d.z).toBeCloseTo(2)
     }
-    const cross = sec.blockY[0] + b.layout.joistW / 2
-    const front = b.placements.filter((q) => q.kind === 'deck' && Math.abs(q.y - sec.rect.y) < 1e-6 && q.x < sec.rect.x + sec.rect.w - 1e-6)
-    expect(front.length).toBeGreaterThan(0)
-    for (const f of front) expect(f.y + f.sy).toBeCloseTo(cross)
+    expect(b.placements.some((q) => q.kind === 'bin' && q.sz > 0 && b.layout.cells.some((c) => c.type === 'drawer' && c.index === q.cell))).toBe(false)
+    expect(b.hardware.find((h) => /Caster/.test(h.name))?.qty).toBe(dr.length * 4)
+  })
+  it('uses the board thickness for the drawer parts', () => {
+    const b = buildFloor({ ...drawerP(), drawerBoardT: 0.5 })
+    expect(b.parts.filter((x) => x.group === 'Drawers').every((x) => x.thickness === 0.5)).toBe(true)
   })
   it('raises the height so the drawer face is flush with the frame and the box has 1" above it', () => {
-    const base = defaultParams()
-    const b = buildFloor({ ...base, finalHeight: 8, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const })
+    const b = buildFloor({ ...drawerP(), finalHeight: 8 })
     expect(b.warnings.some((w) => /raised/i.test(w))).toBe(true)
     const d = b.placements.find((q) => q.kind === 'drawer')!
     const f = b.placements.find((q) => q.kind === 'drawerFace')!
@@ -309,29 +314,26 @@ describe('dragging walls and ready-made drawers', () => {
     expect(hdr!.z - (f.z + f.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
     expect(hdr!.z - (d.z + d.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
   })
-  it('cuts a front fascia opening 1/2" beyond each side and above every drawer face', () => {
-    const base = defaultParams()
-    const b = buildFloor({ ...base, features: { ...base.features, drawers: true, edgeTrim: true }, drawerKind: 'ikea' as const })
+  it('cuts the front fascia in joist-centre to joist-centre pieces, each with a drawer opening', () => {
+    const b = buildFloor(drawerP())
+    const sec = b.layout.sections[0]
     const faces = b.placements.filter((q) => q.kind === 'drawerFace')
-    const trims = b.placements.filter((q) => q.kind === 'trim' && q.sy < 1 && q.z + q.sz > 0 && Math.abs(q.y + q.sy - faces[0].y) < 1e-6)
-    expect(faces.length).toBeGreaterThan(0)
-    const f = faces[0]
-    const mid = f.x + f.sx / 2
-    expect(trims.some((t) => t.x < mid && t.x + t.sx > mid && t.z >= f.z + f.sz + 0.5 - 1e-6)).toBe(true)
-    expect(trims.some((t) => t.z < 1 && t.x < mid && t.x + t.sx > mid)).toBe(false)
-    expect(trims.some((t) => t.z < 1 && t.x + t.sx > f.x - 0.5 + 0.01 && t.x < f.x + f.sx + 0.5 - 0.01)).toBe(false)
-  })
-  it('sizes joist spacing from an IKEA rolling box and drops the drawer cut parts', () => {
-    const base = defaultParams()
-    const p = { ...base, finalHeight: 20, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const, rollingBox: { id: 'x', w: 24, d: 36, h: 8 } }
-    const lay = buildLayout(p)
-    expect(lay.cellMinX).toBeCloseTo(36 + p.clearance)
-    const b = buildFloor(p)
-    expect(b.parts.some((x) => x.name === 'Drawer side')).toBe(false)
-    expect(b.hardware.some((h) => /rolling box/i.test(h.name))).toBe(true)
+    const cuts = b.placements.filter((q) => q.kind === 'cutout')
+    expect(cuts).toHaveLength(faces.length)
+    faces.forEach((f, i) => {
+      const c = cuts[i]
+      expect(f.x - c.x).toBeCloseTo(0.5)
+      expect(c.x + c.sx - (f.x + f.sx)).toBeCloseTo(0.5)
+      expect(c.sz - (f.z + f.sz)).toBeCloseTo(0.5)
+      expect(c.z).toBe(0)
+    })
+    const pieces = b.parts.filter((x) => x.name === 'Front fascia piece with drawer opening')
+    expect(pieces.reduce((s, x) => s + x.qty, 0)).toBe(faces.length)
+    const centres = sec.joistX.map((jx, k) => jx + sec.joistT[k] / 2)
+    const w = pieces[0].length
+    expect(centres.some((c0) => centres.some((c1) => Math.abs(c1 - c0 - w) < 0.01))).toBe(true)
   })
 })
-
 describe('built-up joists', () => {
   it('uses top and bottom 2x4 chords with vertical 2x4 webs cut to the frame height', () => {
     const b = buildFloor({ ...defaultParams(), finalHeight: 16 })
@@ -513,7 +515,7 @@ describe('plywood seams', () => {
 describe('plywood coverage', () => {
   it('covers the whole floor when a filler edge has no joist', () => {
     const d = defaultParams()
-    const b = buildFloor({ ...d, floor: { ...d.floor, shape: 'poly', poly: [{ x: 0, y: 0 }, { x: 139.25, y: 0 }, { x: 139.25, y: 73 }, { x: 0, y: 73 }] }, finalHeight: 15, joistStyle: 'builtup', drawerKind: 'ikea', features: { ...d.features, drawers: true } } as typeof d)
+    const b = buildFloor({ ...d, floor: { ...d.floor, shape: 'poly', poly: [{ x: 0, y: 0 }, { x: 139.25, y: 0 }, { x: 139.25, y: 73 }, { x: 0, y: 73 }] }, finalHeight: 15, joistStyle: 'builtup', features: { ...d.features, drawers: true } } as typeof d)
     const total = b.layout.sections.reduce((s, c) => s + c.rect.w * c.rect.l, 0)
     const area = b.placements.filter((q) => q.kind === 'deck' || q.kind === 'hatch').reduce((s, q) => s + q.sx * q.sy, 0)
     expect(area).toBeCloseTo(total, 0)

@@ -10,9 +10,8 @@ export const WEB_OC = 16
 export function joistWidth(p: Pick<Params, 'joistStyle'>): number {
   return p.joistStyle === 'builtup' ? BUILTUP_W : RIM_T
 }
-export const DRAWER_WALL = 0.5
-export const DRAWER_SLIDE = 0.5
-export const DRAWER_FACE_T = 0.75
+export const DRAWER_SIDE_GAP = 1
+export const DRAWER_BACK_GAP = 1
 
 export interface Section {
   index: number
@@ -74,11 +73,6 @@ export function divide(total: number, cellMin: number, dividerT: number, rimT = 
   return { n, fit, cell, fits: cell >= cellMin - 1e-9 }
 }
 
-/** Ready-made rolling box: long side runs across the front, short side pulls out toward the back. */
-export function rollingAxes(p: Pick<Params, 'rollingBox'>): { rx: number; ry: number } {
-  return { rx: Math.max(p.rollingBox.w, p.rollingBox.d), ry: Math.min(p.rollingBox.w, p.rollingBox.d) }
-}
-
 export function buildLayout(p: Params): Layout {
   const warnings: string[] = []
   const T = joistWidth(p)
@@ -87,12 +81,11 @@ export function buildLayout(p: Params): Layout {
   const { bx, by } = binAxes(p)
   const drawers = p.features.drawers
   const dividerT = p.reinforce.doubleJoists ? T * 2 : T
-  const ready = drawers && p.drawerKind === 'ikea'
-  const { rx, ry } = rollingAxes(p)
-  const drawerExtraX = drawers && !ready ? 2 * (DRAWER_WALL + DRAWER_SLIDE) : 0
-  const cellMinX = ready ? Math.max(bx, rx) + Math.max(p.clearance, 0.5) : bx + p.clearance + drawerExtraX
+  const bt = p.drawerBoardT
+  const drawerExtraX = drawers ? 2 * (DRAWER_SIDE_GAP + bt) : 0
+  const cellMinX = bx + p.clearance + drawerExtraX
   const cellMinY = by + p.clearance
-  const drawerLen = ready ? DRAWER_FACE_T + ry + p.clearance : DRAWER_FACE_T + (by + p.clearance + 2 * DRAWER_WALL) + 0.5
+  const drawerLen = bt + (by + p.clearance + 2 * bt) + DRAWER_BACK_GAP
   const binsAcross = (w: number) => Math.max(1, Math.floor((w - drawerExtraX + 1e-6) / (bx + p.clearance)))
   const binsAlong = (l: number) => Math.max(1, Math.floor((l + 1e-6) / cellMinY))
 
@@ -124,36 +117,19 @@ export function buildLayout(p: Params): Layout {
     if (rect.x + rect.w - cursor > 0.5) out.push({ rect: { ...rect, x: cursor, w: rect.x + rect.w - cursor }, plain: false })
     return out
   })
-  // Ready-made drawers sit snug between joists (clearance split evenly each side), so the cells are exactly one
-  // box wide. Leftover width becomes a plain bin section if it is big enough, otherwise it widens the end joists.
-  const pieces0: { rect: Rect; plain: boolean; exact?: number; fixed?: boolean }[] = liftPieces.flatMap((pc) => {
-    if (!ready || pc.plain || !onFrontRow(pc.rect)) return [pc]
-    const r = pc.rect
-    const nFit = Math.max(1, Math.floor((r.w - 2 * T + dividerT) / (cellMinX + dividerT) + 1e-9))
-    const n = Math.max(1, Math.min(nFit, nFit + p.joistAdjust))
-    const W = 2 * T + n * cellMinX + (n - 1) * dividerT
-    const extra = r.w - W
-    if (extra < -1e-6) return [pc]
-    if (extra >= bx + p.clearance + 2 * T) {
-      return [
-        { rect: { ...r, w: W }, plain: false, exact: n },
-        { rect: { ...r, x: r.x + W, w: extra }, plain: true },
-      ]
-    }
-    return [{ ...pc, exact: n }]
-  })
+  const pieces0: { rect: Rect; plain: boolean; exact?: number; fixed?: boolean }[] = liftPieces
 
   // A plywood filler strip running the full depth of a section gets its own section, so added joists only
   // subdivide the bin area and never land under the filler.
   const pieces: { rect: Rect; plain: boolean; exact?: number; fixed?: boolean }[] = pieces0.flatMap((pc) => {
     if (pc.exact || pc.plain) return [pc]
     let r = pc.rect
-    const inside = fillers.filter((f) => f.x >= r.x - 0.5 && f.x + f.w <= r.x + r.w + 0.5 && f.y >= r.y - 0.5 && f.y + f.l <= r.y + r.l + 0.5)
+    const inside = fillers.filter((f) => f.w >= 6 && f.l >= 6 && f.x >= r.x - 0.5 && f.x + f.w <= r.x + r.w + 0.5 && f.y >= r.y - 0.5 && f.y + f.l <= r.y + r.l + 0.5)
     const out: { rect: Rect; plain: boolean; fixed?: boolean }[] = []
     const back = inside.filter((f) => f.y + f.l >= r.y + r.l - 0.5)
     if (back.length && back.reduce((s, f) => s + f.w, 0) >= r.w - 0.5) {
       const y0 = Math.min(...back.map((f) => f.y))
-      if (y0 - r.y >= cellMinY + 2 * T) {
+      if (y0 - r.y >= cellMinY + 2 * T && r.y + r.l - y0 >= 6) {
         out.push({ rect: { ...r, y: y0, l: r.y + r.l - y0 }, plain: false, fixed: true })
         r = { ...r, l: y0 - r.y }
       }

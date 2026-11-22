@@ -1,7 +1,8 @@
-import { CUSTOM_BIN_ID, findBin, findRollingBox } from './bins'
+import { CUSTOM_BIN_ID } from './bins'
+import { mmToIn } from './units'
 import { normalizeFloor, type FloorGeometry, type PolyEdge } from './geometry'
 import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './height'
-import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, WEB_OC, rollingAxes, type Layout } from './layout'
+import { buildLayout, DRAWER_BACK_GAP, DRAWER_SIDE_GAP, WEB_OC, type Layout } from './layout'
 import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
 import { planPlywood } from './deck'
 import { tatamiFit } from './tatami'
@@ -29,7 +30,6 @@ function subtractRect(q: Placement, z: Rect): Placement[] {
 }
 
 export function defaultParams(): Params {
-  const b = findBin('samla-22')!
   return {
     floor: { shape: 'rect', width: 120, length: 96, notchW: 36, notchL: 36, frontEdge: 0 },
     finalHeight: 15,
@@ -39,13 +39,13 @@ export function defaultParams(): Params {
     sheetL: 96,
     lumberLengths: [96, 120, 144],
     kerf: 0.125,
-    binId: b.id,
-    bin: { w: b.w, d: b.d, h: b.h },
+    binId: CUSTOM_BIN_ID,
+    bin: { w: mmToIn(390), d: mmToIn(280), h: mmToIn(280) },
     binLongAlongJoists: false,
     clearance: 0.5,
     joistStyle: 'builtup',
-    drawerKind: 'ikea',
-    rollingBox: { id: 'malm-box', w: 37.375, d: 24.375, h: 11.375 },
+    drawerBoardT: 0.75,
+    casterH: 2,
     maxSpacing: 24,
     features: { drawers: false, hatches: false, edgeTrim: false, acousticStrips: false, underlay: false },
     underlayThickness: 0.25,
@@ -67,9 +67,7 @@ export function defaultParams(): Params {
 }
 
 export function resolveBin(p: Params) {
-  if (p.binId === CUSTOM_BIN_ID) return p.bin
-  const b = findBin(p.binId)
-  return b ? { w: b.w, d: b.d, h: b.h } : p.bin
+  return p.bin
 }
 
 export type Edge = PolyEdge
@@ -120,7 +118,7 @@ export function mergeParts(parts: Part[]): Part[] {
   return [...m.values()]
 }
 
-const DRAWER_TOP_EXTRA = 2.25 // 1/4" floor gap + 1" above the box + 1-1/2" flat header, less the 1/2" hatch allowance
+const DRAWER_TOP_EXTRA = 2.25 // 1" above the box + 1-1/2" flat header + 1/4" spare, less the 1/2" hatch allowance
 
 export function buildFloor(input: Params): Build {
   const p: Params = { ...input, bin: resolveBin(input) }
@@ -129,14 +127,13 @@ export function buildFloor(input: Params): Build {
   if (geometry.error) warnings.push(`Floor shape problem: ${geometry.error}`)
   const layout = buildLayout(p)
   warnings.push(...layout.warnings)
-  const readyDrawers = p.features.drawers && p.drawerKind === 'ikea'
   const ul = p.features.underlay ? p.underlayThickness : 0
   const heightIn = {
     finalHeight: p.finalHeight - ul,
     plyThickness: p.plyThickness,
     tatamiThickness: p.tatamiThickness,
-    binH: readyDrawers ? Math.max(p.bin.h, p.rollingBox.h) + DRAWER_TOP_EXTRA : p.bin.h,
-    drawers: p.features.drawers && !readyDrawers,
+    binH: p.features.drawers ? p.casterH + p.drawerBoardT + p.bin.h + DRAWER_TOP_EXTRA : p.bin.h,
+    drawers: false,
     style: p.joistStyle,
   }
   let height = solveHeight(heightIn)
@@ -308,36 +305,30 @@ export function buildFloor(input: Params): Build {
           placements.push({ kind: 'bin', x: slotPos(c.x, c.w, c.binsX, layout.binX, ix), y: slotPos(c.y, c.l, c.binsY, layout.binY, iy), z: 0, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index })
     }
   })
-  const boxT = DRAWER_WALL
-  let slides = 0
-  if (readyDrawers) {
-    const { rx, ry } = rollingAxes(p)
-    const faceH = S - 1.5 - 1 - 0.125
+  const bt = p.drawerBoardT
+  const caster = p.casterH
+  const faceH = Math.max(1, S - 1.5 - 1 - 0.125)
+  const boxH = Math.max(bt + 1, S - 1.5 - 1 - caster)
+  let casters = 0
+  const bays: { y: number; px0: number; px1: number; x0: number; x1: number; top: number }[] = []
+  if (p.features.drawers) {
     for (const c of drawerCells) {
-      sheet('Drawers', 'Drawer false front (screws to the IKEA box)', DRAWER_FACE_T, 1, c.w - 0.25, faceH, 'Screw from inside of the IKEA box front')
-      placements.push({ kind: 'drawer', x: c.x + (c.w - rx) / 2, y: c.y + DRAWER_FACE_T, z: 0.25, sx: rx, sy: ry, sz: p.rollingBox.h, cell: c.index })
-      placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
-    }
-  } else if (p.features.drawers) {
-    const faceH = S - 1.5 - 1 - 0.125
-    const boxH = faceH - 0.75
-    for (const c of drawerCells) {
-      const boxW = c.w - 2 * DRAWER_SLIDE
-      const boxL = layout.binY + p.clearance + 2 * boxT
-      const boxLen = Math.min(boxL, c.l - DRAWER_FACE_T - 0.25)
-      sheet('Drawers', 'Drawer side', boxT, 2, boxLen, boxH, 'Pocket-screw to front/back')
-      sheet('Drawers', 'Drawer front/back', boxT, 2, boxW - 2 * boxT, boxH, 'Pocket-screw to sides')
-      sheet('Drawers', 'Drawer bottom', boxT, 1, boxW, boxLen, 'Screw + glue to box')
-      sheet('Drawers', 'Drawer face', DRAWER_FACE_T, 1, c.w - 0.25, faceH, 'Screw from inside of box')
-      pockets += 8
-      slides += Math.floor(Math.max(0, boxLen) / 2) * 2
-      placements.push({ kind: 'drawer', x: c.x + DRAWER_SLIDE, y: c.y + DRAWER_FACE_T, z: 0.5, sx: boxW, sy: boxLen, sz: boxH, cell: c.index })
-      placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
-      const dmode = splitMode(c)
-      if (dmode) pushSplit(c, dmode, c.x + DRAWER_SLIDE, boxW, c.y + DRAWER_FACE_T + boxT, boxLen - 2 * boxT, c.binsX, 1, 0.5 + boxT)
-      else
-        for (let ix = 0; ix < c.binsX; ix++)
-          placements.push({ kind: 'bin', x: slotPos(c.x + DRAWER_SLIDE, boxW, c.binsX, layout.binX, ix), y: c.y + DRAWER_FACE_T + (boxLen - layout.binY) / 2, z: 0.5 + boxT, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index })
+      binCount -= c.binsX * c.binsY
+      const boxW = c.w - 2 * DRAWER_SIDE_GAP
+      const boxLen = Math.max(1, c.l - bt - DRAWER_BACK_GAP)
+      const wall = boxH - bt
+      sheet('Drawers', 'Drawer side', bt, 2, boxLen, wall, 'Screw + glue to front/back; sits on the bottom')
+      sheet('Drawers', 'Drawer front/back', bt, 2, boxW - 2 * bt, wall, 'Screw + glue between the sides')
+      sheet('Drawers', 'Drawer bottom', bt, 1, boxW, boxLen, 'Screw + glue under the box walls; casters mount below')
+      sheet('Drawers', 'Drawer face', bt, 1, c.w - 0.25, faceH, 'Screw from inside the drawer front; 1/8" gap each side')
+      casters += 4
+      placements.push({ kind: 'drawer', x: c.x + DRAWER_SIDE_GAP, y: c.y + bt, z: caster, sx: boxW, sy: boxLen, sz: boxH, cell: c.index })
+      placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: bt, sz: faceH, cell: c.index })
+      const sec = layout.sections[c.section]
+      const kl = sec.joistX.findIndex((jx, k) => Math.abs(jx + sec.joistT[k] - c.x) < 0.05)
+      const px0 = kl >= 0 ? sec.joistX[kl] + sec.joistT[kl] / 2 : c.x - T / 2
+      const px1 = kl >= 0 && kl + 1 < sec.joistX.length ? sec.joistX[kl + 1] + sec.joistT[kl + 1] / 2 : c.x + c.w + T / 2
+      bays.push({ y: c.y, px0, px1, x0: Math.max(px0, c.x + 0.125 - 0.5), x1: Math.min(px1, c.x + c.w - 0.125 + 0.5), top: 0.125 + faceH + 0.5 })
     }
   }
 
@@ -365,18 +356,9 @@ export function buildFloor(input: Params): Build {
 
   if (p.features.edgeTrim) {
     for (const e of floorEdges(p.floor)) {
-
       if (!p.trimSides[e.side]) continue
       const th = 0.75
       const fullH = S + p.plyThickness + p.tatamiThickness / 2
-      const faces = e.isFront && p.features.drawers
-        ? placements.filter((q) => q.kind === 'drawerFace' && Math.abs(q.y - e.y1) < 0.01).sort((m, n) => m.x - n.x)
-        : []
-      const cuts = faces.map((q) => ({ x0: q.x - 0.5, x1: q.x + q.sx + 0.5, top: q.z + q.sz + 0.5 }))
-      const note = cuts.length
-        ? `3/4" plywood, ONE continuous front panel. Cut ${cuts.length} drawer opening(s), each ${r3(cuts[0].x1 - cuts[0].x0)}" wide x ${r3(cuts[0].top)}" tall from the bottom edge (1/2" beyond each side and 1/2" above the drawer face)`
-        : '3/4" plywood, ripped to cover frame + deck edge'
-      sheet('Edge trim', `Side panel - ${e.side}`, th, 1, e.length, fullH, note)
       const horiz = e.y1 === e.y2
       const base = {
         kind: 'trim' as const,
@@ -387,21 +369,35 @@ export function buildFloor(input: Params): Build {
         x: horiz ? Math.min(e.x1, e.x2) : e.side === 'left' ? e.x1 - th : e.x1,
         y: horiz ? (e.side === 'front' ? e.y1 - th : e.y1) : Math.min(e.y1, e.y2),
       }
-      if (!cuts.length) {
+      const mine = e.isFront && p.features.drawers ? bays.filter((b) => Math.abs(b.y - e.y1) < 0.01).sort((m, n) => m.px0 - n.px0) : []
+      if (!mine.length) {
+        sheet('Edge trim', `Side panel - ${e.side}`, th, 1, e.length, fullH, '3/4" plywood, ripped to cover frame + deck edge')
         placements.push(base)
         continue
       }
-      let cursor = base.x
       const end = base.x + base.sx
-      for (const c of cuts) {
-        placements.push({ ...base, kind: 'cutout', x: c.x0, sx: c.x1 - c.x0, sz: c.top })
-        if (c.x0 > cursor + 1e-6) placements.push({ ...base, x: cursor, sx: c.x0 - cursor })
-        if (c.top < fullH - 1e-6) placements.push({ ...base, x: c.x0, sx: c.x1 - c.x0, z: c.top, sz: fullH - c.top })
-        cursor = Math.max(cursor, c.x1)
+      const plain = (a: number, b: number) => {
+        if (b - a < 1e-3) return
+        sheet('Edge trim', 'Front fascia filler piece', th, 1, b - a, fullH, 'Plain panel between drawer pieces; seams land on a joist centre')
+        placements.push({ ...base, x: a, sx: b - a })
       }
-      if (end > cursor + 1e-6) placements.push({ ...base, x: cursor, sx: end - cursor })
+      let cursor = base.x
+      for (const b of mine) {
+        const a0 = Math.max(cursor, b.px0)
+        const a1 = Math.min(end, b.px1)
+        plain(cursor, a0)
+        const ow = b.x1 - b.x0
+        sheet('Edge trim', 'Front fascia piece with drawer opening', th, 1, a1 - a0, fullH, `Joist centre to joist centre. Cut an opening ${r3(ow)}" wide x ${r3(b.top)}" tall from the bottom edge, 1/2" beyond the drawer face each side and 1/2" above it`)
+        placements.push({ ...base, kind: 'cutout', x: b.x0, sx: ow, sz: b.top })
+        if (b.x0 > a0 + 1e-6) placements.push({ ...base, x: a0, sx: b.x0 - a0 })
+        if (b.top < fullH - 1e-6) placements.push({ ...base, x: b.x0, sx: ow, z: b.top, sz: fullH - b.top })
+        if (a1 > b.x1 + 1e-6) placements.push({ ...base, x: b.x1, sx: a1 - b.x1 })
+        cursor = a1
+      }
+      plain(cursor, end)
     }
   }
+
   const liftZones = p.liftTables.map((l) => ({ x: l.x, y: l.y, w: p.tatamiShort, l: p.tatamiShort }))
   if (liftZones.length) {
     const hit = (q: { x: number; y: number; sx: number; sy: number }, z: Rect) =>
@@ -479,16 +475,11 @@ export function buildFloor(input: Params): Build {
     })
   }
   if (joistLf) hardware.push({ name: 'Construction adhesive tubes', qty: Math.max(1, Math.ceil(joistLf / 25)), unit: 'tubes' })
-  if (slides) hardware.push({ name: 'Drawer slides (side mount, pairs)', qty: drawerCells.length, unit: 'pairs', notes: `Total slide length about ${slides}"; choose the nearest even length` })
-  if (readyDrawers && drawerCells.length) {
-    const rb = findRollingBox(p.rollingBox.id)
-    hardware.push({ name: `Ready-made rolling box${rb ? ` - ${rb.name}` : ' (custom size)'}`, qty: drawerCells.length, unit: 'pcs', notes: `${r3(p.rollingBox.w)}" x ${r3(p.rollingBox.d)}" x ${r3(p.rollingBox.h)}"; one per front cell` })
-    if (!rb?.casters) hardware.push({ name: 'Swivel casters (kit)', qty: drawerCells.length, unit: 'sets', notes: 'Only if the box has no wheels; box height above includes them' })
-  }
+  if (casters) hardware.push({ name: `Caster wheels, ${r3(p.casterH)}" tall overall (your own)`, qty: casters, unit: 'pcs', notes: '4 per drawer; screw to the underside of the drawer bottom' })
   if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `Needs about ${LIFT_DEPTH}" of depth below the deck for the retracted table and motor, plus a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
   const smallBins = placements.filter((q) => q.kind === 'bin' && q.split)
-  if (smallBins.length) hardware.push({ name: `Smaller bins, about ${r3(smallBins[0].sx)}" x ${r3(smallBins[0].sy)}" x ${r3(p.bin.h)}" (purchased; sized to fit)`, qty: smallBins.length, unit: 'pcs', notes: 'Split bins: pick the nearest IKEA size that fits each half' })
+  if (smallBins.length) hardware.push({ name: `Smaller bins, about ${r3(smallBins[0].sx)}" x ${r3(smallBins[0].sy)}" x ${r3(p.bin.h)}" (purchased; sized to fit)`, qty: smallBins.length, unit: 'pcs', notes: 'Split bins: pick the nearest standard size that fits each half' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })
   if (accessCount) hardware.push({ name: 'Recessed finger pulls', qty: accessCount, unit: 'pcs' })
   if (serviceCells.length) hardware.push({ name: 'Cable pass-through grommets 1-1/2"', qty: cableHoles, unit: 'pcs', notes: 'Drill through joists / blocks to form a continuous cable chase from wall outlets to TV stand, table and heater' })
@@ -529,7 +520,7 @@ export function buildFloor(input: Params): Build {
       : layers.length ? 'Glue and screw the build-up strips under each joist before standing the frame up.' : 'No build-up strips needed for this height.',
     'Set the frame in place, level it with shims, then glue and screw sections together where they meet.',
     ul > 0 ? `Before the frame goes down, roll out the ${r3(ul)}" acoustic underlay wall to wall, seams butted and taped.` : '',
-    p.features.drawers ? (readyDrawers ? 'Roll the IKEA boxes into the front cells and screw the plywood false fronts on with even 1/8" gaps.' : 'Install drawer slides, build drawer boxes (pocket screws), and fit the faces with even 1/8" gaps.') : '',
+    p.features.drawers ? 'Build the plywood drawer boxes, fit the casters, roll them into the front bays and screw the faces on with even 1/8" gaps.' : '',
     `Lay the ${r3(p.plyThickness)}" plywood deck in ${deckPanels} panel(s), seams on joist/block centres, screws about every 8". Panels are not glued so they can be lifted.`,
     p.features.edgeTrim ? 'Fit fascia trim on the selected exposed edges.' : '',
     'Lay the tatami mats following the chosen arrangement; screw plywood filler pieces down to the joists wherever the mats do not reach.',

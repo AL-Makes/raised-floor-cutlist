@@ -1,4 +1,4 @@
-import { CUSTOM_BIN_ID, CUSTOM_ROLLING_ID, IKEA_BINS, IKEA_ROLLING_BOXES, findBin, findRollingBox } from '../lib/bins'
+import { CUSTOM_BIN_ID } from '../lib/bins'
 import type { Build } from '../lib/build'
 import type { Params } from '../lib/types'
 import { formatLength, type UnitSystem } from '../lib/units'
@@ -22,8 +22,6 @@ function Stepper({ label, value, onChange, hint }: { label: string; value: numbe
 
 export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: Params) => Params) => void; units: UnitSystem; build: Build }) {
   const upd = (patch: Partial<Params>) => set((q) => ({ ...q, ...patch }))
-  const bin = findBin(p.binId)
-  const rolling = findRollingBox(p.rollingBox.id)
   const h = build.height
   return (
     <div className="inputs">
@@ -69,32 +67,15 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
       </section>
 
       <section>
-        <h3>2. Storage bin</h3>
-        <label className="field">
-          <span>IKEA bin</span>
-          <select value={p.binId} onChange={(e) => {
-            const id = e.target.value
-            const b = findBin(id)
-            upd(b ? { binId: id, bin: { w: b.w, d: b.d, h: b.h } } : { binId: id })
-          }}>
-            {IKEA_BINS.map((b) => (
-              <option key={b.id} value={b.id}>{b.name} - {formatLength(b.w, units)} x {formatLength(b.d, units)} x {formatLength(b.h, units)}</option>
-            ))}
-            <option value={CUSTOM_BIN_ID}>Custom size...</option>
-          </select>
-        </label>
-        {bin && (
-          <small>
-            <a href={bin.url} target="_blank" rel="noreferrer">Open {bin.series} on ikea.com</a> to confirm the exact size. Built-in sizes are approximate.
-          </small>
-        )}
+        <h3>2. Storage cell size</h3>
+        <small>The size of the item each cell must hold. It sets the joist spacing and the drawer size.</small>
         <div className="grid2">
-          <LenInput label="Bin width" units={units} value={p.bin.w} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, w: v } })} />
-          <LenInput label="Bin depth" units={units} value={p.bin.d} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, d: v } })} />
-          <LenInput label="Bin height" units={units} value={p.bin.h} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, h: v } })} />
-          <LenInput label="Clearance around bin" units={units} value={p.clearance} onChange={(v) => upd({ clearance: v })} />
+          <LenInput label="Item width" units={units} value={p.bin.w} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, w: v } })} />
+          <LenInput label="Item depth" units={units} value={p.bin.d} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, d: v } })} />
+          <LenInput label="Item height" units={units} value={p.bin.h} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, h: v } })} />
+          <LenInput label="Clearance around item" units={units} value={p.clearance} onChange={(v) => upd({ clearance: v })} />
         </div>
-        <Check label="Bin's long side runs along the joists" checked={p.binLongAlongJoists} onChange={(v) => upd({ binLongAlongJoists: v })} hint="Off = long side across the joists" />
+        <Check label="Item's long side runs along the joists" checked={p.binLongAlongJoists} onChange={(v) => upd({ binLongAlongJoists: v })} hint="Off = long side across the joists" />
       </section>
 
       <section>
@@ -121,7 +102,7 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
           </>
         )}
         <div className={`note ${h.fits ? 'okc' : 'failc'}`}>
-          Frame height needed: <b>{formatLength(h.target, units)}</b> (bins need {formatLength(h.required, units)}).
+          Frame height needed: <b>{formatLength(h.target, units)}</b> (storage items need {formatLength(h.required, units)}).
           {!h.fits && <> Raise the final height to at least <b>{formatLength(h.minFinalHeight, units)}</b>.</>}
         </div>
         <div className="seg">
@@ -142,43 +123,7 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
 
       <section>
         <h3>4. Features</h3>
-        <Check label="Drawers on the front row" checked={p.features.drawers} onChange={(v) => upd({ features: { ...p.features, drawers: v }, heightOption: 0 })} hint="Slide-out or rolling drawers along the front; needs more height" />
-        {p.features.drawers && (
-          <div className="subopts">
-            <div className="seg">
-              <button className={p.drawerKind === 'built' ? 'on' : ''} onClick={() => upd({ drawerKind: 'built', heightOption: 0 })}>Build drawers (bin inside)</button>
-              <button className={p.drawerKind === 'ikea' ? 'on' : ''} onClick={() => upd({ drawerKind: 'ikea', heightOption: 0 })}>Ready-made IKEA rolling box</button>
-            </div>
-            {p.drawerKind === 'ikea' && (
-              <>
-                <label className="field">
-                  <span>Rolling drawer / box</span>
-                  <select value={p.rollingBox.id} onChange={(e) => {
-                    const id = e.target.value
-                    const b = findRollingBox(id)
-                    upd(b ? { rollingBox: { id, w: b.w, d: b.d, h: b.h }, heightOption: 0 } : { rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID } })
-                  }}>
-                    {IKEA_ROLLING_BOXES.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name} - {formatLength(b.w, units)} x {formatLength(b.d, units)} x {formatLength(b.h, units)}</option>
-                    ))}
-                    <option value={CUSTOM_ROLLING_ID}>Custom size...</option>
-                  </select>
-                </label>
-                {rolling && (
-                  <small>
-                    <a href={rolling.url} target="_blank" rel="noreferrer">Open on ikea.com</a> to confirm the size{rolling.casters ? '' : '; this one has no wheels, so add casters (height included below)'}. Joist spacing follows the box width + clearance.
-                  </small>
-                )}
-                <div className="grid2">
-                  <LenInput label="Box width" units={units} value={p.rollingBox.w} min={1} onChange={(v) => upd({ rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID, w: v }, heightOption: 0 })} />
-                  <LenInput label="Box depth" units={units} value={p.rollingBox.d} min={1} onChange={(v) => upd({ rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID, d: v }, heightOption: 0 })} />
-                  <LenInput label="Height incl. wheels" units={units} value={p.rollingBox.h} min={1} onChange={(v) => upd({ rollingBox: { ...p.rollingBox, id: CUSTOM_ROLLING_ID, h: v }, heightOption: 0 })} />
-                </div>
-                <small>The box's short side goes across the joists; its long side pulls out toward the front.</small>
-              </>
-            )}
-          </div>
-        )}
+        <Check label="Drawers on the front row" checked={p.features.drawers} onChange={(v) => upd({ features: { ...p.features, drawers: v }, heightOption: 0 })} hint="Plywood drawers on casters along the front; see Drawer design below" />
         <Check label="Fascia edge trim" checked={p.features.edgeTrim} onChange={(v) => upd({ features: { ...p.features, edgeTrim: v } })} />
         {p.features.edgeTrim && (
           <div className="inline">
@@ -194,7 +139,16 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
       </section>
 
       <section>
-        <h3>5. Stock & loads</h3>
+        <h3>5. Drawer design</h3>
+        {!p.features.drawers && <small>Turn on "Drawers on the front row" in Features to use these.</small>}
+        <div className="grid2">
+          <LenInput label="Board thickness (plywood)" units={units} value={p.drawerBoardT} min={0.25} onChange={(v) => upd({ drawerBoardT: v, heightOption: 0 })} />
+          <LenInput label="Caster wheel height" units={units} value={p.casterH} min={0} onChange={(v) => upd({ casterH: v, heightOption: 0 })} />
+        </div>
+        <small>Each drawer fills the space between two joists, leaving 1" clear on both sides and at the back, with the front flush to the support. The front fascia is cut in pieces from joist centre to joist centre, each with a drawer opening.</small>
+      </section>
+      <section>
+        <h3>6. Stock & loads</h3>
         <div className="grid2">
           <LenInput label="Sheet length" units={units} value={p.sheetL} min={12} onChange={(v) => upd({ sheetL: v })} />
           <LenInput label="Sheet width" units={units} value={p.sheetW} min={12} onChange={(v) => upd({ sheetW: v })} />

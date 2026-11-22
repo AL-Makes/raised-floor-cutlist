@@ -63,11 +63,12 @@ export interface Params {
   /** true = bin's long side runs along the joists (y) */
   binLongAlongJoists: boolean
   clearance: number
-  /** front-row drawers: custom built from plywood, or a ready-made IKEA rolling box */
-  drawerKind: 'built' | 'ikea'
+  /** plywood thickness for the drawer boxes and faces */
+  drawerBoardT: number
+  /** overall height of the caster wheels under each drawer */
+  casterH: number
   /** solid = one deep board on edge; builtup = 2x4 top + bottom chords with vertical 2x4 webs */
   joistStyle: 'solid' | 'builtup'
-  rollingBox: { id: string; w: number; d: number; h: number }
   maxSpacing: number
   features: Features
   trimSides: TrimSides
