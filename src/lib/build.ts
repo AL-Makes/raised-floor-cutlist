@@ -337,7 +337,7 @@ export function buildFloor(input: Params): Build {
         // deck panels are cut to match each filler piece exactly
         for (const f of layout.fillers) {
           for (const [axis, pos] of [['x', f.x], ['x', f.x + f.w], ['y', f.y], ['y', f.y + f.l]] as const)
-            parts = parts.flatMap((r) => splitAt(r, axis, pos))
+            parts = parts.flatMap((r) => (r.x < f.x + f.w - 0.5 && r.x + r.w > f.x + 0.5 && r.y < f.y + f.l - 0.5 && r.y + r.l > f.y + 0.5 ? splitAt(r, axis, pos) : [r]))
         }
         for (const r of parts) {
           const cx = r.x + r.w / 2
@@ -351,31 +351,35 @@ export function buildFloor(input: Params): Build {
       }
     }
     // each filler piece gets one deck panel of exactly its size (no seams from the bin-area joist layout)
-    layout.fillers.forEach((f, fi) => {
-      const x0 = Math.max(f.x, rect.x)
-      const y0 = Math.max(f.y, rect.y)
-      const x1 = Math.min(f.x + f.w, rect.x + rect.w)
-      const y1 = Math.min(f.y + f.l, rect.y + rect.l)
-      if (x1 - x0 < 0.5 || y1 - y0 < 0.5) return
-      const fitSheet = (q: Rect): Rect[] => {
+    // a section that is entirely filler is planned as one zone so adjacent fillers share sheets (fewest cuts)
+    const touching = layout.fillers.map((f, fi) => ({ f, fi })).filter(({ f }) => Math.min(f.x + f.w, rect.x + rect.w) - Math.max(f.x, rect.x) > 0.5 && Math.min(f.y + f.l, rect.y + rect.l) - Math.max(f.y, rect.y) > 0.5)
+    const wholeSection = touching.length > 0 && Math.abs(touching.reduce((s, { f }) => s + (Math.min(f.x + f.w, rect.x + rect.w) - Math.max(f.x, rect.x)) * (Math.min(f.y + f.l, rect.y + rect.l) - Math.max(f.y, rect.y)), 0) - rect.w * rect.l) < 1
+    const zones = wholeSection
+      ? [{ fi: -1, x0: rect.x, y0: rect.y, x1: rect.x + rect.w, y1: rect.y + rect.l, service: touching.some(({ fi }) => (p.fillerAccess ?? []).includes(fi)) }]
+      : touching.map(({ f, fi }) => ({ fi, x0: Math.max(f.x, rect.x), y0: Math.max(f.y, rect.y), x1: Math.min(f.x + f.w, rect.x + rect.w), y1: Math.min(f.y + f.l, rect.y + rect.l), service: (p.fillerAccess ?? []).includes(fi) }))
+    zones.forEach(({ x0, y0, x1, y1, service }) => {      const fitSheet = (q: Rect): Rect[] => {
         const big = Math.max(q.w, q.l)
         const small = Math.min(q.w, q.l)
         if (big <= p.sheetL + 1e-6 && small <= p.sheetW + 1e-6) return [q]
         return (q.w >= q.l ? splitAt(q, 'x', q.x + q.w / 2) : splitAt(q, 'y', q.y + q.l / 2)).flatMap(fitSheet)
       }
       const whole: Rect = { x: x0, y: y0, w: x1 - x0, l: y1 - y0 }
-      const service = (p.fillerAccess ?? []).includes(fi)
-      let pieces: { r: Rect; lift: boolean }[] = fitSheet(whole).map((q) => ({ r: q, lift: false }))
+      let pieces: { r: Rect; lift: boolean }[] = (wholeSection
+        ? planDeck(rect.w, rect.l, joistCenters, yCenters, p.sheetL, p.sheetW).pieces.map((pc) => ({ x: rect.x + pc.x, y: rect.y + pc.y, w: pc.w, l: pc.l }))
+        : fitSheet(whole)
+      ).map((q) => ({ r: q, lift: false }))
       if (service) {
+        const target = pieces.reduce((a, b) => (b.r.w * b.r.l > a.r.w * a.r.l ? b : a))
+        const tr = target.r
         const cands: { axis: 'x' | 'y'; pos: number }[] = [
           ...sec.joistX.map((x, k) => ({ axis: 'x' as const, pos: x + sec.joistT[k] / 2 })),
           ...sec.blockY.map((y) => ({ axis: 'y' as const, pos: y + T / 2 })),
-        ].filter((c) => (c.axis === 'x' ? c.pos > x0 + 0.5 && c.pos < x1 - 0.5 : c.pos > y0 + 0.5 && c.pos < y1 - 0.5))
-        const mid = (c: { axis: 'x' | 'y'; pos: number }) => Math.abs(c.pos - (c.axis === 'x' ? (x0 + x1) / 2 : (y0 + y1) / 2))
+        ].filter((c) => (c.axis === 'x' ? c.pos > tr.x + 0.5 && c.pos < tr.x + tr.w - 0.5 : c.pos > tr.y + 0.5 && c.pos < tr.y + tr.l - 0.5))
+        const mid = (c: { axis: 'x' | 'y'; pos: number }) => Math.abs(c.pos - (c.axis === 'x' ? tr.x + tr.w / 2 : tr.y + tr.l / 2))
         const best = cands.sort((a, b) => mid(a) - mid(b))[0]
-        const halves = best ? splitAt(whole, best.axis, best.pos) : [whole]
+        const halves = best ? splitAt(tr, best.axis, best.pos) : [tr]
         const small = halves.length === 2 ? (halves[0].w * halves[0].l <= halves[1].w * halves[1].l ? 0 : 1) : 0
-        pieces = halves.map((h, k) => ({ r: h, lift: k === small }))
+        pieces = [...pieces.filter((x) => x !== target), ...halves.map((h, k) => ({ r: h, lift: halves.length === 1 || k === small }))]
       }
       for (const { r: q, lift } of pieces) {
         if (lift) {
