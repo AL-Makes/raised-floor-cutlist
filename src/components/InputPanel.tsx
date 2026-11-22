@@ -196,6 +196,7 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
           <LenInput label="Max joist spacing (o.c.)" units={units} value={p.maxSpacing} onChange={(v) => upd({ maxSpacing: v })} />
           <Stepper label="Main joists" value={p.joistAdjust} onChange={(v) => upd({ joistAdjust: v })} hint={`${build.layout.cellMinX ? `Spacing = bin width + clearance (${formatLength(build.layout.cellMinX, units)} clear)` : ''}. + adds, - removes (wider cells hold 2+ bins)`} />
           <Stepper label="Cross joists (per section)" value={p.crossAdjust} onChange={(v) => upd({ crossAdjust: v })} hint="Relative to the automatic count" />
+          <button className="small" onClick={() => upd({ joistAdjust: 0, crossAdjust: 0, secAdjust: {}, colAdjust: {}, fixedCounts: {}, moves: {} })}>Reset all added / deleted supports</button>
           <label className="field">
             <span>Supports per joist <em>0 = continuous</em></span>
             <div className="stepper">
