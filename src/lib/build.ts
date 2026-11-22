@@ -260,7 +260,6 @@ export function buildFloor(input: Params): Build {
   const ply = p.plyThickness
   for (const q of deck.panels) {
     const lift = q.kind === 'lift'
-    const under = q.kind !== 'accessible'
     if (q.kind === 'accessible') {
       sheet('Deck', `Accessible deck panel (${r3(ply)}" ply)`, ply, 1, q.w, q.l, 'Under the tatami mats; lifts out to reach the bins / drawers below. Edges on joist centrelines')
       deckPanels++
@@ -271,9 +270,8 @@ export function buildFloor(input: Params): Build {
       sheet('Deck', `Deck panel under filler (${r3(ply)}" ply, fixed)`, ply, 1, q.w, q.l, 'Same size as the filler area; screw down to the joists and blocks, not accessible')
       deckPanels++
     }
-    if (under) sheet('Deck reinforcement', `Heavy-load reinforcing ply under filler (${r3(ply)}" ply)`, ply, 1, q.w, q.l, 'Glue + screw a second layer for TV / TV stand loads; seams offset from the panel above')
     placements.push({ kind: lift ? 'hatch' : 'deck', x: q.x, y: q.y, z: S, sx: q.w, sy: q.l, sz: ply })
-    heaviest = Math.max(heaviest, q.w * q.l * ply * PLY_LB_PER_IN3 * (under ? 2 : 1))
+    heaviest = Math.max(heaviest, q.w * q.l * ply * PLY_LB_PER_IN3)
   }
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
   const clr = p.clearance
@@ -512,7 +510,7 @@ export function buildFloor(input: Params): Build {
   if (heaviest > 75) {
     warnings.push(`The deck panels lift off whole: the heaviest is about ${Math.round(heaviest)} lb. Consider thinner plywood or a smaller sheet size so one person can lift it.`)
   }
-  if (serviceCells.length) warnings.push(`${serviceCells.length} heavy-load cell(s) under the plywood filler: reinforced with doubled joists and blocking, no bins/drawers, not accessible once screwed down.`)
+  if (serviceCells.length) warnings.push(`${serviceCells.length} heavy-load cell(s) under the plywood filler: extra blocking, no bins/drawers, not accessible once screwed down.`)
   const tatamiFits = geometry.rects.length === 0 || tatamiFit(geometry.rects, p.tatamiShort)
   if (!tatamiFits) warnings.push('Flooring size not large enough to accommodate at least one tatami mat.')
 

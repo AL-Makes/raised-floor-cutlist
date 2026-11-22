@@ -493,7 +493,7 @@ describe('filler service zones', () => {
     const f = b.layout.fillers[0]
     const under = b.placements.filter((q) => q.kind === 'deck' && Math.abs(q.x - f.x) < 0.51 && Math.abs(q.y - f.y) < 0.51)
     expect(under.length).toBeGreaterThan(0)
-    expect(b.parts.some((i) => i.name.startsWith('Heavy-load reinforcing ply'))).toBe(true)
+    expect(b.parts.some((i) => i.name.startsWith('Heavy-load reinforcing ply'))).toBe(false)
   })
   it('cutting a filler at its joist makes one maintenance lift-out; mats stay accessible', () => {
     const base = buildFloor(defaultParams())
