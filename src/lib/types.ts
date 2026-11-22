@@ -83,6 +83,8 @@ export interface Params {
   crossAdjust: number
   /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
   moves: Record<string, number>
+  /** bin cells chosen as access panels (keys from Cell.key); used in addition to features.hatches */
+  hatchCells?: string[]
   tatamiPattern: TatamiPatternId
   /** thickness of the acoustic underlay (QEP natural cork is 6 mm, about 1/4") */
   underlayThickness: number
@@ -146,8 +148,14 @@ export interface Placement {
 
 export type CellType = 'bin' | 'drawer' | 'service'
 
+export function isHatch(p: Pick<Params, 'features' | 'hatchCells'>, c: Cell): boolean {
+  return c.type === 'bin' && (p.features.hatches || (p.hatchCells ?? []).includes(c.key))
+}
+
 export interface Cell {
   index: number
+  /** stable id `${section}:${col}:${row}` */
+  key: string
   section: number
   x: number
   y: number

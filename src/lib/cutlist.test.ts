@@ -367,3 +367,13 @@ describe('filler service zones', () => {
     expect(b.placements.some((x) => x.kind === 'service')).toBe(true)
   })
 })
+
+describe('chosen access panels', () => {
+  it('only chosen bin cells get hatches', () => {
+    const p = defaultParams()
+    const cell = buildFloor(p).layout.cells.find((c) => c.type === 'bin')!
+    const b = buildFloor({ ...p, hatchCells: [cell.key] })
+    expect(b.placements.filter((x) => x.kind === 'hatch').length).toBe(1)
+    expect(buildFloor(p).placements.some((x) => x.kind === 'hatch')).toBe(false)
+  })
+})

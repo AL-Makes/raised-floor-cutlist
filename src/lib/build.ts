@@ -4,6 +4,7 @@ import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './
 import { buildLayout, DRAWER_FACE_T, DRAWER_SLIDE, DRAWER_WALL, WEB_OC, rollingAxes, type Layout } from './layout'
 import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
 import { tatamiFit } from './tatami'
+import { isHatch } from './types'
 import type { FloorSpec, Params, Part, Placement, Rect } from './types'
 
 /** Structural plywood, roughly 34 lb per cubic foot. */
@@ -56,6 +57,7 @@ export function defaultParams(): Params {
     joistAdjust: 0,
     crossAdjust: 0,
     moves: {},
+    hatchCells: [],
     tatamiPattern: 'brick',
     tatamiAnchor: 'bl',
     tatamiLong: 72,
@@ -330,7 +332,6 @@ export function buildFloor(input: Params): Build {
     }
   })
 
-  const binCells = layout.cells.filter((c) => c.type === 'bin')
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
   let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY, 0)
 
@@ -352,8 +353,9 @@ export function buildFloor(input: Params): Build {
     }
   })
 
-  if (p.features.hatches) {
-    for (const c of binCells) {
+  const hatchCells = layout.cells.filter((c) => isHatch(p, c))
+  if (hatchCells.length) {
+    for (const c of hatchCells) {
       const w = c.w + 1
       const l = c.l + 1
       sheet('Access hatches', `Hatch panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, w, l, 'Rests 1/2" on joist/block tops; cut 1/8" clear opening in deck')
@@ -528,7 +530,7 @@ export function buildFloor(input: Params): Build {
   }
   if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `Needs about ${LIFT_DEPTH}" of depth below the deck for the retracted table and motor, plus a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
-  if (p.features.hatches && binCells.length) hardware.push({ name: 'Recessed finger pulls', qty: binCells.length, unit: 'pcs' })
+  if (hatchCells.length) hardware.push({ name: 'Recessed finger pulls', qty: hatchCells.length, unit: 'pcs' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })
   if (serviceCells.length) hardware.push({ name: 'Cable pass-through grommets 1-1/2"', qty: cableHoles, unit: 'pcs', notes: 'Drill through joists / blocks to form a continuous cable chase from wall outlets to TV stand, table and heater' })
   if (serviceCells.length) hardware.push({ name: 'Cable clips / surface raceway', qty: serviceCells.length * 2, unit: 'pcs', notes: 'Keep cables off the slab; leave heater clearance' })
@@ -570,7 +572,7 @@ export function buildFloor(input: Params): Build {
     ul > 0 ? `Before the frame goes down, roll out the ${r3(ul)}" acoustic underlay wall to wall, seams butted and taped.` : '',
     p.features.drawers ? (readyDrawers ? 'Roll the IKEA boxes into the front cells and screw the plywood false fronts on with even 1/8" gaps.' : 'Install drawer slides, build drawer boxes (pocket screws), and fit the faces with even 1/8" gaps.') : '',
     `Lay the ${r3(p.plyThickness)}" plywood deck in ${deckPanels} panel(s), seams on joist/block centres, screws about every 8". Panels are not glued so they can be lifted.`,
-    p.features.hatches ? 'Cut access hatch openings and fit the hatch panels; add finger pulls.' : '',
+    hatchCells.length ? 'Cut access hatch openings and fit the hatch panels; add finger pulls.' : '',
     p.features.edgeTrim ? 'Fit fascia trim on the selected exposed edges.' : '',
     'Lay the tatami mats following the chosen arrangement; screw plywood filler pieces down to the joists wherever the mats do not reach.',
     serviceCells.length ? 'Heavy-load / cable zones under the filler pieces: no bins or drawers. Add the sister joists and mid-cell blocks, drill 1-1/2" holes in line through joists and blocks for the cable chase, fit grommets, and run extension cables before screwing the fillers down.' : '',

@@ -5,6 +5,7 @@ import { Edges, Html, OrbitControls } from '@react-three/drei'
 import type { Build } from '../lib/build'
 import type { Structural, Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
+import { isHatch } from '../lib/types'
 import type { Placement } from '../lib/types'
 import { formatLength, type UnitSystem } from '../lib/units'
 
@@ -212,8 +213,9 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; onMove: (key: string, v: number) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onToggleHatch, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; onMove: (key: string, v: number) => void; onToggleHatch: (key: string) => void; units?: UnitSystem }) {
   const [hover, setHoverState] = useState<Hover | null>(null)
+  const [hoverCell, setHoverCell] = useState<string | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const endDrag = useMemo(() => () => setDrag(null), [])
   const timer = useRef<number | undefined>(undefined)
@@ -230,6 +232,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
   const ply = build.params.plyThickness
   const status = new Map(structural.cells.map((c) => [c.cell, c.status]))
   const L = opts.layers
+  const cutMode = L.deck.visible
   const front = g.front
 
   return (
@@ -254,12 +257,12 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
           const st = p.cell !== undefined ? status.get(p.cell) : undefined
           return <Box key={i} p={p} color={opts.loadMap && st ? STATUS_COLOR[st] : COLORS.hatch} opacity={layer.opacity} />
         }
-        const edit = p.kind === 'block'
+        const edit = p.kind === 'block' && !cutMode
         const id = `p${i}`
         const dragging = !!drag && !!p.ref && drag.ref.s === p.ref.s && drag.ref.axis === p.ref.axis && drag.ref.k === p.ref.k
         const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'
         const over = edit && !drag ? () => setHover({ id, kind: 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
-        const down = p.ref
+        const down = p.ref && !cutMode
           ? (pt: { x: number; y: number; z: number }) => {
               setHoverState(null)
               const r = p.ref!
@@ -291,7 +294,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
         if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
         return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
-      {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
+      {!cutMode && voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
           key={v.id}
           position={[v.zone.x + v.zone.sx / 2, v.zone.z + v.zone.sz / 2, -(v.zone.y + v.zone.sy / 2)]}
@@ -320,10 +323,27 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
           </div>
         </Html>
       )}
+      {cutMode &&
+        build.layout.cells.filter((c) => c.type === 'bin').map((c) => {
+          const on = isHatch(build.params, c)
+          const hot = hoverCell === c.key
+          return (
+            <mesh
+              key={`cut${c.key}`}
+              position={[c.x + c.w / 2, S + ply + 0.1, -(c.y + c.l / 2)]}
+              onPointerOver={(e) => { e.stopPropagation(); setHoverCell(c.key) }}
+              onPointerOut={() => setHoverCell((h) => (h === c.key ? null : h))}
+              onClick={(e) => { e.stopPropagation(); if (e.delta < 5) onToggleHatch(c.key) }}
+            >
+              <boxGeometry args={[c.w - 0.3, 0.1, c.l - 0.3]} />
+              <meshBasicMaterial color={on ? '#2ecc71' : '#3b82f6'} transparent opacity={hot ? 0.6 : on ? 0.35 : 0.01} depthWrite={false} />
+            </mesh>
+          )
+        })}
       {opts.loadMap &&
         L.deck.visible &&
         build.layout.cells.map((c) => {
-          if (build.params.features.hatches && c.type === 'bin') return null
+          if (isHatch(build.params, c)) return null
           const st = status.get(c.index) ?? 'ok'
           const pl: Placement = { kind: 'deck', x: c.x, y: c.y, z: S + ply + 0.05, sx: c.w, sy: c.l, sz: 0.05 }
           return <Box key={`lm${c.index}`} p={pl} color={STATUS_COLOR[st]} opacity={0.8} />

@@ -234,14 +234,15 @@ export function buildLayout(p: Params): Layout {
     }
 
     sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact, applied })
-    for (const row of rows) {
-      for (const col of cols) {
+    rows.forEach((row, ri) => {
+      cols.forEach((col, ci) => {
         const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer ? 'drawer' : 'bin'
         const isSvc = type === 'service'
         const needL = row.drawer ? drawerLen - 0.01 : cellMinY
         const fitsBin = isSvc || (col.w >= cellMinX - 1e-6 && row.l >= needL - 1e-6)
         cells.push({
           index: cells.length,
+          key: `${si}:${ci}:${ri}`,
           section: si,
           x: col.x,
           y: row.y,
@@ -257,8 +258,8 @@ export function buildLayout(p: Params): Layout {
             `Section ${si + 1}: a ${type} cell is ${col.w.toFixed(2)}" x ${row.l.toFixed(2)}" - too small for the bin. Remove a joist/cross joist, make the floor larger or pick a smaller bin.`,
           )
         }
-      }
-    }
+      })
+    })
   })
 
   return { sections, cells, fillers, binX: bx, binY: by, cellMinX, cellMinY, drawerLen, dividerT, joistW: T, warnings: [...new Set(warnings)] }

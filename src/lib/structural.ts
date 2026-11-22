@@ -1,4 +1,5 @@
 import { buildFloor, type Build } from './build'
+import { isHatch } from './types'
 import type { Params } from './types'
 
 function buildFloorLazy(p: Params): Build | null {
@@ -106,7 +107,7 @@ function joistRatio(b: Build): number {
 function cellAnalysis(b: Build): CellAnalysis[] {
   const p = b.params
   return b.layout.cells.map((c) => {
-    const hatch = p.features.hatches && c.type === 'bin'
+    const hatch = isHatch(p, c)
     const span = Math.min(c.w, c.l) + (hatch ? 0.5 : 0)
     const cap = plyCapacity(p.plyThickness, span)
     const ratio = Math.min(cap.psf / p.designLoadPsf, cap.pointLb / p.pointLoadLb)
@@ -162,7 +163,7 @@ export function analyze(b: Build): Structural {
         apply: (q) => ({ ...q, binLongAlongJoists: !q.binLongAlongJoists }),
       })
     }
-    if (p.features.hatches) {
+    if (b.layout.cells.some((c) => isHatch(p, c))) {
       suggestions.push({
         id: 'hatch-note',
         text: 'Wide hatches flex most: glue a second 1/4" ply skin under each hatch panel, or split wide hatches into two smaller ones.',
