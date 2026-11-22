@@ -193,7 +193,6 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
   const ply = build.params.plyThickness
   const status = new Map(structural.cells.map((c) => [c.cell, c.status]))
   const L = opts.layers
-  const deckTop = Math.max(S, ...build.placements.filter((q) => q.kind === 'deck').map((q) => q.z + q.sz))
   const front = g.front
 
   return (
@@ -242,8 +241,8 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
         )
       })}
       {build.placements.map((p, i) => {
-        if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
-        return <DimPlane key={`dim${i}`} p={p} y={(L.deck.visible ? deckTop : p.z + p.sz) + 0.04} units={units} />
+        if (!opts.dims || L.deck.visible || L.tatami.visible || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
+        return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
