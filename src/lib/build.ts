@@ -314,7 +314,7 @@ export function buildFloor(input: Params): Build {
   const faceH = Math.max(1, S - 1.5 - 1 - 0.125)
   const boxH = Math.max(bt + 1, S - 1.5 - 1 - caster)
   let casters = 0
-  const bays: { y: number; px0: number; px1: number; x0: number; x1: number; top: number }[] = []
+  const bays: { cell: number; y: number; px0: number; px1: number; x0: number; x1: number; top: number }[] = []
   if (p.features.drawers) {
     for (const c of drawerCells) {
       binCount -= c.binsX * c.binsY
@@ -332,7 +332,7 @@ export function buildFloor(input: Params): Build {
       const kl = sec.joistX.findIndex((jx, k) => Math.abs(jx + sec.joistT[k] - c.x) < 0.05)
       const px0 = kl >= 0 ? sec.joistX[kl] + sec.joistT[kl] / 2 : c.x - T / 2
       const px1 = kl >= 0 && kl + 1 < sec.joistX.length ? sec.joistX[kl + 1] + sec.joistT[kl + 1] / 2 : c.x + c.w + T / 2
-      bays.push({ y: c.y, px0, px1, x0: Math.max(px0, c.x + 0.125 - 0.5), x1: Math.min(px1, c.x + c.w - 0.125 + 0.5), top: 0.125 + faceH + 0.5 })
+      bays.push({ cell: c.index, y: c.y, px0, px1, x0: Math.max(px0, c.x + 0.125 - 0.5), x1: Math.min(px1, c.x + c.w - 0.125 + 0.5), top: 0.125 + faceH + 0.5 })
     }
   }
 
@@ -392,7 +392,7 @@ export function buildFloor(input: Params): Build {
         plain(cursor, a0)
         const ow = b.x1 - b.x0
         sheet('Edge trim', 'Front fascia piece with drawer opening', th, 1, a1 - a0, fullH, `Joist centre to joist centre. Cut an opening ${r3(ow)}" wide x ${r3(b.top)}" tall from the bottom edge, 1/2" beyond the drawer face each side and 1/2" above it`)
-        placements.push({ ...base, kind: 'cutout', x: b.x0, sx: ow, sz: b.top })
+        placements.push({ ...base, kind: 'cutout', x: b.x0, sx: ow, sz: b.top, cell: b.cell })
         if (b.x0 > a0 + 1e-6) placements.push({ ...base, x: a0, sx: b.x0 - a0 })
         if (b.top < fullH - 1e-6) placements.push({ ...base, x: b.x0, sx: ow, z: b.top, sz: fullH - b.top })
         if (a1 > b.x1 + 1e-6) placements.push({ ...base, x: b.x1, sx: a1 - b.x1 })

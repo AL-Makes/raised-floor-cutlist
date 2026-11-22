@@ -328,7 +328,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
   const memberOf = new Map(members.filter((m) => m.kind !== 'pad').map((m) => [m.index, m]))
   const L = opts.layers
   const front = g.front
-  const pullKey = (p: Placement) => (p.lift !== undefined ? `l${p.lift}` : (p.kind === 'drawer' || p.kind === 'drawerFace') && p.cell !== undefined ? `d${p.cell}` : undefined)
+  const pullKey = (p: Placement) => (p.lift !== undefined ? `l${p.lift}` : (p.kind === 'drawer' || p.kind === 'drawerFace' || p.kind === 'cutout') && p.cell !== undefined ? `d${p.cell}` : undefined)
   const placed = build.placements.map((p) => {
     const k = pullKey(p)
     const v = k ? pulls[k] ?? 0 : 0
