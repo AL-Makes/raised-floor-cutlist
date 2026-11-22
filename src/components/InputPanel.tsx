@@ -1,4 +1,4 @@
-import { CUSTOM_BIN_ID } from '../lib/bins'
+import { CUSTOM_BIN_ID, IKEA_BINS, findBin } from '../lib/bins'
 import type { Build } from '../lib/build'
 import type { Params } from '../lib/types'
 import { formatLength, type UnitSystem } from '../lib/units'
@@ -22,6 +22,7 @@ function Stepper({ label, value, onChange, hint }: { label: string; value: numbe
 
 export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: Params) => Params) => void; units: UnitSystem; build: Build }) {
   const upd = (patch: Partial<Params>) => set((q) => ({ ...q, ...patch }))
+  const bin = findBin(p.binId)
   const h = build.height
   return (
     <div className="inputs">
@@ -67,15 +68,32 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
       </section>
 
       <section>
-        <h3>2. Storage cell size</h3>
-        <small>The size of the item each cell must hold. It sets the joist spacing and the drawer size.</small>
+        <h3>2. Storage bin</h3>
+        <label className="field">
+          <span>IKEA bin</span>
+          <select value={p.binId} onChange={(e) => {
+            const id = e.target.value
+            const b = findBin(id)
+            upd(b ? { binId: id, bin: { w: b.w, d: b.d, h: b.h }, heightOption: 0 } : { binId: id })
+          }}>
+            {IKEA_BINS.map((b) => (
+              <option key={b.id} value={b.id}>{b.name} - {formatLength(b.w, units)} x {formatLength(b.d, units)} x {formatLength(b.h, units)}</option>
+            ))}
+            <option value={CUSTOM_BIN_ID}>Custom size...</option>
+          </select>
+        </label>
+        {bin && (
+          <small>
+            <a href={bin.url} target="_blank" rel="noreferrer">Open {bin.series} on ikea.com</a> to confirm the exact size. Built-in sizes are approximate.
+          </small>
+        )}
         <div className="grid2">
-          <LenInput label="Item width" units={units} value={p.bin.w} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, w: v } })} />
-          <LenInput label="Item depth" units={units} value={p.bin.d} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, d: v } })} />
-          <LenInput label="Item height" units={units} value={p.bin.h} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, h: v } })} />
-          <LenInput label="Clearance around item" units={units} value={p.clearance} onChange={(v) => upd({ clearance: v })} />
+          <LenInput label="Bin width" units={units} value={p.bin.w} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, w: v } })} />
+          <LenInput label="Bin depth" units={units} value={p.bin.d} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, d: v } })} />
+          <LenInput label="Bin height" units={units} value={p.bin.h} min={1} onChange={(v) => upd({ binId: CUSTOM_BIN_ID, bin: { ...p.bin, h: v } })} />
+          <LenInput label="Clearance around bin" units={units} value={p.clearance} onChange={(v) => upd({ clearance: v })} />
         </div>
-        <Check label="Item's long side runs along the joists" checked={p.binLongAlongJoists} onChange={(v) => upd({ binLongAlongJoists: v })} hint="Off = long side across the joists" />
+        <Check label="Bin's long side runs along the joists" checked={p.binLongAlongJoists} onChange={(v) => upd({ binLongAlongJoists: v })} hint="Off = long side across the joists" />
       </section>
 
       <section>
@@ -102,7 +120,7 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
           </>
         )}
         <div className={`note ${h.fits ? 'okc' : 'failc'}`}>
-          Frame height needed: <b>{formatLength(h.target, units)}</b> (storage items need {formatLength(h.required, units)}).
+          Frame height needed: <b>{formatLength(h.target, units)}</b> (bins need {formatLength(h.required, units)}).
           {!h.fits && <> Raise the final height to at least <b>{formatLength(h.minFinalHeight, units)}</b>.</>}
         </div>
         <div className="seg">

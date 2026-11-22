@@ -38,7 +38,7 @@ export function defaultParams(): Params {
     sheetL: 96,
     lumberLengths: [96, 120, 144],
     kerf: 0.125,
-    binId: CUSTOM_BIN_ID,
+    binId: 'samla-22',
     bin: { w: mmToIn(390), d: mmToIn(280), h: mmToIn(280) },
     binLongAlongJoists: false,
     clearance: 0.5,
