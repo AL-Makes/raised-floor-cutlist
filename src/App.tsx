@@ -148,7 +148,11 @@ export default function App() {
                 </label>
                 </>)}
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d, moves: {} } : { ...q, crossAdjust: q.crossAdjust + d, moves: {} }))}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))}               onToggleAccess={(key) => setParams((q) => {
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d, s) => setParams((q) => {
+                const cur = q.secAdjust?.[s] ?? { x: 0, y: 0 }
+                const nx = kind === 'joist' ? { ...cur, x: cur.x + d } : { ...cur, y: cur.y + d }
+                return { ...q, secAdjust: { ...q.secAdjust, [s]: nx }, moves: {} }
+              })}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))}               onToggleAccess={(key) => setParams((q) => {
                                             const cur = q.accessPanels ?? []
                                             return { ...q, accessPanels: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] }
                                           })} onToggleCut={(s, axis, pos) => setParams((q) => {

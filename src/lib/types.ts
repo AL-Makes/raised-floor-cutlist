@@ -81,6 +81,8 @@ export interface Params {
   joistAdjust: number
   /** change in the number of cross joists (blocking rows) vs. the bin-driven count */
   crossAdjust: number
+  /** per-section extra joists (x = main, y = cross), added on top of the global adjusts */
+  secAdjust?: Record<number, { x: number; y: number }>
   /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
   moves: Record<string, number>
   /** plywood cut lines along a joist (`axis` x = a joist, y = a cross joist); `pos` is its centre in plan inches */

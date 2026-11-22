@@ -367,6 +367,12 @@ describe('filler service zones', () => {
     expect(b.placements.some((x) => x.kind === 'service')).toBe(true)
   })
   it('added joists never land inside a filler strip', () => {
+    const one = buildFloor({ ...defaultParams(), secAdjust: { 0: { x: 0, y: 1 } } })
+    const base = buildFloor(defaultParams())
+    expect(one.layout.sections[0].blockY.length).toBe(base.layout.sections[0].blockY.length + 1)
+    one.layout.sections.slice(1).forEach((s, i) => expect(s.blockY.length).toBe(base.layout.sections[i + 1].blockY.length))
+  })
+  it('filler strip is unaffected by joist adjust', () => {
     const b = buildFloor({ ...defaultParams(), joistAdjust: 1 })
     for (const f of b.layout.fillers) {
       for (const s of b.layout.sections) {

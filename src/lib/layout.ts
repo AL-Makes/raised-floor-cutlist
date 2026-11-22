@@ -166,7 +166,7 @@ export function buildLayout(p: Params): Layout {
   })
 
   pieces.forEach(({ rect, plain, exact, fixed }, si) => {
-    const dx = divide(rect.w, cellMinX, dividerT, T, fixed ? 0 : p.joistAdjust)
+    const dx = divide(rect.w, cellMinX, dividerT, T, fixed ? 0 : p.joistAdjust + (p.secAdjust?.[si]?.x ?? 0))
     const cols: Section['cols'] = []
     const ex = 0
     const nCols = exact ?? dx.n
@@ -193,7 +193,7 @@ export function buildLayout(p: Params): Layout {
       let dLen = drawerLen
       const remaining = rect.l - T - dLen - T
       const fitRows = Math.max(0, Math.floor((remaining + T) / (cellMinY + T) + 1e-9))
-      const nRows = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + p.crossAdjust) : 0
+      const nRows = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + p.crossAdjust + (p.secAdjust?.[si]?.y ?? 0)) : 0
       if (nRows === 0) {
         dLen = rect.l - T
         rows.push({ y: rect.y, l: dLen, drawer: true })
@@ -208,7 +208,7 @@ export function buildLayout(p: Params): Layout {
         }
       }
     } else {
-      const dy = divide(rect.l, cellMinY, T, T, fixed ? 0 : p.crossAdjust)
+      const dy = divide(rect.l, cellMinY, T, T, fixed ? 0 : p.crossAdjust + (p.secAdjust?.[si]?.y ?? 0))
       for (let j = 0; j < dy.n; j++) {
         const y = rect.y + T + j * (dy.cell + T)
         rows.push({ y, l: dy.cell, drawer: false })
