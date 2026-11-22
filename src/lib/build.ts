@@ -1,4 +1,4 @@
-import { CUSTOM_BIN_ID, STANDARD_BIN_FOOTPRINTS_MM } from './bins'
+import { STANDARD_BIN_FOOTPRINTS_MM } from './bins'
 import { mmToIn } from './units'
 import { normalizeFloor, type FloorGeometry, type PolyEdge } from './geometry'
 import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './height'
