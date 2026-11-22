@@ -113,6 +113,21 @@ export interface DeckPiece {
  * Cut a w x l rectangle of deck into the fewest panels (each liftable on its own), seams on supports.
  * Tries the sheet's long side across and along the joists and keeps whichever needs fewer pieces.
  */
+/** Rect r minus hole h, as up to four rectangles. */
+function cutRect(r: Rect, h: Rect): Rect[] {
+  const x0 = Math.max(r.x, h.x)
+  const x1 = Math.min(r.x + r.w, h.x + h.w)
+  const y0 = Math.max(r.y, h.y)
+  const y1 = Math.min(r.y + r.l, h.y + h.l)
+  if (x1 - x0 <= 1e-6 || y1 - y0 <= 1e-6) return [r]
+  const out: Rect[] = []
+  if (y0 > r.y) out.push({ x: r.x, y: r.y, w: r.w, l: y0 - r.y })
+  if (y1 < r.y + r.l) out.push({ x: r.x, y: y1, w: r.w, l: r.y + r.l - y1 })
+  if (x0 > r.x) out.push({ x: r.x, y: y0, w: x0 - r.x, l: y1 - y0 })
+  if (x1 < r.x + r.w) out.push({ x: x1, y: y0, w: r.x + r.w - x1, l: y1 - y0 })
+  return out
+}
+
 export function planDeck(w: number, l: number, xCenters: number[], yCenters: number[], sheetL: number, sheetW: number) {
   const attempt = (longAcross: boolean) => {
     const maxX = longAcross ? sheetL : sheetW
@@ -186,6 +201,9 @@ export function buildFloor(input: Params): Build {
   const geometry = normalizeFloor(p.floor)
   if (geometry.error) warnings.push(`Floor shape problem: ${geometry.error}`)
   const layout = buildLayout(p)
+  const openings = layout.cells
+    .filter((c) => isHatch(p, c))
+    .map((c) => ({ x: c.x - 0.5, y: c.y - 0.5, w: c.w + 1, l: c.l + 1, section: c.section }))
   warnings.push(...layout.warnings)
   const readyDrawers = p.features.drawers && p.drawerKind === 'ikea'
   const ul = p.features.underlay ? p.underlayThickness : 0
@@ -324,10 +342,15 @@ export function buildFloor(input: Params): Build {
         unsupportedSeams.push({ axis: u.axis, pos: u.axis === 'x' ? rect.x + u.pos : rect.y + reg.y0 + u.pos, section: sec.index }),
       )
       for (const pc of plan.pieces) {
-        sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, pc.w, pc.l)
-        placements.push({ kind: 'deck', x: rect.x + pc.x, y: rect.y + reg.y0 + pc.y, z: S, sx: pc.w, sy: pc.l, sz: p.plyThickness })
-        deckPanels++
-        heaviest = Math.max(heaviest, pc.w * pc.l * p.plyThickness * PLY_LB_PER_IN3)
+        let parts: Rect[] = [{ x: rect.x + pc.x, y: rect.y + reg.y0 + pc.y, w: pc.w, l: pc.l }]
+        for (const h of openings.filter((o) => o.section === sec.index)) parts = parts.flatMap((r) => cutRect(r, h))
+        for (const r of parts) {
+          if (r.w < 0.25 || r.l < 0.25) continue
+          sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l)
+          placements.push({ kind: 'deck', x: r.x, y: r.y, z: S, sx: r.w, sy: r.l, sz: p.plyThickness })
+          deckPanels++
+          heaviest = Math.max(heaviest, r.w * r.l * p.plyThickness * PLY_LB_PER_IN3)
+        }
       }
     }
   })
@@ -358,8 +381,8 @@ export function buildFloor(input: Params): Build {
     for (const c of hatchCells) {
       const w = c.w + 1
       const l = c.l + 1
-      sheet('Access hatches', `Hatch panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, w, l, 'Rests 1/2" on joist/block tops; cut 1/8" clear opening in deck')
-      placements.push({ kind: 'hatch', x: c.x - 0.5, y: c.y - 0.5, z: S + 0.02, sx: w, sy: l, sz: p.plyThickness, cell: c.index })
+      sheet('Access hatches', `Access panel (${r3(p.plyThickness)}" ply, cut out of the deck)`, p.plyThickness, 1, w - 0.25, l - 0.25, 'Whole deck piece over this cell, lifts out for maintenance; rests 1/2" on joist/block tops, 1/8" clearance all round')
+      placements.push({ kind: 'hatch', x: c.x - 0.5 + 0.125, y: c.y - 0.5 + 0.125, z: S, sx: w - 0.25, sy: l - 0.25, sz: p.plyThickness, cell: c.index })
     }
   }
 
