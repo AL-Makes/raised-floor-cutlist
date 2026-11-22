@@ -287,7 +287,7 @@ export function buildLayout(p: Params): Layout {
     sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, exact: !!exact, fixed: !!fixed, applied })
     cols.forEach((col, ci) => {
       colData[ci].rows.forEach((row, ri) => {
-        const key = `::`
+        const key = `${si}:${ci}:${ri}`
         const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer && !p.drawerOff?.[key] ? 'drawer' : 'bin'
         const isSvc = type === 'service'
         const needL = row.drawer ? drawerLen - 0.01 : cellMinY
