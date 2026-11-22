@@ -27,6 +27,7 @@ export interface Section {
   /** rows / block lines of each bay (column) between main joists */
   colRows: { y: number; l: number; drawer: boolean }[][]
   colBlocks: number[][]
+  colMin?: number[]
   /** true when the section's front edge (y = 0) carries drawers */
   drawerFront: boolean
   shareFront?: boolean
@@ -288,10 +289,34 @@ export function buildLayout(p: Params): Layout {
       }
       rows.push({ y: start, l: rect.y + rect.l - T - start, drawer: false })
     }
+    // filler bays: each stretch between filler-edge joists starts with one mid support; + / - add or remove supports
+    // (spread evenly over the stretches) and the edge joists always stay
+    const fixedMin = -rows.filter((r) => r.l > 2 * T + 2).length
     const adjustFixed = (extra: number) => {
-      if (extra <= 0) return { rows, blockY }
-      const out = tweak(rows.map((r) => ({ y: r.y, l: r.l })), extra + 1)
-      return { rows: out.map((c) => ({ y: c.y, l: c.l, drawer: false })), blockY: out.slice(0, -1).map((c) => c.y + c.l) }
+      const counts = rows.map((r) => (r.l > 2 * T + 2 ? 1 : 0))
+      let k = Math.max(extra, fixedMin)
+      for (; k > 0; k--) {
+        let b = -1
+        rows.forEach((r, i) => { if (r.l > 2 * T + 2 && (b < 0 || r.l / (counts[i] + 1) > rows[b].l / (counts[b] + 1))) b = i })
+        if (b >= 0) counts[b]++
+      }
+      for (; k < 0; k++) {
+        let b = -1
+        rows.forEach((r, i) => { if (counts[i] > 0 && (b < 0 || r.l / (counts[i] + 1) < rows[b].l / (counts[b] + 1))) b = i })
+        if (b >= 0) counts[b]--
+      }
+      const outRows: Section['rows'] = []
+      const outBlocks: number[] = []
+      rows.forEach((r, i) => {
+        const n = counts[i] + 1
+        const cell = (r.l - (n - 1) * T) / n
+        for (let j = 0; j < n; j++) {
+          outRows.push({ y: r.y + j * (cell + T), l: cell, drawer: false })
+          if (j < n - 1) outBlocks.push(r.y + j * (cell + T) + cell)
+        }
+        if (i < rows.length - 1) outBlocks.push(r.y + r.l)
+      })
+      return { rows: outRows, blockY: outBlocks }
     }
     const mv = p.moves ?? {}
     const applied: Record<string, number> = {}
@@ -316,7 +341,7 @@ export function buildLayout(p: Params): Layout {
 
     // every bay between two main joists keeps its own cross joists, so adding or removing one never touches the neighbours
     const colData = cols.map((col, ci) => (fixed ? adjustFixed(p.colAdjust?.[`${si}:${ci}`] ?? 0) : calcRows(p.crossAdjust, p.colAdjust?.[`${si}:${ci}`] ?? 0, col)))
-    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, shareFront: shareFront.has(rect), exact: !!exact, fixed: !!fixed, applied })
+    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), colMin: fixed ? cols.map(() => fixedMin) : undefined, drawerFront: drawerFront0, shareFront: shareFront.has(rect), exact: !!exact, fixed: !!fixed, applied })
     cols.forEach((col, ci) => {
       colData[ci].rows.forEach((row, ri) => {
         const key = `${si}:${ci}:${ri}`
