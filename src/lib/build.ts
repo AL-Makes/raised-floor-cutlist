@@ -342,35 +342,7 @@ export function buildFloor(input: Params): Build {
         for (const r of parts) {
           const cx = r.x + r.w / 2
           const cy = r.y + r.l / 2
-          const fi = layout.fillers.findIndex((f) => cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.l)
-          if (fi >= 0) {
-            const service = (p.fillerAccess ?? []).includes(fi)
-            let pieces: { r: Rect; lift: boolean }[] = [{ r, lift: false }]
-            if (service) {
-              const cands: { axis: 'x' | 'y'; pos: number }[] = [
-                ...sec.joistX.map((x, k) => ({ axis: 'x' as const, pos: x + sec.joistT[k] / 2 })),
-                ...sec.blockY.map((y) => ({ axis: 'y' as const, pos: y + T / 2 })),
-              ].filter((c) => (c.axis === 'x' ? c.pos > r.x + 0.5 && c.pos < r.x + r.w - 0.5 : c.pos > r.y + 0.5 && c.pos < r.y + r.l - 0.5))
-              const mid = (c: { axis: 'x' | 'y'; pos: number }) => Math.abs(c.pos - (c.axis === 'x' ? cx : cy))
-              const best = cands.sort((a, b) => mid(a) - mid(b))[0]
-              const halves = best ? splitAt(r, best.axis, best.pos) : [r]
-              const small = halves.length === 2 ? (halves[0].w * halves[0].l <= halves[1].w * halves[1].l ? 0 : 1) : 0
-              pieces = halves.map((h, k) => ({ r: h, lift: k === small }))
-            }
-            for (const { r: q, lift } of pieces) {
-              if (lift) {
-                sheet('Deck', `Maintenance lift-out under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, q.w - 0.25, q.l - 0.25, 'Cut at the joist; not screwed down, lifts out for cable / power access. 1/8" clearance, finger pull')
-                accessCount++
-              } else {
-                sheet('Deck', `Deck panel under filler (${r3(p.plyThickness)}" ply, fixed)`, p.plyThickness, 1, q.w, q.l, 'Same size as the filler piece above; screw down to joists and blocks, not accessible')
-                deckPanels++
-              }
-              sheet('Deck reinforcement', `Heavy-load reinforcing ply under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, q.w, q.l, 'Glue + screw a second layer for TV / TV stand loads; seams offset from the panel above')
-              placements.push({ kind: lift ? 'hatch' : 'deck', x: q.x, y: q.y, z: S, sx: q.w, sy: q.l, sz: p.plyThickness })
-              heaviest = Math.max(heaviest, q.w * q.l * p.plyThickness * PLY_LB_PER_IN3 * 2)
-            }
-            continue
-          }
+          if (layout.fillers.some((f) => cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.l)) continue
           sheet('Deck', `Accessible deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l, 'Under the tatami mats; lifts out to reach the bins / drawers below')
           deckPanels++
           placements.push({ kind: 'deck', x: r.x, y: r.y, z: S, sx: r.w, sy: r.l, sz: p.plyThickness })
@@ -378,6 +350,46 @@ export function buildFloor(input: Params): Build {
         }
       }
     }
+    // each filler piece gets one deck panel of exactly its size (no seams from the bin-area joist layout)
+    layout.fillers.forEach((f, fi) => {
+      const x0 = Math.max(f.x, rect.x)
+      const y0 = Math.max(f.y, rect.y)
+      const x1 = Math.min(f.x + f.w, rect.x + rect.w)
+      const y1 = Math.min(f.y + f.l, rect.y + rect.l)
+      if (x1 - x0 < 0.5 || y1 - y0 < 0.5) return
+      const fitSheet = (q: Rect): Rect[] => {
+        const big = Math.max(q.w, q.l)
+        const small = Math.min(q.w, q.l)
+        if (big <= p.sheetL + 1e-6 && small <= p.sheetW + 1e-6) return [q]
+        return (q.w >= q.l ? splitAt(q, 'x', q.x + q.w / 2) : splitAt(q, 'y', q.y + q.l / 2)).flatMap(fitSheet)
+      }
+      const whole: Rect = { x: x0, y: y0, w: x1 - x0, l: y1 - y0 }
+      const service = (p.fillerAccess ?? []).includes(fi)
+      let pieces: { r: Rect; lift: boolean }[] = fitSheet(whole).map((q) => ({ r: q, lift: false }))
+      if (service) {
+        const cands: { axis: 'x' | 'y'; pos: number }[] = [
+          ...sec.joistX.map((x, k) => ({ axis: 'x' as const, pos: x + sec.joistT[k] / 2 })),
+          ...sec.blockY.map((y) => ({ axis: 'y' as const, pos: y + T / 2 })),
+        ].filter((c) => (c.axis === 'x' ? c.pos > x0 + 0.5 && c.pos < x1 - 0.5 : c.pos > y0 + 0.5 && c.pos < y1 - 0.5))
+        const mid = (c: { axis: 'x' | 'y'; pos: number }) => Math.abs(c.pos - (c.axis === 'x' ? (x0 + x1) / 2 : (y0 + y1) / 2))
+        const best = cands.sort((a, b) => mid(a) - mid(b))[0]
+        const halves = best ? splitAt(whole, best.axis, best.pos) : [whole]
+        const small = halves.length === 2 ? (halves[0].w * halves[0].l <= halves[1].w * halves[1].l ? 0 : 1) : 0
+        pieces = halves.map((h, k) => ({ r: h, lift: k === small }))
+      }
+      for (const { r: q, lift } of pieces) {
+        if (lift) {
+          sheet('Deck', `Maintenance lift-out under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, q.w - 0.25, q.l - 0.25, 'Cut at the joist; not screwed down, lifts out for cable / power access. 1/8" clearance, finger pull')
+          accessCount++
+        } else {
+          sheet('Deck', `Deck panel under filler (${r3(p.plyThickness)}" ply, fixed)`, p.plyThickness, 1, q.w, q.l, 'Same size as the filler piece above; screw down to joists and blocks, not accessible')
+          deckPanels++
+        }
+        sheet('Deck reinforcement', `Heavy-load reinforcing ply under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, q.w, q.l, 'Glue + screw a second layer for TV / TV stand loads; seams offset from the panel above')
+        placements.push({ kind: lift ? 'hatch' : 'deck', x: q.x, y: q.y, z: S, sx: q.w, sy: q.l, sz: p.plyThickness })
+        heaviest = Math.max(heaviest, q.w * q.l * p.plyThickness * PLY_LB_PER_IN3 * 2)
+      }
+    })
   })
 
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
