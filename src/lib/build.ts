@@ -120,6 +120,8 @@ export function mergeParts(parts: Part[]): Part[] {
   return [...m.values()]
 }
 
+const DRAWER_TOP_EXTRA = 2.25 // 1/4" floor gap + 1" above the box + 1-1/2" flat header, less the 1/2" hatch allowance
+
 export function buildFloor(input: Params): Build {
   const p: Params = { ...input, bin: resolveBin(input) }
   const warnings: string[] = []
@@ -129,14 +131,20 @@ export function buildFloor(input: Params): Build {
   warnings.push(...layout.warnings)
   const readyDrawers = p.features.drawers && p.drawerKind === 'ikea'
   const ul = p.features.underlay ? p.underlayThickness : 0
-  const height = solveHeight({
+  const heightIn = {
     finalHeight: p.finalHeight - ul,
     plyThickness: p.plyThickness,
     tatamiThickness: p.tatamiThickness,
-    binH: readyDrawers ? Math.max(p.bin.h, p.rollingBox.h) : p.bin.h,
+    binH: readyDrawers ? Math.max(p.bin.h, p.rollingBox.h) + DRAWER_TOP_EXTRA : p.bin.h,
     drawers: p.features.drawers && !readyDrawers,
     style: p.joistStyle,
-  })
+  }
+  let height = solveHeight(heightIn)
+  if (p.features.drawers && !height.fits) {
+    const raised = Math.ceil((height.minFinalHeight + ul) * 8) / 8
+    warnings.push(`Final height raised from ${r3(p.finalHeight)}" to ${r3(raised)}" so the drawers fit (face flush with the frame, 1" above each drawer, 1/4" each side).`)
+    height = solveHeight({ ...heightIn, finalHeight: raised - ul })
+  }
   if (height.message) warnings.push(height.message)
   const option = height.options[Math.min(Math.max(0, p.heightOption), Math.max(0, height.options.length - 1))]
   const S = option?.achieved ?? Math.max(0, height.target)
@@ -203,7 +211,7 @@ export function buildFloor(input: Params): Build {
   layout.sections.forEach((sec) => {
     const { rect } = sec
     const n = sec.joistX.length
-    const frontT = sec.drawerFront ? 3.5 : T
+    const frontT = sec.drawerFront ? 3.5 + DRAWER_FACE_T : T
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       const t = sec.joistT[k]
@@ -236,7 +244,7 @@ export function buildFloor(input: Params): Build {
     placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
     member('Back rim (between end joists)', 1, innerW, 4)
     if (sec.drawerFront) {
-      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
+      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y + DRAWER_FACE_T, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
       lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
     } else {
       placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
@@ -304,15 +312,15 @@ export function buildFloor(input: Params): Build {
   let slides = 0
   if (readyDrawers) {
     const { rx, ry } = rollingAxes(p)
-    const faceH = S - 1.5 - 0.375
+    const faceH = S - 0.25
     for (const c of drawerCells) {
-      sheet('Drawers', 'Drawer false front (screws to the IKEA box)', DRAWER_FACE_T, 1, c.w - 0.25, Math.min(faceH, S - 0.5), 'Screw from inside of the IKEA box front')
+      sheet('Drawers', 'Drawer false front (screws to the IKEA box)', DRAWER_FACE_T, 1, c.w - 0.25, faceH, 'Screw from inside of the IKEA box front')
       placements.push({ kind: 'drawer', x: c.x + (c.w - rx) / 2, y: c.y + DRAWER_FACE_T, z: 0.25, sx: rx, sy: ry, sz: p.rollingBox.h, cell: c.index })
       placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
     }
   } else if (p.features.drawers) {
-    const faceH = S - 1.5 - 0.375
-    const boxH = faceH - 0.75
+    const faceH = S - 0.25
+    const boxH = S - 3
     for (const c of drawerCells) {
       const boxW = c.w - 2 * DRAWER_SLIDE
       const boxL = layout.binY + p.clearance + 2 * boxT

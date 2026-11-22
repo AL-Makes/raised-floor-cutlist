@@ -90,7 +90,7 @@ export function buildLayout(p: Params): Layout {
   const ready = drawers && p.drawerKind === 'ikea'
   const { rx, ry } = rollingAxes(p)
   const drawerExtraX = drawers && !ready ? 2 * (DRAWER_WALL + DRAWER_SLIDE) : 0
-  const cellMinX = ready ? Math.max(bx, rx) + p.clearance : bx + p.clearance + drawerExtraX
+  const cellMinX = ready ? Math.max(bx, rx) + Math.max(p.clearance, 0.5) : bx + p.clearance + drawerExtraX
   const cellMinY = by + p.clearance
   const drawerLen = ready ? DRAWER_FACE_T + ry + p.clearance : DRAWER_FACE_T + (by + p.clearance + 2 * DRAWER_WALL) + 0.5
   const binsAcross = (w: number) => Math.max(1, Math.floor((w - drawerExtraX + 1e-6) / (bx + p.clearance)))

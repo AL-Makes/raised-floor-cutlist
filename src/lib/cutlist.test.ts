@@ -298,6 +298,16 @@ describe('dragging walls and ready-made drawers', () => {
     expect(front.length).toBeGreaterThan(0)
     for (const f of front) expect(f.y + f.sy).toBeCloseTo(cross)
   })
+  it('raises the height so the drawer face is flush with the frame and the box has 1" above it', () => {
+    const base = defaultParams()
+    const b = buildFloor({ ...base, finalHeight: 8, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const })
+    expect(b.warnings.some((w) => /raised/i.test(w))).toBe(true)
+    const d = b.placements.find((q) => q.kind === 'drawer')!
+    const f = b.placements.find((q) => q.kind === 'drawerFace')!
+    const hdr = b.placements.find((q) => q.kind === 'header')
+    expect(f.z + f.sz).toBeCloseTo(b.supportHeight - 0.125)
+    expect(hdr!.z - (d.z + d.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
+  })
   it('sizes joist spacing from an IKEA rolling box and drops the drawer cut parts', () => {
     const base = defaultParams()
     const p = { ...base, finalHeight: 20, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const, rollingBox: { id: 'x', w: 24, d: 36, h: 8 } }
