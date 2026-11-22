@@ -207,7 +207,7 @@ export function buildFloor(input: Params): Build {
   layout.sections.forEach((sec) => {
     const { rect } = sec
     const n = sec.joistX.length
-    const frontT = sec.drawerFront ? 3.5 : T
+    const frontT = sec.drawerFront ? 3.5 : sec.shareFront ? 0 : T
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       const t = sec.joistT[k]

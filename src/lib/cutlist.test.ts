@@ -330,6 +330,9 @@ describe('dragging walls and plywood drawers', () => {
     expect(rear.drawerFront).toBe(false)
     expect(rear.rect.y).toBeCloseTo(front.rect.y + front.rect.l)
     expect(rear.joistX.length).not.toBe(front.joistX.length)
+    const shared = front.rect.y + front.rect.l
+    const inner = b.placements.filter((q) => q.kind === 'joist' && Math.abs(q.y - shared) < 1e-6)
+    expect(inner.length).toBeGreaterThan(0)
     const area = b.placements.filter((q) => q.kind === 'deck' || q.kind === 'hatch').reduce((s, q) => s + q.sx * q.sy, 0)
     const floor = b.layout.sections.reduce((s, x) => s + x.rect.w * x.rect.l, 0)
     expect(area).toBeCloseTo(floor, 0)
