@@ -5,6 +5,7 @@ import type { Build } from '../lib/build'
 import type { Structural, Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
 import type { Placement } from '../lib/types'
+import { formatLength, type UnitSystem } from '../lib/units'
 
 export type LayerKey = 'joists' | 'cross' | 'frame' | 'side' | 'deck' | 'tatami' | 'lift' | 'bins' | 'drawers' | 'underlay'
 export interface Layer {
@@ -14,6 +15,7 @@ export interface Layer {
 export interface ViewOptions {
   layers: Record<LayerKey, Layer>
   loadMap: boolean
+  dims: boolean
 }
 
 export const LAYER_LABELS: Record<LayerKey, string> = {
@@ -43,6 +45,7 @@ export const defaultView = (): ViewOptions => ({
     underlay: { visible: true, opacity: 1 },
   },
   loadMap: false,
+  dims: true,
 })
 
 function layerOf(kind: string): LayerKey {
@@ -137,7 +140,7 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void }) {
+export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; units?: UnitSystem }) {
   const [hover, setHoverState] = useState<Hover | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const setHover = (h: Hover) => { window.clearTimeout(timer.current); setHoverState(h) }
@@ -198,6 +201,19 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust }: { build: B
             onOver={over}
             onOut={edit ? leave : undefined}
           />
+        )
+      })}
+      {build.placements.map((p, i) => {
+        if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
+        return (
+          <Html key={`dim${i}`} position={[p.x + p.sx / 2, p.z + p.sz + 0.3, -(p.y + p.sy / 2)]} center zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
+            <div className="dimtag">
+              <b>{p.kind === 'drawer' ? 'Drawer' : 'Bin'}</b>
+              <span>W {formatLength(p.sx, units)}</span>
+              <span>D {formatLength(p.sy, units)}</span>
+              <span>H {formatLength(p.sz, units)}</span>
+            </div>
+          </Html>
         )
       })}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (

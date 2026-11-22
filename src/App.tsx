@@ -103,8 +103,12 @@ export default function App() {
                   <input type="checkbox" checked={view.loadMap} onChange={(e) => setView({ ...view, loadMap: e.target.checked })} />
                   Load map
                 </label>
+                <label>
+                  <input type="checkbox" checked={view.dims} onChange={(e) => setView({ ...view, dims: e.target.checked })} />
+                  Bin / drawer dimensions
+                </label>
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d } : { ...q, crossAdjust: q.crossAdjust + d }))} />
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d } : { ...q, crossAdjust: q.crossAdjust + d }))} />
               <div className="hud">
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf
               </div>
