@@ -215,6 +215,7 @@ function findVoids(build: Build): Void[] {
 export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onToggleCut, onToggleAccess, deckMode, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; onMove: (key: string, v: number) => void; onToggleCut: (s: number, axis: 'x' | 'y', pos: number) => void; onToggleAccess: (key: string) => void; deckMode: 'cut' | 'access'; units?: UnitSystem }) {
   const [hover, setHoverState] = useState<Hover | null>(null)
   const [hoverCell, setHoverCell] = useState<string | null>(null)
+  const downAt = useRef<[number, number] | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const endDrag = useMemo(() => () => setDrag(null), [])
   const timer = useRef<number | undefined>(undefined)
@@ -332,7 +333,8 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
               position={[q.x + q.sx / 2, q.z + q.sz + 0.1, -(q.y + q.sy / 2)]}
               onPointerOver={(e) => { e.stopPropagation(); setHoverCell(q.panel!) }}
               onPointerOut={() => setHoverCell((h) => (h === q.panel ? null : h))}
-              onClick={(e) => { e.stopPropagation(); if (e.delta < 5) onToggleAccess(q.panel!) }}
+              onPointerDown={(e) => { downAt.current = [e.clientX, e.clientY] }}
+              onPointerUp={(e) => { e.stopPropagation(); const d = downAt.current; if (d && Math.hypot(e.clientX - d[0], e.clientY - d[1]) < 8) onToggleAccess(q.panel!); downAt.current = null }}
             >
               <boxGeometry args={[q.sx - 0.3, 0.1, q.sy - 0.3]} />
               <meshBasicMaterial color={on ? '#2ecc71' : '#3b82f6'} transparent opacity={hot ? 0.6 : on ? 0.4 : 0.01} depthWrite={false} />
@@ -345,26 +347,34 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
           sec.joistX.forEach((jx, k) => {
             if (k === 0 || k === sec.joistX.length - 1) return
             const pos = jx + sec.joistT[k] / 2
-            lines.push({ id: `${sec.index}:x:${k}`, axis: 'x', pos, cx: pos, cy: sec.rect.y + sec.rect.l / 2, sx: 1.2, sy: sec.rect.l })
+            lines.push({ id: `${sec.index}:x:${k}`, axis: 'x', pos, cx: pos, cy: sec.rect.y + sec.rect.l / 2, sx: 4, sy: sec.rect.l })
           })
           sec.blockY.forEach((by, k) => {
             const pos = by + build.layout.joistW / 2
-            lines.push({ id: `${sec.index}:y:${k}`, axis: 'y', pos, cx: sec.rect.x + sec.rect.w / 2, cy: pos, sx: sec.rect.w, sy: 1.2 })
+            lines.push({ id: `${sec.index}:y:${k}`, axis: 'y', pos, cx: sec.rect.x + sec.rect.w / 2, cy: pos, sx: sec.rect.w, sy: 4 })
           })
           return lines.map((ln) => {
             const on = (build.params.deckCuts ?? []).some((c) => c.s === sec.index && c.axis === ln.axis && Math.abs(c.pos - ln.pos) < 0.01)
             const hot = hoverCell === ln.id
+            const wide = ln.axis === 'x' ? [8, ln.sy] : [ln.sx, 8]
+            const thin = ln.axis === 'x' ? [2, ln.sy] : [ln.sx, 2]
             return (
-              <mesh
-                key={`cl${ln.id}`}
-                position={[ln.cx, S + ply + 0.1, -ln.cy]}
-                onPointerOver={(e) => { e.stopPropagation(); setHoverCell(ln.id) }}
-                onPointerOut={() => setHoverCell((h) => (h === ln.id ? null : h))}
-                onClick={(e) => { e.stopPropagation(); if (e.delta < 5) onToggleCut(sec.index, ln.axis, ln.pos) }}
-              >
-                <boxGeometry args={[ln.sx, 0.1, ln.sy]} />
-                <meshBasicMaterial color={on ? '#e53935' : '#3b82f6'} transparent opacity={hot ? 0.8 : on ? 0.85 : 0.18} depthWrite={false} />
-              </mesh>
+              <group key={`cl${ln.id}`}>
+                <mesh position={[ln.cx, S + ply + 0.3, -ln.cy]} raycast={() => null} renderOrder={10}>
+                  <boxGeometry args={[thin[0], 0.1, thin[1]]} />
+                  <meshBasicMaterial color={on ? '#e53935' : '#3b82f6'} transparent opacity={hot ? 0.9 : on ? 0.9 : 0.35} depthWrite={false} depthTest={false} />
+                </mesh>
+                <mesh
+                  position={[ln.cx, S + ply, -ln.cy]}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoverCell(ln.id) }}
+                  onPointerOut={() => setHoverCell((h) => (h === ln.id ? null : h))}
+                  onPointerDown={(e) => { downAt.current = [e.clientX, e.clientY] }}
+                  onPointerUp={(e) => { e.stopPropagation(); const d = downAt.current; if (d && Math.hypot(e.clientX - d[0], e.clientY - d[1]) < 8) onToggleCut(sec.index, ln.axis, ln.pos); downAt.current = null }}
+                >
+                  <boxGeometry args={[wide[0], 4, wide[1]]} />
+                  <meshBasicMaterial transparent opacity={hot ? 0.15 : 0} depthWrite={false} color="#3b82f6" />
+                </mesh>
+              </group>
             )
           })
         })}
