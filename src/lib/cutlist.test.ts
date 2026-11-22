@@ -461,7 +461,7 @@ describe('filler service zones', () => {
     if (b.layout.fillers.length === 0) return
     expect(svc.length).toBeGreaterThan(0)
     svc.forEach((c) => expect(c.binsX * c.binsY).toBe(0))
-    expect(b.placements.some((x) => x.kind === 'service')).toBe(true)
+    expect(b.placements.some((x) => x.kind === 'service')).toBe(false)
   })
   it('added joists never land inside a filler strip', () => {
     const one = buildFloor({ ...defaultParams(), colAdjust: { '0:0': 1 } })

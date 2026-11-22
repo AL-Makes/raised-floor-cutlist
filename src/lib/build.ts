@@ -351,7 +351,6 @@ export function buildFloor(input: Params): Build {
       const key = `${c.section}:${k}`
       sisterLen.set(key, (sisterLen.get(key) ?? 0) + c.l + T)
     }
-    placements.push({ kind: 'service', x: c.x, y: c.y, z: 0, sx: c.w, sy: c.l, sz: 0.25, cell: c.index })
     cableHoles++
   })
   sisterLen.forEach((len) => {
