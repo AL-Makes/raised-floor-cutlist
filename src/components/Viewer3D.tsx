@@ -3,7 +3,7 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { CanvasTexture, Plane, Vector3 } from 'three'
 import { Edges, Html, OrbitControls } from '@react-three/drei'
 import type { Build } from '../lib/build'
-import type { Structural, Status } from '../lib/structural'
+import { memberLoads, type Structural, type Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
 import type { Placement } from '../lib/types'
 import { formatLength, type UnitSystem } from '../lib/units'
@@ -249,7 +249,7 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSplit, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units = 'imperial' }: { build: Build; structural?: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; units?: UnitSystem }) {
   const [binSel, setBinSel] = useState<{ cell: number; split?: 'x' | 'y'; pos: [number, number, number] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; bin?: { cell: number; split?: 'x' | 'y' } } | null>(null)
   const ctxBin = useRef<{ cell: number; split?: 'x' | 'y' } | undefined>(undefined)
@@ -269,7 +269,8 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
   const span = Math.max(g.width, g.length, 60)
   const S = build.supportHeight
   const ply = build.params.plyThickness
-  const status = new Map(structural.cells.map((c) => [c.cell, c.status]))
+  const members = useMemo(() => (opts.loadMap ? memberLoads(build) : []), [build, opts.loadMap])
+  const memberOf = new Map(members.filter((m) => m.kind !== 'pad').map((m) => [m.index, m]))
   const L = opts.layers
   const front = g.front
 
@@ -301,7 +302,8 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
         const edit = p.kind === 'block'
         const id = `p${i}`
         const dragging = !!drag && !!p.ref && drag.ref.s === p.ref.s && drag.ref.axis === p.ref.axis && drag.ref.k === p.ref.k
-        const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'
+        const mem = memberOf.get(i)
+        const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : mem ? STATUS_COLOR[mem.status] : COLORS[p.kind] ?? '#999'
         const over = edit && !drag ? () => setHover({ id, kind: 'block', delta: -1, s: p.ref!.s, c: p.ref!.c ?? 0, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
         const down = DRAG_ENABLED && p.ref
           ? (pt: { x: number; y: number; z: number }) => {
@@ -388,10 +390,11 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
         </Html>
       )}
       {opts.loadMap &&
-        build.layout.cells.map((c) => {
-          const st = status.get(c.index) ?? 'ok'
-          const pl: Placement = { kind: 'deck', x: c.x, y: c.y, z: S + ply + 0.05, sx: c.w, sy: c.l,           sz: 0.15 }
-                    return <Box key={`lm${c.index}`} p={pl} color={STATUS_COLOR[st]} opacity={0.75} />
+        members.filter((m) => m.kind === 'pad').map((m, k) => {
+          const j = build.placements[m.index]
+          const h = Math.max(j.z, 0.4)
+          const pl: Placement = { kind: 'block', x: j.x + j.sx / 2 - 1.5, y: Math.min(Math.max(m.y! - 1.5, j.y), j.y + j.sy - 3), z: 0, sx: 3, sy: 3, sz: h }
+          return <Box key={'pad' + k} p={pl} color={STATUS_COLOR[m.status]} opacity={1} />
         })}
       {L.tatami.visible &&
         mats.map((m, i) => {

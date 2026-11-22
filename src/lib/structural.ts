@@ -118,6 +118,76 @@ function worstRatio(b: Build): number {
   return Math.min(cs.length ? Math.min(...cs.map((c) => c.ratio)) : Infinity, joistRatio(b))
 }
 
+export interface MemberLoad {
+  /** index into build.placements */
+  index: number
+  kind: 'joist' | 'block' | 'pad'
+  ratio: number
+  status: Status
+  /** load carried, lb (pads) or allowable psf (joists/blocks) */
+  loadLb: number
+  /** pad position along the joist, inches */
+  y?: number
+  note: string
+}
+
+const PAD_LB = 600
+
+function neighbourTrib(centres: number[], c: number, edgeDefault: number): number {
+  const left = centres.filter((v) => v < c - 0.01).pop()
+  const right = centres.find((v) => v > c + 0.01)
+  const dl = left === undefined ? (right === undefined ? edgeDefault : right - c) : c - left
+  const dr = right === undefined ? dl : right - c
+  return (dl + dr) / 2
+}
+
+/** Per-member load check: joists (tributary width, span between supports), cross blocks and the shim pads under the joists. */
+export function memberLoads(b: Build): MemberLoad[] {
+  const p = b.params
+  const out: MemberLoad[] = []
+  const pl = b.placements
+  const long = pl.map((q, index) => ({ q, index })).filter(({ q }) => (q.kind === 'joist' || q.kind === 'rim') && q.sy >= q.sx * 2)
+  const n = p.supportCount
+  const builtup = p.joistStyle === 'builtup'
+  for (const { q, index } of long) {
+    const peers = long.filter(({ q: o }) => Math.min(o.y + o.sy, q.y + q.sy) - Math.max(o.y, q.y) > Math.min(o.sy, q.sy) * 0.5)
+    const centres = peers.map(({ q: o }) => o.x + o.sx / 2).sort((x, y) => x - y)
+    const trib = Math.max(neighbourTrib(centres, q.x + q.sx / 2, b.layout.cellMinX + q.sx), 1)
+    const span = n >= 2 ? q.sy / (n - 1) : Math.min(q.sy, 24)
+    const cap = joistCapacityPsf(q.sx, q.sz, span, trib, builtup && q.sz >= 3.2)
+    const ratio = cap / p.designLoadPsf
+    const status = statusOf(ratio)
+    let note = `${Math.round(cap)} psf allowed over ${trib.toFixed(1)}" tributary, span ${span.toFixed(0)}"`
+    if (status !== 'ok') note += n >= 2 ? '. Reinforce: double this joist or add a support point.' : '. Reinforce: double this joist.'
+    out.push({ index, kind: 'joist', ratio, status, loadLb: cap, note })
+    if (n >= 2) {
+      const reaction = (p.designLoadPsf * (trib / 12) * (span / 12))
+      for (let i = 0; i < n; i++) {
+        const lb = (i === 0 || i === n - 1 ? 0.5 : 1) * reaction
+        out.push({ index, kind: 'pad', ratio: PAD_LB / Math.max(lb, 1), status: statusOf(PAD_LB / Math.max(lb, 1)), loadLb: lb, y: q.y + (i * q.sy) / (n - 1), note: `${Math.round(lb)} lb on this support (rated ${PAD_LB} lb).${lb > PAD_LB ? ' Use a bigger shim stack or add supports.' : ''}` })
+      }
+    }
+  }
+  const blocks = pl.map((q, index) => ({ q, index })).filter(({ q }) => q.kind === 'block' && q.sx > q.sy)
+  for (const { q, index } of blocks) {
+    const peers = blocks.filter(({ q: o }) => Math.min(o.x + o.sx, q.x + q.sx) - Math.max(o.x, q.x) > q.sx * 0.5)
+    const centres = peers.map(({ q: o }) => o.y + o.sy / 2).sort((x, y) => x - y)
+    const trib = Math.max(neighbourTrib(centres, q.y + q.sy / 2, 24), 1)
+    const cap = joistCapacityPsf(q.sy, q.sz, q.sx, trib, builtup && q.sz >= 3.2)
+    const ratio = cap / p.designLoadPsf
+    const status = statusOf(ratio)
+    out.push({
+      index,
+      kind: 'block',
+      ratio,
+      status,
+      loadLb: cap,
+      note: `${Math.round(cap)} psf allowed over ${trib.toFixed(1)}" tributary${status !== 'ok' ? '. Reinforce: add a cross joist row or double this block.' : ''}`,
+    })
+  }
+  return out
+}
+
 export function analyze(b: Build): Structural {
   const p = b.params
   const t = p.plyThickness
@@ -163,6 +233,13 @@ export function analyze(b: Build): Structural {
     }
   }
 
+  const ml = memberLoads(b)
+  for (const [kind, label, fix] of [['joist', 'joist(s)', 'double them or add support points'], ['pad', 'support pad(s)', 'use bigger shim stacks or add support points'], ['block', 'cross block(s)', 'add a cross joist row']] as const) {
+    const flagged = ml.filter((m) => m.kind === kind && m.status !== 'ok')
+    if (flagged.length) {
+      issues.push({ severity: flagged.some((m) => m.status === 'fail') ? 'fail' : 'warn', text: `Load map: ${flagged.length} ${label} need reinforcement for ${p.designLoadPsf} psf; ${fix}.` })
+    }
+  }
   const spacingOC = b.layout.cellMinX + b.layout.dividerT
   const span = joistSpan(b)
   let joistPsf: number | undefined
