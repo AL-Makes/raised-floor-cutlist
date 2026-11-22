@@ -173,6 +173,7 @@ function builtUp(p: Placement): { chord: Placement[]; web: Placement[] } {
 /** Dimensions printed flat on the surface, as a transparent canvas texture lying over the object's footprint. */
 function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem }) {
   const tex = useMemo(() => {
+    const tall = p.sy > p.sx
     const PPI = 24 // texture pixels per world unit, so text is the same physical size on every block
     const W = Math.max(64, Math.round(p.sx * PPI))
     const H = Math.max(64, Math.round(p.sy * PPI))
@@ -180,8 +181,11 @@ function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem 
     c.width = W
     c.height = H
     const g = c.getContext('2d')!
-    const lines = [`${formatLength(p.sx, units)} × ${formatLength(p.sy, units)}`, `H ${formatLength(p.sz, units)}`]
-    const fs = 2 * PPI
+    // labels run along the long side of the bin
+    if (tall) { g.translate(W / 2, H / 2); g.rotate(Math.PI / 2); g.translate(-W / 2, -H / 2) }
+    const lh = tall ? W : H
+    const lines = [`${formatLength(Math.max(p.sx, p.sy), units)} × ${formatLength(Math.min(p.sx, p.sy), units)}`, `H ${formatLength(p.sz, units)}`]
+    const fs = Math.min(2 * PPI, lh / 4)
     g.font = `bold ${fs}px sans-serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
@@ -347,7 +351,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
       {binSel && (() => {
         const cell = build.layout.cells[binSel.cell]
         if (!cell) return null
-        const half = (n: number) => (n - 0.5) / 2 >= 4
+        const half = (n: number) => (n - build.params.clearance) / 2 >= 4
         const go = (m: 'x' | 'y' | null) => { onSplit(cell.key, m); setBinSel(null) }
         return (
           <Html position={binSel.pos} center zIndexRange={[20, 0]}>
@@ -398,8 +402,8 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
               <button onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, null); setMenu(null) }}>Recombine bins</button>
             ) : (
               <>
-                <button disabled={(build.layout.binX - 0.5) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'x'); setMenu(null) }}>Split bins ↔</button>
-                <button disabled={(build.layout.binY - 0.5) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'y'); setMenu(null) }}>Split bins ↕</button>
+                <button disabled={(build.layout.binX - build.params.clearance) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'x'); setMenu(null) }}>Split bins ↔</button>
+                <button disabled={(build.layout.binY - build.params.clearance) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'y'); setMenu(null) }}>Split bins ↕</button>
               </>
             )}
             <hr />

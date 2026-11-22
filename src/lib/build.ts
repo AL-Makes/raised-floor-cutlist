@@ -268,27 +268,32 @@ export function buildFloor(input: Params): Build {
     heaviest = Math.max(heaviest, q.w * q.l * ply * PLY_LB_PER_IN3 * (under ? 2 : 1))
   }
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
+  const clr = p.clearance
   const splitMode = (c: { key: string }) => {
     const m = p.binSplit?.[c.key]
-    return m === 'x' && (layout.binX - 0.5) / 2 >= MIN_SPLIT ? 'x' : m === 'y' && (layout.binY - 0.5) / 2 >= MIN_SPLIT ? 'y' : undefined
+    return m === 'x' && (layout.binX - clr) / 2 >= MIN_SPLIT ? 'x' : m === 'y' && (layout.binY - clr) / 2 >= MIN_SPLIT ? 'y' : undefined
   }
-  let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY * (c.type !== 'service' && splitMode(c) ? 2 : 1), 0)
+  let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY, 0)
 
   const slotPos = (start: number, size: number, n: number, item: number, k: number) => start + (size / n) * k + (size / n - item) / 2
-  // one bin footprint, or two half-size bins when the cell is split
-  const pushBin = (c: { key: string; index: number }, x: number, y: number, z: number) => {
-    const mode = splitMode(c)
-    const base: Placement = { kind: 'bin', x, y, z, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index }
-    if (!mode) return placements.push(base)
-    const hx = mode === 'x' ? (layout.binX - 0.5) / 2 : layout.binX
-    const hy = mode === 'y' ? (layout.binY - 0.5) / 2 : layout.binY
-    placements.push({ ...base, sx: hx, sy: hy, split: mode })
-    placements.push({ ...base, x: mode === 'x' ? x + layout.binX - hx : x, y: mode === 'y' ? y + layout.binY - hy : y, sx: hx, sy: hy, split: mode })
+  // a split cell is refilled with the smaller bin along the split axis, so extra bins appear when they fit
+  const pushSplit = (c: { index: number; binsX: number; binsY: number }, mode: 'x' | 'y', rx: number, rw: number, ry: number, rl: number, nxFixed: number, nyFixed: number, z: number) => {
+    const half = ((mode === 'x' ? layout.binX : layout.binY) - clr) / 2
+    const sx = mode === 'x' ? half : layout.binX
+    const sy = mode === 'y' ? half : layout.binY
+    const nx = mode === 'x' ? Math.max(2, Math.floor((rw + 1e-6) / (half + clr))) : nxFixed
+    const ny = mode === 'y' ? Math.max(2, Math.floor((rl + 1e-6) / (half + clr))) : nyFixed
+    for (let ix = 0; ix < nx; ix++)
+      for (let iy = 0; iy < ny; iy++) placements.push({ kind: 'bin', x: slotPos(rx, rw, nx, sx, ix), y: slotPos(ry, rl, ny, sy, iy), z, sx, sy, sz: p.bin.h, cell: c.index, split: mode })
+    binCount += nx * ny - c.binsX * c.binsY
   }
   layout.cells.forEach((c) => {
     if (c.type === 'bin') {
+      const mode = splitMode(c)
+      if (mode) return pushSplit(c, mode, c.x, c.w, c.y, c.l, c.binsX, c.binsY, 0)
       for (let ix = 0; ix < c.binsX; ix++)
-        for (let iy = 0; iy < c.binsY; iy++) pushBin(c, slotPos(c.x, c.w, c.binsX, layout.binX, ix), slotPos(c.y, c.l, c.binsY, layout.binY, iy), 0)
+        for (let iy = 0; iy < c.binsY; iy++)
+          placements.push({ kind: 'bin', x: slotPos(c.x, c.w, c.binsX, layout.binX, ix), y: slotPos(c.y, c.l, c.binsY, layout.binY, iy), z: 0, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index })
     }
   })
   const boxT = DRAWER_WALL
@@ -316,8 +321,11 @@ export function buildFloor(input: Params): Build {
       slides += Math.floor(Math.max(0, boxLen) / 2) * 2
       placements.push({ kind: 'drawer', x: c.x + DRAWER_SLIDE, y: c.y + DRAWER_FACE_T, z: 0.5, sx: boxW, sy: boxLen, sz: boxH, cell: c.index })
       placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
-      for (let ix = 0; ix < c.binsX; ix++)
-        pushBin(c, slotPos(c.x + DRAWER_SLIDE, boxW, c.binsX, layout.binX, ix), c.y + DRAWER_FACE_T + (boxLen - layout.binY) / 2, 0.5 + boxT)
+      const dmode = splitMode(c)
+      if (dmode) pushSplit(c, dmode, c.x + DRAWER_SLIDE, boxW, c.y + DRAWER_FACE_T + boxT, boxLen - 2 * boxT, c.binsX, 1, 0.5 + boxT)
+      else
+        for (let ix = 0; ix < c.binsX; ix++)
+          placements.push({ kind: 'bin', x: slotPos(c.x + DRAWER_SLIDE, boxW, c.binsX, layout.binX, ix), y: c.y + DRAWER_FACE_T + (boxLen - layout.binY) / 2, z: 0.5 + boxT, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index })
     }
   }
 
