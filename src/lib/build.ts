@@ -225,17 +225,20 @@ export function buildFloor(input: Params): Build {
     }
 
     const nJ = sec.joistX.length
-    const endL = sec.joistT[0]
-    const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
-    placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
-    member('Back rim (between end joists)', 1, innerW, 4)
-    if (sec.drawerFront) {
-      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
-      lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
-    } else {
-      placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
-      member('Front rim (between end joists)', 1, innerW, 4)
+    for (let k = 0; k < nJ - 1; k++) {
+      const x0 = sec.joistX[k] + sec.joistT[k]
+      const w = sec.joistX[k + 1] - x0
+      if (w < 0.1) continue
+      placements.push({ kind: 'rim', x: x0, y: backY, z: bu, sx: w, sy: T, sz: depth })
+      member('Back rim (between joists)', 1, w, 4)
+      if (sec.drawerFront) {
+        placements.push({ kind: 'header', x: x0, y: rect.y, z: S - 1.5, sx: w, sy: 3.5, sz: 1.5 })
+        lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, w, 3.5, 1.5, 'Sits flush under deck at the front opening, between joists', 4)
+      } else {
+        placements.push({ kind: 'rim', x: x0, y: rect.y, z: bu, sx: w, sy: T, sz: depth })
+        member('Front rim (between joists)', 1, w, 4)
+      }
     }
 
     sec.cols.forEach((col, ci) => {
