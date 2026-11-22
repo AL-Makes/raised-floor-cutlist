@@ -428,3 +428,20 @@ describe('filler service zones', () => {
     expect(b.layout.cells.filter((c) => c.type === 'service').length).toBe(base)
   })
 })
+
+describe('plywood seams', () => {
+  it('only land on joists or blocks, and follow joist removal', () => {
+    for (const adj of [0, -2]) {
+      const d = defaultParams()
+      const b = buildFloor({ ...d, joistAdjust: adj } as typeof d)
+      const T = b.layout.joistW
+      for (const q of b.placements.filter((p) => p.kind === 'deck' || p.kind === 'hatch')) {
+        const sec = b.layout.sections.find((s) => q.x >= s.rect.x - 0.5 && q.x < s.rect.x + s.rect.w - 0.5 && q.y >= s.rect.y - 0.5 && q.y < s.rect.y + s.rect.l - 0.5)!
+        const xs = [sec.rect.x, sec.rect.x + sec.rect.w, ...sec.joistX.map((x, k) => x + sec.joistT[k] / 2)]
+        const ys = [sec.rect.y, sec.rect.y + sec.rect.l, ...sec.blockY.map((y) => y + T / 2)]
+        for (const x of [q.x, q.x + q.sx]) expect(xs.some((c) => Math.abs(c - x) < T) || x < 0.5 || x > Math.max(...b.layout.sections.map((s) => s.rect.x + s.rect.w)) - 0.5).toBe(true)
+        for (const y of [q.y, q.y + q.sy]) expect(ys.some((c) => Math.abs(c - y) < T) || y < 0.5 || y > Math.max(...b.layout.sections.map((s) => s.rect.y + s.rect.l)) - 0.5).toBe(true)
+      }
+    }
+  })
+})

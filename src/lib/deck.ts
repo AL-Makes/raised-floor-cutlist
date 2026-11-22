@@ -25,7 +25,16 @@ export function splitAxis(length: number, centers: number[], first: number, max:
     const cands = centers.filter((c) => c > pos + 6 && c <= target + 1e-9)
     let cut = target
     if (cands.length) cut = Math.max(...cands)
-    else unsupported.push(cut)
+    else {
+      // never cut over thin air: run on to the next support (the oversize piece is flagged by the sheet check)
+      const beyond = centers.filter((c) => c > target && c < length - 6)
+      if (beyond.length) cut = Math.min(...beyond)
+      else {
+        unsupported.push(target)
+        cuts.push(length)
+        break
+      }
+    }
     cuts.push(cut)
     pos = cut
     limit = max
@@ -114,6 +123,8 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
       for (const u of plan.unsupported) unsupported.push({ axis: u.axis, pos: u.axis === 'x' ? z.x + u.pos : z.y + u.pos, section: sec.index })
       return plan.pieces.map((pc) => ({ x: z.x + pc.x, y: z.y + pc.y, w: pc.w, l: pc.l }))
     }
+    const onSupport = (axis: 'x' | 'y', pos: number) =>
+      (axis === 'x' ? xs : ys).some((c) => Math.abs(c - pos) < T) || Math.abs(pos - (axis === 'x' ? rect.x : rect.y)) < 0.5 || Math.abs(pos - (axis === 'x' ? rect.x + rect.w : rect.y + rect.l)) < 0.5
     const underFiller = (r: Rect) => {
       const cx = r.x + r.w / 2
       const cy = r.y + r.l / 2
@@ -132,7 +143,7 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
           for (const f of fillers) {
             if (!overlap(pc, f)) continue
             for (const [axis, pos] of [['x', f.x], ['x', f.x + f.w], ['y', f.y], ['y', f.y + f.l]] as const)
-              parts = parts.flatMap((r) => (overlap(r, f) ? splitAt(r, axis, pos) : [r]))
+              if (onSupport(axis, pos)) parts = parts.flatMap((r) => (overlap(r, f) ? splitAt(r, axis, pos) : [r]))
           }
           for (const r of parts) if (!underFiller(r)) panels.push({ ...r, kind: 'accessible', section: sec.index })
         }
