@@ -545,7 +545,7 @@ export function buildFloor(input: Params): Build {
     `Lay the ${r3(p.plyThickness)}" plywood deck in ${deckPanels} panel(s), seams on joist/block centres, screws about every 8". Panels are not glued so they can be lifted.`,
     p.features.hatches ? 'Cut access hatch openings and fit the hatch panels; add finger pulls.' : '',
     p.features.edgeTrim ? 'Fit fascia trim on the selected exposed edges.' : '',
-    'Lay the tatami mats following the chosen arrangement.',
+    'Lay the tatami mats following the chosen arrangement; screw plywood filler pieces down to the joists wherever the mats do not reach.',
   ].filter(Boolean)
 
   return {

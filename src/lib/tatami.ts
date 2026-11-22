@@ -244,7 +244,7 @@ export function matSchedule(mats: Mat[]): { name: string; w: number; l: number; 
   for (const mat of mats) {
     const w = Math.max(mat.w, mat.l)
     const l = Math.min(mat.w, mat.l)
-    const name = mat.kind === 'cut' ? 'Custom-cut mat' : mat.kind === 'full' ? 'Full mat' : 'Square mat'
+    const name = mat.kind === 'cut' ? 'Plywood filler piece (fixed, tatami height)' : mat.kind === 'full' ? 'Full mat' : 'Square mat'
     const k = `${name}|${w}|${l}`
     const e = m.get(k)
     if (e) e.qty++

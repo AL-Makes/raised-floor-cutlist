@@ -7,7 +7,7 @@ const ANCHORS: { id: TatamiAnchor; label: string }[] = [
   { id: 'br', label: 'Front-right' },
 ]
 
-const FILL = { full: '#b7c78a', square: '#a9cf9a', cut: '#e6c97a' }
+const FILL = { full: '#b7c78a', square: '#a9cf9a', cut: '#c9a66b' }
 
 export function TatamiTab({ build, options, selected, onSelect, units, lifts, onToggleLift, anchor, onAnchor }: { build: Build; options: TatamiArrangement[]; selected: string; onSelect: (id: string) => void; units: UnitSystem; lifts: { x: number; y: number }[]; onToggleLift: (x: number, y: number) => void; anchor: TatamiAnchor; onAnchor: (a: TatamiAnchor) => void }) {
   const f = build.geometry
@@ -32,7 +32,7 @@ export function TatamiTab({ build, options, selected, onSelect, units, lifts, on
             <b>{o.label}</b> {i === 0 && <span className="badge">Best fit</span>}
             <small>{o.description}</small>
             <small>
-              {o.counts.full} full, {o.counts.square} square, {o.counts.cut} cut - {o.auspicious ? 'auspicious (shugi-jiki, T-joints only)' : `${o.fourCorner} four-corner joint${o.fourCorner === 1 ? '' : 's'} (grid, fushugi-jiki)`}
+              {o.counts.full} full, {o.counts.square} square, {o.counts.cut} plywood filler - {o.auspicious ? 'auspicious (shugi-jiki, T-joints only)' : `${o.fourCorner} four-corner joint${o.fourCorner === 1 ? '' : 's'} (grid, fushugi-jiki)`}
             </small>
           </button>
         ))}
@@ -60,8 +60,8 @@ export function TatamiTab({ build, options, selected, onSelect, units, lifts, on
         {lifts.length > 0 && ` ${lifts.length} selected - the frame, deck, bins and drawers are adjusted around them.`}
       </p>
       <p className="legend">
-        Dashed outlines = bin cells under the mats (red) / drawers (blue). Cut mats (yellow) are
-        {' '}{cur.cutAreaPct.toFixed(1)}% of the area. Mat sizes: {formatLength(build.params.tatamiLong, units)} x {formatLength(build.params.tatamiShort, units)}.
+        Dashed outlines = bin cells under the mats (red) / drawers (blue). Plywood filler pieces (tan) cover the leftover area where mats do not reach ({cur.cutAreaPct.toFixed(1)}% of the floor); they are screwed down to the joists and are not accessible.
+        {' '}Mat sizes: {formatLength(build.params.tatamiLong, units)} x {formatLength(build.params.tatamiShort, units)}.
       </p>
     </div>
   )

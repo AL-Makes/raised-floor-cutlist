@@ -285,7 +285,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
       {L.tatami.visible &&
         mats.map((m, i) => {
           const pl: Placement = { kind: 'bin', x: m.x + 0.1, y: m.y + 0.1, z: S + ply, sx: m.w - 0.2, sy: m.l - 0.2, sz: build.params.tatamiThickness }
-          return <Box key={`m${i}`} p={pl} color={m.kind === 'cut' ? '#d9c27a' : '#b7c78a'} opacity={L.tatami.opacity} />
+          return <Box key={`m${i}`} p={pl} color={m.kind === 'cut' ? '#c9a66b' : '#b7c78a'} opacity={L.tatami.opacity} />
         })}
     </Canvas>
     </div>

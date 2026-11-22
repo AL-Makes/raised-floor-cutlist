@@ -82,6 +82,11 @@ export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiA
           <li key={`${m.name}${m.w}${m.l}`}><b>{m.qty}</b> x {m.name} {f(m.w)} x {f(m.l)}</li>
         ))}
       </ul>
+      {sched.some((m) => m.name.startsWith('Plywood filler')) && (
+        <p className="legend">
+          Where the mat pattern does not reach, cut plywood filler pieces (laminate plywood to {f(build.params.tatamiThickness)} to match the mat height) and screw them down to the joists below. They are fixed in place, so the bins under them are not accessible.
+        </p>
+      )}
 
       <h3>Assembly order (pocket-screw joinery)</h3>
       <ol>{build.assembly.map((s, i) => <li key={i}>{s}</li>)}</ol>
