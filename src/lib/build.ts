@@ -239,7 +239,7 @@ export function buildFloor(input: Params): Build {
 
     sec.cols.forEach((col, ci) => {
       sec.colBlocks[ci].forEach((by, bk) => {
-        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth, ref: sec.drawerFront && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk, c: ci } })
+        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth, ref: sec.colRows[ci]?.[0]?.drawer && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk, c: ci } })
         member('Cross member', 1, col.w, 4)
         deckScrewLen += col.w
       })

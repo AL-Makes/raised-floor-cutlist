@@ -345,6 +345,21 @@ describe('motorized lift tables', () => {
   })
 })
 
+describe('drawer back support stays in drawer bays', () => {
+  it('no bay under a filler gets a drawer row or its back joist', () => {
+    for (const w of [139.25, 120, 100]) {
+      const p = defaultParams()
+      const b = buildFloor({ ...p, features: { ...p.features, drawers: true }, rects: undefined as never, width: w } as never)
+      b.layout.sections.forEach((s) =>
+        s.colRows.forEach((rows, ci) => {
+          const svc = b.layout.cells.some((c) => c.section === s.index && c.type === 'service' && c.x >= s.cols[ci].x - 0.01 && c.x < s.cols[ci].x + s.cols[ci].w && c.y < s.rect.y + 1)
+          if (svc) expect(rows[0].drawer).toBe(false)
+        })
+      )
+    }
+  })
+})
+
 describe('per-bay cross joists', () => {
   it('adding or removing a cross joist only changes its own bay; main joists stay continuous', () => {
     const p = defaultParams()

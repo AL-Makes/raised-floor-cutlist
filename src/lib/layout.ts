@@ -190,10 +190,12 @@ export function buildLayout(p: Params): Layout {
     joistT.push(T + ex)
 
     const f = geo.front
-    const drawerFront =
+    const drawerFront0 =
       drawers && !plain && !!f && Math.abs(rect.y - f.y) < 1e-6 && rect.x >= f.x1 - 1e-6 && rect.x + rect.w <= f.x2 + 1e-6
     // rows between cross joists for one bay (column); each bay can carry its own count
-    const calcRows = (adj: number) => {
+    const calcRows = (adj: number, col?: { x: number; w: number }) => {
+      // a bay only gets the drawer row (and its back support) when it is not under a filler
+      const drawerFront = drawerFront0 && !(col && overFiller(col.x, rect.y, col.w, drawerLen))
       const rows: Section['rows'] = []
       const blockY: number[] = []
       if (drawerFront) {
@@ -280,8 +282,8 @@ export function buildLayout(p: Params): Layout {
     }
 
     // every bay between two main joists keeps its own cross joists, so adding or removing one never touches the neighbours
-    const colData = cols.map((_, ci) => (fixed ? { rows, blockY } : calcRows(p.crossAdjust + (p.colAdjust?.[`${si}:${ci}`] ?? 0))))
-    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront, exact: !!exact, fixed: !!fixed, applied })
+    const colData = cols.map((col, ci) => (fixed ? { rows, blockY } : calcRows(p.crossAdjust + (p.colAdjust?.[`${si}:${ci}`] ?? 0), col)))
+    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, exact: !!exact, fixed: !!fixed, applied })
     cols.forEach((col, ci) => {
       colData[ci].rows.forEach((row, ri) => {
         const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer ? 'drawer' : 'bin'
