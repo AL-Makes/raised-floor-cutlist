@@ -10,7 +10,9 @@ import type { FloorSpec, Params, Part, Placement, Rect } from './types'
 
 /** Structural plywood, roughly 34 lb per cubic foot. */
 const PLY_LB_PER_IN3 = 34 / 1728
-const LIFT_DEPTH = 8
+const LIFT_DEPTH = 12.4 // compressed column height: its top meets the underside of the plywood table top
+const LIFT_TRAVEL = 16.5
+const LIFT_COL = 6 // column footprint, square
 
 function subtractRect(q: Placement, z: Rect): Placement[] {
   const out: Placement[] = []
@@ -516,6 +518,8 @@ export function buildFloor(input: Params): Build {
     const inFloor = (x: number, y: number) => geometry.rects.some((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.l)
     let sides = 0
     let ends = 0
+    let falseFloors = 0
+    let falseFloorPost = 0
     for (const z of liftZones) {
       const zi = liftZones.indexOf(z)
       const frame = [
@@ -530,17 +534,36 @@ export function buildFloor(input: Params): Build {
         if (m.side) sides++
         else ends++
       }
-      const bodyBottom = Math.max(0, S - LIFT_DEPTH)
-      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: bodyBottom, sx: z.w - 0.25, sy: z.l - 0.25, sz: S - bodyBottom, lift: zi })
+      const colBottom = Math.max(0, S - LIFT_DEPTH)
+      const cx0 = z.x + (z.w - LIFT_COL) / 2
+      const cy0 = z.y + (z.l - LIFT_COL) / 2
+      // false floor fills the height from the slab up to the bottom of the column
+      if (colBottom > 0.01) {
+        const postH = Math.max(0.1, colBottom - p.plyThickness)
+        for (const [px, py] of [[z.x + 0.125, z.y + 0.125], [z.x + z.w - 0.125 - T, z.y + 0.125], [z.x + 0.125, z.y + z.l - 0.125 - T], [z.x + z.w - 0.125 - T, z.y + z.l - 0.125 - T]]) {
+          next.push({ kind: 'block', x: px, y: py, z: 0, sx: T, sy: T, sz: postH })
+        }
+        next.push({ kind: 'block', x: z.x + 0.125, y: z.y + 0.125, z: postH, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.plyThickness })
+        falseFloors++
+        falseFloorPost = postH
+      }
+      // column: fixed 6" sleeve plus the telescoping stage that carries the table top
+      next.push({ kind: 'block', x: cx0, y: cy0, z: colBottom, sx: LIFT_COL, sy: LIFT_COL, sz: LIFT_DEPTH })
+      next.push({ kind: 'lift', x: cx0 + 0.25, y: cy0 + 0.25, z: colBottom, sx: LIFT_COL - 0.5, sy: LIFT_COL - 0.5, sz: LIFT_DEPTH, lift: zi })
+      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.plyThickness, lift: zi })
       next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S + p.plyThickness, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.tatamiThickness, lift: zi })
+      sheet('Deck', `Lift table top (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, z.w - 0.25, z.l - 0.25, `Screwed to the column's top plate; carries the ${r3(p.tatamiShort)}" square tatami mat`)
+    }    placements.splice(0, placements.length, ...next)
+    if (falseFloors) {
+      member('Lift false-floor post (2x4)', falseFloors * 4, falseFloorPost, 4)
+      sheet('Deck', `False floor under lift table (${r3(p.plyThickness)}" ply)`, p.plyThickness, falseFloors, p.tatamiShort - 0.25, p.tatamiShort - 0.25, 'Carried on four 2x4 posts; the motorized column bolts to this platform')
     }
-    placements.splice(0, placements.length, ...next)
     member('Lift pocket frame (side, along joists)', sides, p.tatamiShort, 4)
     member('Lift pocket frame (end, across)', ends, p.tatamiShort + 2 * T, 4)
     warnings.push(
       `${liftZones.length} motorized lift table(s): joists, cross blocks and the plywood are cut back around each ${r3(p.tatamiShort)}" opening and framed by the pocket frame; cut the members full length and trim on site. Bins cannot sit under a table, and front drawers are laid out across the front width left beside it.`,
     )
-    if (S < LIFT_DEPTH) warnings.push(`Lift tables need about ${LIFT_DEPTH}" below the deck but the frame is only ${r3(S)}" high. Raise the final height.`)
+    if (S < LIFT_DEPTH) warnings.push(`The lift column is ${LIFT_DEPTH}" tall when compressed but the frame is only ${r3(S)}" high. Raise the final height.`)
     const clash = drawerCells.filter((c) => liftZones.some((z) => hit({ x: c.x, y: c.y, sx: c.w, sy: c.l }, z))).length
     if (clash) warnings.push(`${clash} drawer(s) overlap a lift table. Move the table off the front row or turn drawers off there.`)
   }
@@ -573,7 +596,7 @@ export function buildFloor(input: Params): Build {
   }
   if (joistLf) hardware.push({ name: 'Construction adhesive tubes', qty: Math.max(1, Math.ceil(joistLf / 25)), unit: 'tubes' })
   if (casters) hardware.push({ name: `Caster wheels, ${r3(p.casterH)}" tall overall (your own)`, qty: casters, unit: 'pcs', notes: '4 per drawer; screw to the underside of the drawer bottom' })
-  if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `Needs about ${LIFT_DEPTH}" of depth below the deck for the retracted table and motor, plus a power feed and control` })
+  if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `${LIFT_COL}" x ${LIFT_COL}" column, ${LIFT_DEPTH}" compressed, ${LIFT_TRAVEL}" travel. Its top meets the underside of the plywood table top at rest; a false floor fills the height below it. Needs a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
   const smallBins = placements.filter((q) => q.kind === 'bin' && q.split)
   if (smallBins.length) hardware.push({ name: `Smaller bins, about ${r3(smallBins[0].sx)}" x ${r3(smallBins[0].sy)}" x ${r3(p.bin.h)}" (purchased; sized to fit)`, qty: smallBins.length, unit: 'pcs', notes: 'Split bins: pick the nearest standard size that fits each half' })

@@ -397,7 +397,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
     if (armed[0] === 'l') {
       const top = mine.reduce<Placement | undefined>((a, b) => (!a || b.z > a.z ? b : a), undefined)
       if (!top) return null
-      return { dir: 'up' as const, max: 24, anchor: [top.x + top.sx / 2, top.z + top.sz + 1, -(top.y + top.sy / 2)] as [number, number, number] }
+      return { dir: 'up' as const, max: 16.5, anchor: [top.x + top.sx / 2, top.z + top.sz + 1, -(top.y + top.sy / 2)] as [number, number, number] }
     }
     const parts = mine.filter((p) => p.kind === 'drawer')
     if (!parts.length) return null
