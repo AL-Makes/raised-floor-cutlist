@@ -1,6 +1,6 @@
 import { STANDARD_BIN_FOOTPRINTS_MM } from './bins'
 import { mmToIn } from './units'
-import { normalizeFloor, type FloorGeometry, type PolyEdge } from './geometry'
+import { insetForTrim, normalizeFloor, type FloorGeometry, type PolyEdge } from './geometry'
 import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './height'
 import { buildLayout, DRAWER_BACK_GAP, DRAWER_SIDE_GAP, WEB_OC, type Layout } from './layout'
 import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
@@ -121,6 +121,7 @@ const DRAWER_TOP_EXTRA = 2.25 // 1" above the box + 1-1/2" flat header + 1/4" sp
 
 export function buildFloor(input: Params): Build {
   const p: Params = { ...input, bin: resolveBin(input) }
+  if (p.features.edgeTrim) p.floor = insetForTrim(p.floor, p.trimSides, 0.75)
   const warnings: string[] = []
   const geometry = normalizeFloor(p.floor)
   if (geometry.error) warnings.push(`Floor shape problem: ${geometry.error}`)

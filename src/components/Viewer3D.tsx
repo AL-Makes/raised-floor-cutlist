@@ -485,12 +485,19 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
       {opts.dims && (
-        <group>
-          <FlatDim x={cx} y={-8} sx={g.width} sy={12} text={`Width ${formatLength(g.width, units)}`} />
-          <FlatDim x={-8} y={g.length / 2} sx={12} sy={g.length} text={`Depth ${formatLength(g.length, units)}`} />
-          <FlatDim x={-8} y={-8} sx={12} sy={12} text={`H ${formatLength(build.params.finalHeight, units)}`} />
-        </group>
-      )}
+        (() => {
+          const bb = build.placements.filter((q) => q.kind !== 'wheel').reduce((m, q) => ({ x0: Math.min(m.x0, q.x), x1: Math.max(m.x1, q.x + q.sx), y0: Math.min(m.y0, q.y), y1: Math.max(m.y1, q.y + q.sy) }), { x0: g.width, x1: 0, y0: g.length, y1: 0 })
+          if (bb.x1 <= bb.x0) return null
+          const W = bb.x1 - bb.x0
+          const D = bb.y1 - bb.y0
+          return (
+            <group>
+              <FlatDim x={(bb.x0 + bb.x1) / 2} y={bb.y0 - 8} sx={W} sy={12} text={`Width ${formatLength(W, units)}`} />
+              <FlatDim x={bb.x0 - 8} y={(bb.y0 + bb.y1) / 2} sx={12} sy={D} text={`Depth ${formatLength(D, units)}`} />
+              <FlatDim x={bb.x0 - 8} y={bb.y0 - 8} sx={12} sy={12} text={`H ${formatLength(build.params.finalHeight, units)}`} />
+            </group>
+          )
+        })()      )}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
           key={v.id}

@@ -250,3 +250,18 @@ export function normalizeFloor(f: FloorSpec): FloorGeometry {
     area: rects.reduce((s, r) => s + r.w * r.l, 0),
   }
 }
+
+/** Pull the trimmed walls inward by `th` so that frame + side panels together fill the entered floor size. */
+export function insetForTrim(f: FloorSpec, sides: Record<Side, boolean>, th: number): FloorSpec {
+  const g = normalizeFloor(f)
+  if (g.error) return f
+  let poly = g.poly
+  g.edges.forEach((e) => {
+    if (!sides[e.side]) return
+    const dx = Math.sign(e.x2 - e.x1)
+    const dy = Math.sign(e.y2 - e.y1)
+    poly = moveEdge(poly, e.index, e.y1 === e.y2 ? dx * th : -dy * th)
+  })
+  if (validatePolygon(poly)) return f
+  return { ...f, shape: 'poly', poly, frontEdge: g.edges.findIndex((e) => e.isFront) }
+}
