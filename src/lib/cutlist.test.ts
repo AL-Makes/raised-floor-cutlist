@@ -371,9 +371,14 @@ describe('filler service zones', () => {
 describe('chosen access panels', () => {
   it('only chosen bin cells get hatches', () => {
     const p = defaultParams()
-    const cell = buildFloor(p).layout.cells.find((c) => c.type === 'bin')!
-    const b = buildFloor({ ...p, hatchCells: [cell.key] })
-    expect(b.placements.filter((x) => x.kind === 'hatch').length).toBe(1)
-    expect(buildFloor(p).placements.some((x) => x.kind === 'hatch')).toBe(false)
+    const base = buildFloor(p)
+    const sec = base.layout.sections[0]
+    const pos = sec.joistX[1] + sec.joistT[1] / 2
+    const cut = buildFloor({ ...p, deckCuts: [{ s: 0, axis: 'x', pos }] })
+    expect(cut.deckPanels).toBeGreaterThan(base.deckPanels)
+    const key = cut.placements.find((x) => x.kind === 'deck' && x.panel)!.panel!
+    const acc = buildFloor({ ...p, deckCuts: [{ s: 0, axis: 'x', pos }], accessPanels: [key] })
+    expect(acc.placements.filter((x) => x.kind === 'hatch').length).toBe(1)
+    expect(acc.deckPanels).toBe(cut.deckPanels - 1)
   })
 })

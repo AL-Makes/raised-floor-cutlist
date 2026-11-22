@@ -1,5 +1,4 @@
 import { buildFloor, type Build } from './build'
-import { isHatch } from './types'
 import type { Params } from './types'
 
 function buildFloorLazy(p: Params): Build | null {
@@ -107,8 +106,7 @@ function joistRatio(b: Build): number {
 function cellAnalysis(b: Build): CellAnalysis[] {
   const p = b.params
   return b.layout.cells.map((c) => {
-    const hatch = isHatch(p, c)
-    const span = Math.min(c.w, c.l) + (hatch ? 0.5 : 0)
+    const span = Math.min(c.w, c.l)
     const cap = plyCapacity(p.plyThickness, span)
     const ratio = Math.min(cap.psf / p.designLoadPsf, cap.pointLb / p.pointLoadLb)
     return { cell: c.index, span, psf: cap.psf, pointLb: cap.pointLb, ratio, status: statusOf(ratio) }
@@ -163,10 +161,10 @@ export function analyze(b: Build): Structural {
         apply: (q) => ({ ...q, binLongAlongJoists: !q.binLongAlongJoists }),
       })
     }
-    if (b.layout.cells.some((c) => isHatch(p, c))) {
+    if (p.accessPanels?.length) {
       suggestions.push({
         id: 'hatch-note',
-        text: 'Wide hatches flex most: glue a second 1/4" ply skin under each hatch panel, or split wide hatches into two smaller ones.',
+        text: 'Lift-out panels are not screwed down, so only their edges are held: keep each one a manageable size and glue a second 1/4" ply skin under wide ones.',
       })
     }
   }

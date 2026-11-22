@@ -5,7 +5,6 @@ import { Edges, Html, OrbitControls } from '@react-three/drei'
 import type { Build } from '../lib/build'
 import type { Structural, Status } from '../lib/structural'
 import type { Mat } from '../lib/tatami'
-import { isHatch } from '../lib/types'
 import type { Placement } from '../lib/types'
 import { formatLength, type UnitSystem } from '../lib/units'
 
@@ -213,7 +212,7 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onToggleHatch, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; onMove: (key: string, v: number) => void; onToggleHatch: (key: string) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onToggleCut, onToggleAccess, deckMode, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; onMove: (key: string, v: number) => void; onToggleCut: (s: number, axis: 'x' | 'y', pos: number) => void; onToggleAccess: (key: string) => void; deckMode: 'cut' | 'access'; units?: UnitSystem }) {
   const [hover, setHoverState] = useState<Hover | null>(null)
   const [hoverCell, setHoverCell] = useState<string | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -323,27 +322,55 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
           </div>
         </Html>
       )}
-      {cutMode &&
-        build.layout.cells.filter((c) => c.type !== 'drawer').map((c) => {
-          const on = isHatch(build.params, c)
-          const hot = hoverCell === c.key
+      {cutMode && deckMode === 'access' &&
+        build.placements.filter((q) => q.panel && (q.kind === 'deck' || q.kind === 'hatch')).map((q) => {
+          const on = q.kind === 'hatch'
+          const hot = hoverCell === q.panel
           return (
             <mesh
-              key={`cut${c.key}`}
-              position={[c.x + c.w / 2, S + ply + 0.1, -(c.y + c.l / 2)]}
-              onPointerOver={(e) => { e.stopPropagation(); setHoverCell(c.key) }}
-              onPointerOut={() => setHoverCell((h) => (h === c.key ? null : h))}
-              onClick={(e) => { e.stopPropagation(); if (e.delta < 5) onToggleHatch(c.key) }}
+              key={`pn${q.panel}`}
+              position={[q.x + q.sx / 2, q.z + q.sz + 0.1, -(q.y + q.sy / 2)]}
+              onPointerOver={(e) => { e.stopPropagation(); setHoverCell(q.panel!) }}
+              onPointerOut={() => setHoverCell((h) => (h === q.panel ? null : h))}
+              onClick={(e) => { e.stopPropagation(); if (e.delta < 5) onToggleAccess(q.panel!) }}
             >
-              <boxGeometry args={[c.w - 0.3, 0.1, c.l - 0.3]} />
-              <meshBasicMaterial color={on ? '#2ecc71' : '#3b82f6'} transparent opacity={hot ? 0.6 : on ? 0.35 : 0.01} depthWrite={false} />
+              <boxGeometry args={[q.sx - 0.3, 0.1, q.sy - 0.3]} />
+              <meshBasicMaterial color={on ? '#2ecc71' : '#3b82f6'} transparent opacity={hot ? 0.6 : on ? 0.4 : 0.01} depthWrite={false} />
             </mesh>
           )
+        })}
+      {cutMode && deckMode === 'cut' &&
+        build.layout.sections.flatMap((sec) => {
+          const lines: { id: string; axis: 'x' | 'y'; pos: number; cx: number; cy: number; sx: number; sy: number }[] = []
+          sec.joistX.forEach((jx, k) => {
+            if (k === 0 || k === sec.joistX.length - 1) return
+            const pos = jx + sec.joistT[k] / 2
+            lines.push({ id: `${sec.index}:x:${k}`, axis: 'x', pos, cx: pos, cy: sec.rect.y + sec.rect.l / 2, sx: 1.2, sy: sec.rect.l })
+          })
+          sec.blockY.forEach((by, k) => {
+            const pos = by + build.layout.joistW / 2
+            lines.push({ id: `${sec.index}:y:${k}`, axis: 'y', pos, cx: sec.rect.x + sec.rect.w / 2, cy: pos, sx: sec.rect.w, sy: 1.2 })
+          })
+          return lines.map((ln) => {
+            const on = (build.params.deckCuts ?? []).some((c) => c.s === sec.index && c.axis === ln.axis && Math.abs(c.pos - ln.pos) < 0.01)
+            const hot = hoverCell === ln.id
+            return (
+              <mesh
+                key={`cl${ln.id}`}
+                position={[ln.cx, S + ply + 0.1, -ln.cy]}
+                onPointerOver={(e) => { e.stopPropagation(); setHoverCell(ln.id) }}
+                onPointerOut={() => setHoverCell((h) => (h === ln.id ? null : h))}
+                onClick={(e) => { e.stopPropagation(); if (e.delta < 5) onToggleCut(sec.index, ln.axis, ln.pos) }}
+              >
+                <boxGeometry args={[ln.sx, 0.1, ln.sy]} />
+                <meshBasicMaterial color={on ? '#e53935' : '#3b82f6'} transparent opacity={hot ? 0.8 : on ? 0.85 : 0.18} depthWrite={false} />
+              </mesh>
+            )
+          })
         })}
       {opts.loadMap &&
         L.deck.visible &&
         build.layout.cells.map((c) => {
-          if (isHatch(build.params, c)) return null
           const st = status.get(c.index) ?? 'ok'
           const pl: Placement = { kind: 'deck', x: c.x, y: c.y, z: S + ply + 0.05, sx: c.w, sy: c.l, sz: 0.05 }
           return <Box key={`lm${c.index}`} p={pl} color={STATUS_COLOR[st]} opacity={0.8} />

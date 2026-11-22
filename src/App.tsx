@@ -8,7 +8,6 @@ import { toCsv } from './lib/export'
 import { analyze } from './lib/structural'
 import { suggestTatami } from './lib/tatami'
 import { floorRects } from './lib/layout'
-import { isHatch } from './lib/types'
 import type { Params } from './lib/types'
 import type { UnitSystem } from './lib/units'
 import './App.css'
@@ -25,6 +24,7 @@ function loadSaved(): { params?: Partial<Params>; units?: UnitSystem; tab?: Tab;
 }
 
 export default function App() {
+  const [deckMode, setDeckMode] = useState<'cut' | 'access'>('cut')
   const [layersOpen, setLayersOpen] = useState(() => localStorage.getItem('raised-floor-cutlist:layersOpen') !== '0')
   useEffect(() => {
     try {
@@ -148,14 +148,23 @@ export default function App() {
                 </label>
                 </>)}
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d, moves: {} } : { ...q, crossAdjust: q.crossAdjust + d, moves: {} }))}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))} onToggleHatch={(key) => setParams((q) => {
-                              const cur = q.features.hatches ? build.layout.cells.filter((c) => isHatch(q, c)).map((c) => c.key) : q.hatchCells ?? []
-                              const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]
-                              return { ...q, features: { ...q.features, hatches: false }, hatchCells: next }
-                            })} />
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d, moves: {} } : { ...q, crossAdjust: q.crossAdjust + d, moves: {} }))}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))}               onToggleAccess={(key) => setParams((q) => {
+                                            const cur = q.accessPanels ?? []
+                                            return { ...q, accessPanels: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] }
+                                          })} onToggleCut={(s, axis, pos) => setParams((q) => {
+                                            const cur = q.deckCuts ?? []
+                                            const has = cur.some((c) => c.s === s && c.axis === axis && Math.abs(c.pos - pos) < 0.01)
+                                            return { ...q, deckCuts: has ? cur.filter((c) => !(c.s === s && c.axis === axis && Math.abs(c.pos - pos) < 0.01)) : [...cur, { s, axis, pos }] }
+                                          })} deckMode={deckMode} />
               <div className="hud">
+                              {view.layers.deck.visible && (
+                                <>
+                                  <button type="button" className="layertoggle" style={{ fontWeight: deckMode === 'cut' ? 700 : 400 }} onClick={() => setDeckMode('cut')}>Cut points</button>
+                                  <button type="button" className="layertoggle" style={{ fontWeight: deckMode === 'access' ? 700 : 400 }} onClick={() => setDeckMode('access')}>Access panels</button>
+                                </>
+                              )}
                 {Object.keys(params.moves ?? {}).length > 0 && <button type="button" className="layertoggle" onClick={() => setParams((q) => ({ ...q, moves: {} }))}>Reset joist positions</button>}
-                              {view.layers.deck.visible ? 'Plywood on: click a panel to make it an access hatch (joist editing is off) -' : 'Drag a joist to move it -'}
+                                            {view.layers.deck.visible ? (deckMode === 'cut' ? 'Plywood on: click a joist line to cut the plywood there (joist editing is off) -' : 'Plywood on: click a panel to make it lift out for access (joist editing is off) -') : 'Drag a joist to move it -'}
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf
               </div>
             </div>
