@@ -551,7 +551,7 @@ export function buildFloor(input: Params): Build {
       next.push({ kind: 'block', x: cx0, y: cy0, z: colBottom, sx: LIFT_COL, sy: LIFT_COL, sz: LIFT_DEPTH })
       next.push({ kind: 'lift', x: cx0 + 0.25, y: cy0 + 0.25, z: colBottom, sx: LIFT_COL - 0.5, sy: LIFT_COL - 0.5, sz: LIFT_DEPTH, lift: zi })
       next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.plyThickness, lift: zi })
-      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S + p.plyThickness, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.tatamiThickness, lift: zi })
+      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S + p.plyThickness, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.tatamiThickness, lift: zi, liftMat: true })
       sheet('Deck', `Lift table top (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, z.w - 0.25, z.l - 0.25, `Screwed to the column's top plate; carries the ${r3(p.tatamiShort)}" square tatami mat`)
     }    placements.splice(0, placements.length, ...next)
     if (falseFloors) {

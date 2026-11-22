@@ -439,7 +439,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         </mesh>
       )}
       {placed.map((p, i) => {
-        const key = layerOf(p.kind)
+        const key = p.liftMat ? 'tatami' : layerOf(p.kind)
         const layer = L[key]
         if (!layer.visible) return null
         const edit = p.kind === 'block'
