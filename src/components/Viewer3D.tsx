@@ -360,7 +360,6 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
       {binSel && (() => {
         const cell = build.layout.cells[binSel.cell]
         if (!cell) return null
-        const half = (n: number) => (n - build.params.clearance) / 2 >= 4
         const go = (m: 'x' | 'y' | null) => { onSplit(cell.key, m); setBinSel(null) }
         return (
           <Html position={binSel.pos} center zIndexRange={[20, 0]}>
@@ -369,8 +368,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
                 <button onClick={() => go(null)}>Recombine</button>
               ) : (
                 <>
-                  <button disabled={!half(build.layout.binX)} title="Two bins side by side" onClick={() => go('x')}>Split ↔</button>
-                  <button disabled={!half(build.layout.binY)} title="Two bins one behind the other" onClick={() => go('y')}>Split ↕</button>
+                  <button title="Swap to the next smaller standard IKEA bin size" onClick={() => go('x')}>Split to smaller bin</button>
                 </>
               )}
               <button onClick={() => setBinSel(null)}>×</button>
@@ -411,8 +409,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
               <button onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, null); setMenu(null) }}>Recombine bins</button>
             ) : (
               <>
-                <button disabled={(build.layout.binX - build.params.clearance) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'x'); setMenu(null) }}>Split bins ↔</button>
-                <button disabled={(build.layout.binY - build.params.clearance) / 2 < 4} onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'y'); setMenu(null) }}>Split bins ↕</button>
+                <button onClick={() => { onSplit(build.layout.cells[menu.bin!.cell].key, 'x'); setMenu(null) }}>Split to smaller standard bin</button>
               </>
             )}
             <hr />

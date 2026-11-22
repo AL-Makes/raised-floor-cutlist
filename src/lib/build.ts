@@ -1,4 +1,4 @@
-import { CUSTOM_BIN_ID } from './bins'
+import { CUSTOM_BIN_ID, STANDARD_BIN_FOOTPRINTS_MM } from './bins'
 import { mmToIn } from './units'
 import { normalizeFloor, type FloorGeometry, type PolyEdge } from './geometry'
 import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './height'
@@ -11,7 +11,6 @@ import type { FloorSpec, Params, Part, Placement, Rect } from './types'
 /** Structural plywood, roughly 34 lb per cubic foot. */
 const PLY_LB_PER_IN3 = 34 / 1728
 const LIFT_DEPTH = 8
-const MIN_SPLIT = 4
 
 function subtractRect(q: Placement, z: Rect): Placement[] {
   const out: Placement[] = []
@@ -278,20 +277,22 @@ export function buildFloor(input: Params): Build {
   }
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
   const clr = p.clearance
-  const splitMode = (c: { key: string }) => {
-    const m = p.binSplit?.[c.key]
-    return m === 'x' && (layout.binX - clr) / 2 >= MIN_SPLIT ? 'x' : m === 'y' && (layout.binY - clr) / 2 >= MIN_SPLIT ? 'y' : undefined
-  }
+  // a split cell steps down to the next smaller standard IKEA footprint (never a stretched half-bin)
+  const smaller = (() => {
+    const long = Math.max(layout.binX, layout.binY)
+    const short = Math.min(layout.binX, layout.binY)
+    const s = STANDARD_BIN_FOOTPRINTS_MM.map(([l, w]) => [mmToIn(l), mmToIn(w)]).find(([l, w]) => l < long - 0.05 && w <= short + 0.05)
+    if (!s) return undefined
+    return layout.binX >= layout.binY ? { sx: s[0], sy: s[1] } : { sx: s[1], sy: s[0] }
+  })()
+  const splitMode = (c: { key: string }) => (p.binSplit?.[c.key] && smaller ? 'x' : undefined)
   let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY, 0)
 
   const slotPos = (start: number, size: number, n: number, item: number, k: number) => start + (size / n) * k + (size / n - item) / 2
-  // a split cell is refilled with the smaller bin along the split axis, so extra bins appear when they fit
-  const pushSplit = (c: { index: number; binsX: number; binsY: number }, mode: 'x' | 'y', rx: number, rw: number, ry: number, rl: number, nxFixed: number, nyFixed: number, z: number) => {
-    const half = ((mode === 'x' ? layout.binX : layout.binY) - clr) / 2
-    const sx = mode === 'x' ? half : layout.binX
-    const sy = mode === 'y' ? half : layout.binY
-    const nx = mode === 'x' ? Math.max(2, Math.floor((rw + 1e-6) / (half + clr))) : nxFixed
-    const ny = mode === 'y' ? Math.max(2, Math.floor((rl + 1e-6) / (half + clr))) : nyFixed
+  const pushSplit = (c: { index: number; binsX: number; binsY: number }, mode: 'x' | 'y', rx: number, rw: number, ry: number, rl: number, _nxFixed: number, _nyFixed: number, z: number) => {
+    const { sx, sy } = smaller!
+    const nx = Math.max(1, Math.floor((rw + 1e-6) / (sx + clr)))
+    const ny = Math.max(1, Math.floor((rl + 1e-6) / (sy + clr)))
     for (let ix = 0; ix < nx; ix++)
       for (let iy = 0; iy < ny; iy++) placements.push({ kind: 'bin', x: slotPos(rx, rw, nx, sx, ix), y: slotPos(ry, rl, ny, sy, iy), z, sx, sy, sz: p.bin.h, cell: c.index, split: mode })
     binCount += nx * ny - c.binsX * c.binsY

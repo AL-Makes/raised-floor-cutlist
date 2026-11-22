@@ -386,15 +386,15 @@ describe('drawer back support stays in drawer bays', () => {
 })
 
 describe('split bins', () => {
-  it('splits a bin cell into two smaller bins and recombines', () => {
+  it('splits a bin cell to the next smaller standard IKEA size and recombines', () => {
     const p = defaultParams()
     const b0 = buildFloor(p)
     const cell = b0.layout.cells.find((c) => c.type === 'bin' && c.binsX > 0)!
     const bins0 = b0.placements.filter((q) => q.kind === 'bin' && q.cell === cell.index)
     const b1 = buildFloor({ ...p, binSplit: { [cell.key]: 'x' } })
     const bins1 = b1.placements.filter((q) => q.kind === 'bin' && q.cell === cell.index)
-    expect(bins1.length).toBeGreaterThanOrEqual(bins0.length * 2)
-    bins1.forEach((q) => expect(q.sx).toBeLessThan(b0.layout.binX / 2))
+    expect(bins1.length).toBeGreaterThanOrEqual(bins0.length)
+    bins1.forEach((q) => { expect(q.sx).toBeLessThan(b0.layout.binX); expect(q.sx / q.sy).toBeCloseTo(280 / 195, 1) })
     expect(b1.binCount).toBe(b0.binCount - bins0.length + bins1.length)
     expect(buildFloor({ ...p, binSplit: {} }).binCount).toBe(b0.binCount)
   })
