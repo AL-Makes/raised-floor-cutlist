@@ -256,7 +256,6 @@ export function buildFloor(input: Params): Build {
     const endL = sharedEdge ? 0 : sec.joistT[0]
     const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
-    placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
     const runPieces = (): number[] => {
       if (innerW <= MAX_RUN + 0.01) return [innerW]
       const cuts = sec.joistX.slice(1, -1).map((jx, i) => jx + sec.joistT[i + 1] / 2 - (rect.x + endL))
@@ -273,12 +272,24 @@ export function buildFloor(input: Params): Build {
       const pcs = runPieces()
       pcs.forEach((len) => mk(pcs.length > 1 ? name + ' (spliced over a joist)' : name, 1, len, pk))
     }
+    const pushRun = (kind: string, y: number, z: number, sy: number, sz: number) => {
+      let x = rect.x + endL
+      const pcs = runPieces()
+      pcs.forEach((len, i) => {
+        const g = pcs.length > 1 ? 0.15 : 0
+        const a = i > 0 ? g : 0
+        const b = i < pcs.length - 1 ? g : 0
+        placements.push({ kind, x: x + a, y, z, sx: len - a - b, sy, sz } as never)
+        x += len
+      })
+    }
+    pushRun('rim', backY, bu, T, depth)
     splitRun('Back rim (between end joists)', 4, member)
     if (sec.drawerFront) {
-      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
+      pushRun('header', rect.y, S - 1.5, 3.5, 1.5)
       splitRun('Drawer header (2x4 laid flat)', 4, (nm, q, len, pk) => lumber('Frame', nm, '2x4', q, len, 3.5, 1.5, 'Sits flush under deck at the front opening', pk))
     } else if (!sec.shareFront) {
-      placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
+      pushRun('rim', rect.y, bu, T, depth)
       splitRun('Front rim (between end joists)', 4, member)
     }
     sec.cols.forEach((col, ci) => {
@@ -290,6 +301,15 @@ export function buildFloor(input: Params): Build {
       })
     })
   })
+
+  for (let i = placements.length - 1; i >= 0; i--) {
+    const q = placements[i]
+    if (!['joist', 'rim', 'buildup', 'block'].includes(q.kind) || q.sy <= MAX_RUN + 0.01) continue
+    const nP = Math.ceil(q.sy / MAX_RUN)
+    const len = q.sy / nP
+    const pcs = Array.from({ length: nP }, (_, k) => ({ ...q, y: q.y + k * len + (k > 0 ? 0.15 : 0), sy: len - (k > 0 ? 0.15 : 0) - (k < nP - 1 ? 0.15 : 0) }))
+    placements.splice(i, 1, ...pcs)
+  }
 
   const deck = planPlywood(layout, { sheetL: p.sheetL, sheetW: p.sheetW, serviceFillers: p.fillerAccess ?? [] })
   unsupportedSeams.push(...deck.unsupported)
