@@ -312,15 +312,15 @@ export function buildFloor(input: Params): Build {
   let slides = 0
   if (readyDrawers) {
     const { rx, ry } = rollingAxes(p)
-    const faceH = S - 1.5 - 0.25
+    const faceH = S - 1.5 - 1 - 0.125
     for (const c of drawerCells) {
       sheet('Drawers', 'Drawer false front (screws to the IKEA box)', DRAWER_FACE_T, 1, c.w - 0.25, faceH, 'Screw from inside of the IKEA box front')
       placements.push({ kind: 'drawer', x: c.x + (c.w - rx) / 2, y: c.y + DRAWER_FACE_T, z: 0.25, sx: rx, sy: ry, sz: p.rollingBox.h, cell: c.index })
       placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
     }
   } else if (p.features.drawers) {
-    const faceH = S - 1.5 - 0.25
-    const boxH = faceH - 1.25
+    const faceH = S - 1.5 - 1 - 0.125
+    const boxH = faceH - 0.75
     for (const c of drawerCells) {
       const boxW = c.w - 2 * DRAWER_SLIDE
       const boxL = layout.binY + p.clearance + 2 * boxT
