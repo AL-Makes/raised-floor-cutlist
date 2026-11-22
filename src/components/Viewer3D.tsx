@@ -306,7 +306,7 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawer, units = 'imperial' }: { build: Build; structural?: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number, y?: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; onDrawer: (key: string, on: boolean) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawer, units = 'imperial', pullTo }: { build: Build; structural?: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number, y?: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; onDrawer: (key: string, on: boolean) => void; units?: UnitSystem; pullTo?: Record<string, number> }) {
   const [binSel, setBinSel] = useState<{ cell: number; split?: 'x' | 'y'; pos: [number, number, number] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; bin?: { cell: number; split?: 'x' | 'y' } } | null>(null)
   const ctxBin = useRef<{ cell: number; split?: 'x' | 'y' } | undefined>(undefined)
@@ -345,7 +345,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
   const pullKey = (p: Placement) => (p.lift !== undefined ? `l${p.lift}` : (p.kind === 'drawer' || p.kind === 'wheel' || p.kind === 'cutout') && p.cell !== undefined ? `d${p.cell}` : undefined)
   const placed = build.placements.map((p) => {
     const k = pullKey(p)
-    const v = k ? pulls[k] ?? 0 : 0
+    const v = k ? pullTo?.[k] ?? pulls[k] ?? 0 : 0
     return !v ? p : k![0] === 'l' ? { ...p, z: p.z + v } : { ...p, y: p.y - v }
   })
   const armInfo = (() => {

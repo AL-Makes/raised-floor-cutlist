@@ -3,11 +3,13 @@ import { InputPanel } from './components/InputPanel'
 import { CutListTab, LoadTab } from './components/Results'
 import { TatamiTab } from './components/TatamiTab'
 import { Viewer3D, LAYER_LABELS, FEATURE_KEYS, defaultView, type Layer, type LayerKey, type ViewOptions } from './components/Viewer3D'
-import { buildFloor, defaultParams } from './lib/build'
+import { buildFloor, defaultParams, type Build } from './lib/build'
 import { toCsv } from './lib/export'
 import { analyze } from './lib/structural'
 import { suggestTatami } from './lib/tatami'
 import { floorRects } from './lib/layout'
+import { findBin } from './lib/bins'
+import { DEMO_CAPTIONS, DEMO_MS, runDemo } from './demo'
 import type { Params } from './lib/types'
 import type { UnitSystem } from './lib/units'
 import './App.css'
@@ -23,18 +25,10 @@ function loadSaved(): { params?: Partial<Params>; units?: UnitSystem; tab?: Tab;
   }
 }
 
-const DEMO_STEPS: { at: number; text: string }[] = [
-  { at: 0, text: '1. Enter any floor shape and an IKEA bin - the frame is laid out around the bin size' },
-  { at: 1800, text: '2. Switch drawers on - supports, headers and frames rebuild automatically' },
-  { at: 3600, text: '3. Tatami mat layout, with lift-out tables' },
-  { at: 5400, text: '4. Full cut list with quantities, ready for CSV or print' },
-  { at: 7200, text: '5. Load check flags weak spots and suggests fixes' },
-  { at: 9000, text: 'Back to your design - this was just a demo' },
-]
-
 export default function App() {
   const [demo, setDemo] = useState<number | null>(null)
-  const demoTimers = useRef<number[]>([])
+  const demoRun = useRef<{ on: boolean } | null>(null)
+  const [demoPulls, setDemoPulls] = useState<Record<string, number>>({})
   const demoSaved = useRef<{ params: Params; tab: Tab; view: ViewOptions } | null>(null)
   const [layersOpen, setLayersOpen] = useState(() => localStorage.getItem('raised-floor-cutlist:layersOpen') !== '0')
   useEffect(() => {
@@ -86,9 +80,10 @@ export default function App() {
     </div>
   )
 
+  const buildRef = useRef<Build | null>(null)
   const stopDemo = () => {
-    demoTimers.current.forEach((t) => window.clearTimeout(t))
-    demoTimers.current = []
+    if (demoRun.current) demoRun.current.on = false
+    demoRun.current = null
     const s = demoSaved.current
     demoSaved.current = null
     if (s) {
@@ -96,29 +91,37 @@ export default function App() {
       setTab(s.tab)
       setView(s.view)
     }
+    setDemoPulls({})
     setDemo(null)
   }
-  useEffect(() => () => demoTimers.current.forEach((t) => window.clearTimeout(t)), [])
+  useEffect(() => () => { if (demoRun.current) demoRun.current.on = false }, [])
   const startDemo = () => {
     if (demo !== null) return
     demoSaved.current = { params, tab, view }
-    const base: Params = { ...params, features: { ...params.features, drawers: false } }
-    const dv = view
-    const acts: (() => void)[] = [
-      () => { setParams(base); setTab('3d'); setView({ ...dv, dims: true, layers: { ...dv.layers, deck: { ...dv.layers.deck, visible: false }, tatami: { ...dv.layers.tatami, visible: false } } }) },
-      () => setParams({ ...base, features: { ...base.features, drawers: true } }),
-      () => setTab('tatami'),
-      () => setTab('cut'),
-      () => setTab('load'),
-      () => stopDemo(),
-    ]
-    DEMO_STEPS.forEach((st, i) => {
-      demoTimers.current.push(window.setTimeout(() => { setDemo(i); acts[i]() }, st.at))
-    })
-    demoTimers.current.push(window.setTimeout(() => stopDemo(), 10200))
+    const run = { on: true }
+    demoRun.current = run
+    const d = defaultParams()
+    const b = findBin('samla-22')!
+    const poly = [{ x: 0, y: 0 }, { x: 96, y: 0 }, { x: 96, y: 48 }, { x: 60, y: 48 }, { x: 60, y: 84 }, { x: 0, y: 84 }]
+    setParams({ ...d, floor: { ...d.floor, shape: 'poly', poly, frontEdge: 0 }, binId: b.id, bin: { w: b.w, d: b.d, h: b.h }, finalHeight: 16 })
+    const dv = defaultView()
+    setView({ ...dv, dims: true, layers: { ...dv.layers, deck: { ...dv.layers.deck, visible: false }, tatami: { ...dv.layers.tatami, visible: false } } })
+    setTab('3d')
+    setLayersOpen(true)
+    setDemo(0)
+    window.setTimeout(() => {
+      if (!run.on) return
+      void runDemo({
+        alive: () => run.on,
+        caption: (i) => setDemo(i),
+        build: () => buildRef.current!,
+        setPulls: setDemoPulls,
+      }).then(() => { if (run.on) stopDemo() })
+    }, 500)
   }
 
   const build = useMemo(() => buildFloor(params), [params])
+  buildRef.current = build
   const structural = useMemo(() => analyze(build), [build])
   const tatamiOptions = useMemo(() => suggestTatami(floorRects(build.params), params), [build.params, params])
   const tatami = tatamiOptions.find((o) => o.id === params.tatamiPattern) ?? tatamiOptions[0]
@@ -195,7 +198,7 @@ export default function App() {
                 </label>
                 </>)}
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onDrawer={(key, on) => setParams((q) => ({ ...q, drawerOff: { ...q.drawerOff, [key]: !on }, heightOption: 0 }))} onSplit={(key, mode) => setParams((q) => {
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} pullTo={demoPulls} onDrawer={(key, on) => setParams((q) => ({ ...q, drawerOff: { ...q.drawerOff, [key]: !on }, heightOption: 0 }))} onSplit={(key, mode) => setParams((q) => {
                 const next = { ...q.binSplit }
                 if (mode) next[key] = mode
                 else delete next[key]
@@ -254,8 +257,8 @@ export default function App() {
       </main>
       {demo !== null && (
         <div className="demo-cap" onClick={stopDemo} title="Click to stop">
-          <span>{DEMO_STEPS[demo].text}</span>
-          <i style={{ animationDuration: '10.2s' }} />
+          <span>{DEMO_CAPTIONS[demo]}</span>
+          <i style={{ animationDuration: DEMO_MS + 'ms' }} />
         </div>
       )}
     </div>

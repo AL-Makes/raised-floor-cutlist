@@ -112,7 +112,11 @@ export function ShapeEditor({ floor, units, onChange }: { floor: FloorSpec; unit
 
   const startDrag = (e: React.PointerEvent, i: number, corner = false) => {
     e.stopPropagation()
-    svgRef.current?.setPointerCapture(e.pointerId)
+    try {
+      svgRef.current?.setPointerCapture(e.pointerId)
+    } catch {
+      /* scripted (demo) pointer has no active capture */
+    }
     drag.current = { i, start: svgPoint(e), poly0: poly, moved: false, vb, corner }
     setDragVb(vb)
   }
