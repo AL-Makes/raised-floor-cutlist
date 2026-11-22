@@ -221,20 +221,16 @@ export function buildFloor(input: Params): Build {
     const endOf = (o: typeof sec, k: number) => (k === 0 ? o.joistX[0] : o.joistX[o.joistX.length - 1])
     const endExtra = (k: number) => (rear && Math.abs(endOf(rear, k === 0 ? 0 : 1) - endOf(sec, k)) < 0.05 ? rear.rect.l : 0)
     const endSkip = (k: number) => !!front && Math.abs(endOf(front, k === 0 ? 0 : 1) - endOf(sec, k)) < 0.05
-    const thru = (k: number) => !!rear && rear.joistX.some((x, i) => i > 0 && i < rear.joistX.length - 1 && Math.abs(x - sec.joistX[k]) < 0.05)
-    const inherited = (k: number) => !!front && front.joistX.some((x, i) => i > 0 && i < front.joistX.length - 1 && Math.abs(x - sec.joistX[k]) < 0.05)
-    const inner = Array.from({ length: Math.max(0, n - 2) }, (_, i) => i + 1).filter((k) => !inherited(k))
-    const drawerIdx = sec.drawerFront ? inner.filter((k) => !thru(k)) : []
-    const thruIdx = sec.drawerFront ? inner.filter((k) => thru(k)) : []
+    const inner = Array.from({ length: Math.max(0, n - 2) }, (_, i) => i + 1)
+    const drawerIdx = sec.drawerFront ? inner : []
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       if (k === 0 && sharedEdge) return
       if (rim && endSkip(k)) return
-      if (!rim && inherited(k)) return
       const t = sec.joistT[k]
-      const drawerJoist = !rim && sec.drawerFront && !thru(k)
+      const drawerJoist = !rim && sec.drawerFront
       const jy = rim || sec.drawerFront ? rect.y : rect.y + frontT
-      const jl = rim ? rect.l + endExtra(k) : drawerJoist ? rect.l - T : sec.drawerFront ? rect.l + rear!.rect.l - T : rect.l - frontT - T
+      const jl = rim ? rect.l + endExtra(k) : drawerJoist ? rect.l - T : rect.l - frontT - T
       placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: drawerJoist ? depth - 1.5 : depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
@@ -251,7 +247,6 @@ export function buildFloor(input: Params): Build {
     rimLens.forEach((len) => member(jname, 1, len))
     if (sec.drawerFront) {
       if (drawerIdx.length) member(jname + ' (drawer support, front face to back rim)', drawerIdx.length * mult, rect.l - T)
-      if (thruIdx.length) member(jname + ' (runs through, front face to back rim)', thruIdx.length * mult, rect.l + rear!.rect.l - T)
     } else if (divTotal > 0) member(jname + ' (interior, between front & back rims)', divTotal * mult, rect.l - frontT - T)
     if (drawerIdx.length) {
       const dTotal = drawerIdx.length
@@ -275,13 +270,8 @@ export function buildFloor(input: Params): Build {
     const backY = rect.y + rect.l - T
     const runPieces = (): { x: number; len: number }[] => {
       const x0 = rect.x + endL
-      const gaps = thruIdx.map((k) => [sec.joistX[k] - x0, sec.joistX[k] + sec.joistT[k] - x0])
       const segs: number[][] = []
-      if (gaps.length) {
-        let st = 0
-        for (const g of gaps) { if (g[0] > st + 0.01) segs.push([st, g[0]]); st = g[1] }
-        if (innerW > st + 0.01) segs.push([st, innerW])
-      } else if (innerW <= MAX_RUN + 0.01) segs.push([0, innerW])
+      if (innerW <= MAX_RUN + 0.01) segs.push([0, innerW])
       else {
         const cuts = sec.joistX.slice(1, -1).map((jx, i) => jx + sec.joistT[i + 1] / 2 - x0)
         let start = 0
@@ -298,7 +288,7 @@ export function buildFloor(input: Params): Build {
     }
     const splitRun = (name: string, pk: number, mk: (nm: string, q: number, len: number, pk: number) => void) => {
       const pcs = runPieces()
-      pcs.forEach((pc) => mk(pcs.length > 1 ? name + ' (cut between joists)' : name, 1, pc.len, pk))
+      pcs.forEach((pc) => mk(pcs.length > 1 ? name + ' (spliced over a joist)' : name, 1, pc.len, pk))
     }
     const pushRun = (kind: string, y: number, z: number, sy: number, sz: number) => {
       runPieces().forEach((pc) => placements.push({ kind, x: rect.x + endL + pc.x, y, z, sx: pc.len, sy, sz } as never))

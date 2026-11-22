@@ -582,13 +582,14 @@ describe('plywood coverage', () => {
 })
 
 
-describe('through joists', () => {
-  it('runs interior joists front to back when drawer and rear columns line up, with no drawer support special', () => {
+describe('drawer supports and header', () => {
+  it('keeps the special cap support between every drawer even when bin columns line up, with one continuous header per 8 ft', () => {
     const p = { ...defaultParams(), floor: { shape: 'poly' as const, width: 120, length: 73, notchW: 36, notchL: 36, frontEdge: 0, poly: [{ x: 0, y: 0 }, { x: 105, y: 0 }, { x: 105, y: 73 }, { x: 0, y: 73 }] }, features: { ...defaultParams().features, drawers: true }, finalHeight: 20 }
     const b = buildFloor(p)
-    const js = b.placements.filter((q) => q.kind === 'joist' && q.sy > 60)
-    expect(js.length).toBeGreaterThan(0)
-    expect(b.parts.some((x) => /drawer support cap/i.test(x.name))).toBe(false)
+    expect(b.parts.some((x) => /drawer support cap/i.test(x.name))).toBe(true)
+    const headers = b.placements.filter((q) => q.kind === 'header' && q.sx > 20 && q.y < 0.1)
+    expect(headers.length).toBe(2)
+    expect(Math.max(...headers.map((q) => q.sx))).toBeLessThanOrEqual(96.01)
   })
 })
 
