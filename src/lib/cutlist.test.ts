@@ -356,3 +356,14 @@ describe('manual joist moves', () => {
     b.blockY.forEach((y, i) => { if (i !== k) expect(y).toBeCloseTo(a.blockY[i], 3) })
   })
 })
+
+describe('filler service zones', () => {
+  it('puts no bins or drawers under filler pieces', () => {
+    const b = buildFloor(defaultParams())
+    const svc = b.layout.cells.filter((c) => c.type === 'service')
+    if (b.layout.fillers.length === 0) return
+    expect(svc.length).toBeGreaterThan(0)
+    svc.forEach((c) => expect(c.binsX * c.binsY).toBe(0))
+    expect(b.placements.some((x) => x.kind === 'service')).toBe(true)
+  })
+})

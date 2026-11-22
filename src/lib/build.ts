@@ -400,8 +400,31 @@ export function buildFloor(input: Params): Build {
     }
   }
 
+  const serviceCells = layout.cells.filter((c) => c.type === 'service')
+  const sisterLen = new Map<string, number>()
+  let cableHoles = 0
+  serviceCells.forEach((c) => {
+    const sec = layout.sections[c.section]
+    const ci = sec.cols.findIndex((col) => Math.abs(col.x - c.x) < 1e-3)
+    const last = sec.joistX.length - 1
+    for (const k of [ci, ci + 1]) {
+      if (ci < 0 || k <= 0 || k >= last) continue
+      const key = `${c.section}:${k}`
+      sisterLen.set(key, (sisterLen.get(key) ?? 0) + c.l + T)
+    }
+    placements.push({ kind: 'block', x: c.x, y: c.y + c.l / 2 - T / 2, z: bu, sx: c.w, sy: T, sz: depth })
+    member('Heavy-load cross block (mid-cell, drill 1-1/2" cable hole)', 1, c.w, 4)
+    placements.push({ kind: 'service', x: c.x, y: c.y, z: 0, sx: c.w, sy: c.l, sz: 0.25, cell: c.index })
+    cableHoles++
+  })
+  sisterLen.forEach((len) => {
+    member('Sister joist (doubled for TV / heavy-load zone)', 1, len, 4)
+    cableHoles++
+  })
+
   if (p.features.edgeTrim) {
     for (const e of floorEdges(p.floor)) {
+
       if (!p.trimSides[e.side]) continue
       const th = 0.75
       const fullH = S + p.plyThickness + p.tatamiThickness / 2 + ul
@@ -507,6 +530,8 @@ export function buildFloor(input: Params): Build {
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
   if (p.features.hatches && binCells.length) hardware.push({ name: 'Recessed finger pulls', qty: binCells.length, unit: 'pcs' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })
+  if (serviceCells.length) hardware.push({ name: 'Cable pass-through grommets 1-1/2"', qty: cableHoles, unit: 'pcs', notes: 'Drill through joists / blocks to form a continuous cable chase from wall outlets to TV stand, table and heater' })
+  if (serviceCells.length) hardware.push({ name: 'Cable clips / surface raceway', qty: serviceCells.length * 2, unit: 'pcs', notes: 'Keep cables off the slab; leave heater clearance' })
   if (height.options.length) {
     if (supportPads) hardware.push({ name: 'Support pads / shim stacks under joists', qty: supportPads, unit: 'pcs', notes: `${p.supportCount} per joist, evenly spaced end to end` })
     else hardware.push({ name: 'Cedar leveling shims', qty: Math.ceil(joistLf / 2), unit: 'pcs', notes: 'Estimate for uneven slab' })
@@ -526,6 +551,7 @@ export function buildFloor(input: Params): Build {
   if (heaviest > 75) {
     warnings.push(`The deck panels lift off whole: the heaviest is about ${Math.round(heaviest)} lb. Consider thinner plywood or a smaller sheet size so one person can lift it.`)
   }
+  if (serviceCells.length) warnings.push(`${serviceCells.length} heavy-load cell(s) under the plywood filler: reinforced with doubled joists and blocking, no bins/drawers, not accessible once screwed down.`)
   const tatamiFits = geometry.rects.length === 0 || tatamiFit(geometry.rects, p.tatamiShort)
   if (!tatamiFits) warnings.push('Flooring size not large enough to accommodate at least one tatami mat.')
 
@@ -547,6 +573,7 @@ export function buildFloor(input: Params): Build {
     p.features.hatches ? 'Cut access hatch openings and fit the hatch panels; add finger pulls.' : '',
     p.features.edgeTrim ? 'Fit fascia trim on the selected exposed edges.' : '',
     'Lay the tatami mats following the chosen arrangement; screw plywood filler pieces down to the joists wherever the mats do not reach.',
+    serviceCells.length ? 'Heavy-load / cable zones under the filler pieces: no bins or drawers. Add the sister joists and mid-cell blocks, drill 1-1/2" holes in line through joists and blocks for the cable chase, fit grommets, and run extension cables before screwing the fillers down.' : '',
   ].filter(Boolean)
 
   return {

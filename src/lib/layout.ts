@@ -1,4 +1,5 @@
 import { normalizeFloor } from './geometry'
+import { fillerRects } from './tatami'
 import type { Cell, Params, Rect } from './types'
 
 export const RIM_T = 1.5
@@ -35,6 +36,8 @@ export interface Section {
 export interface Layout {
   sections: Section[]
   cells: Cell[]
+  /** plywood filler areas beside the tatami mats; cells under them hold no bins or drawers */
+  fillers: Rect[]
   binX: number
   binY: number
   cellMinX: number
@@ -90,6 +93,9 @@ export function buildLayout(p: Params): Layout {
 
   const sections: Section[] = []
   const cells: Cell[] = []
+  const fillers = fillerRects(geo.rects, p)
+  const overFiller = (x: number, y: number, w: number, l: number) =>
+    fillers.some((f) => Math.min(x + w, f.x + f.w) - Math.max(x, f.x) > 2 && Math.min(y + l, f.y + f.l) - Math.max(y, f.y) > 2)
 
   // A lift table on the front drawer row takes priority: the drawers share only the front width left on either side of it.
   const liftZones = p.liftTables.map((l) => ({ x: l.x, y: l.y, w: p.tatamiShort, l: p.tatamiShort }))
@@ -230,9 +236,10 @@ export function buildLayout(p: Params): Layout {
     sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact, applied })
     for (const row of rows) {
       for (const col of cols) {
-        const type = row.drawer ? 'drawer' : 'bin'
+        const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer ? 'drawer' : 'bin'
+        const isSvc = type === 'service'
         const needL = row.drawer ? drawerLen - 0.01 : cellMinY
-        const fitsBin = col.w >= cellMinX - 1e-6 && row.l >= needL - 1e-6
+        const fitsBin = isSvc || (col.w >= cellMinX - 1e-6 && row.l >= needL - 1e-6)
         cells.push({
           index: cells.length,
           section: si,
@@ -242,8 +249,8 @@ export function buildLayout(p: Params): Layout {
           l: row.l,
           type,
           fitsBin,
-          binsX: binsAcross(col.w),
-          binsY: row.drawer ? 1 : binsAlong(row.l),
+          binsX: isSvc ? 0 : binsAcross(col.w),
+          binsY: isSvc ? 0 : row.drawer ? 1 : binsAlong(row.l),
         })
         if (!fitsBin) {
           warnings.push(
@@ -254,6 +261,6 @@ export function buildLayout(p: Params): Layout {
     }
   })
 
-  return { sections, cells, binX: bx, binY: by, cellMinX, cellMinY, drawerLen, dividerT, joistW: T, warnings: [...new Set(warnings)] }
+  return { sections, cells, fillers, binX: bx, binY: by, cellMinX, cellMinY, drawerLen, dividerT, joistW: T, warnings: [...new Set(warnings)] }
 }
 

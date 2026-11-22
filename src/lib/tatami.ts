@@ -239,6 +239,13 @@ export function suggestTatami(rects: Rect[], p: Pick<Params, 'tatamiLong' | 'tat
   return out.sort((a, b) => a.score - b.score)
 }
 
+/** Rectangles the chosen tatami arrangement leaves for plywood filler (fixed down, heavy-load, not accessible). */
+export function fillerRects(rects: Rect[], p: Pick<Params, 'tatamiLong' | 'tatamiShort' | 'tatamiPattern'> & { tatamiAnchor?: TatamiAnchor }): Rect[] {
+  const opts = suggestTatami(rects, p)
+  const pick = opts.find((o) => o.id === p.tatamiPattern) ?? opts[0]
+  return (pick?.mats ?? []).filter((m) => m.kind === 'cut').map((m) => ({ x: m.x, y: m.y, w: m.w, l: m.l }))
+}
+
 export function matSchedule(mats: Mat[]): { name: string; w: number; l: number; qty: number }[] {
   const m = new Map<string, { name: string; w: number; l: number; qty: number }>()
   for (const mat of mats) {

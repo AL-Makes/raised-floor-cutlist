@@ -115,6 +115,7 @@ export interface Part {
 
 export type PlacementKind =
   | 'lift'
+  | 'service'
   | 'joist'
   | 'rim'
   | 'block'
@@ -143,7 +144,7 @@ export interface Placement {
   ref?: { s: number; axis: 'x' | 'y'; k: number }
 }
 
-export type CellType = 'bin' | 'drawer'
+export type CellType = 'bin' | 'drawer' | 'service'
 
 export interface Cell {
   index: number

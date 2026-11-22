@@ -55,6 +55,7 @@ function layerOf(kind: string): LayerKey {
   if (kind === 'joist' || kind === 'buildup') return 'joists'
   if (kind === 'block') return 'cross'
   if (kind === 'lift') return 'lift'
+  if (kind === 'service') return 'cross'
   if (kind === 'bin') return 'bins'
   if (kind === 'drawer') return 'drawers'
   if (kind === 'underlay') return 'underlay'
@@ -68,6 +69,7 @@ const COLORS: Record<string, string> = {
   header: '#a87c45',
   deck: '#e9d9b4',
   hatch: '#dcc790',
+  service: '#e0a030',
   drawer: '#9fb8c8',
   drawerFace: '#7da2bd',
   bin: '#3a7bd5',
