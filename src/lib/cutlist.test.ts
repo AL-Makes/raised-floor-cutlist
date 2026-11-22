@@ -605,3 +605,24 @@ describe('frame members never overlap', () => {
     expect(bad).toBe(0)
   })
 })
+
+describe('joists not touching a drawer', () => {
+  it('are standard supports and never overlap', () => {
+    const base = { ...defaultParams(), floor: { shape: 'poly' as const, width: 120, length: 73, notchW: 36, notchL: 36, frontEdge: 0, poly: [{ x: 0, y: 0 }, { x: 136, y: 0 }, { x: 136, y: 73 }, { x: 0, y: 73 }] }, features: { ...defaultParams().features, drawers: true }, finalHeight: 20 }
+    const all = buildFloor(base)
+    const keys = all.layout.cells.filter((c) => c.drawerBay).map((c) => c.key)
+    const first = keys.slice(0, 1)
+    const one = buildFloor({ ...base, drawerOff: Object.fromEntries(keys.filter((k) => !first.includes(k)).map((k) => [k, true])) })
+    const capsAll = all.parts.filter((x) => /drawer support cap/i.test(x.name)).reduce((a, x) => a + x.qty, 0)
+    const capsOne = one.parts.filter((x) => /drawer support cap/i.test(x.name)).reduce((a, x) => a + x.qty, 0)
+    expect(capsOne).toBe(2)
+    expect(capsOne).toBeLessThan(capsAll)
+    const f = one.placements.filter((q) => ['rim', 'joist', 'block', 'header'].includes(q.kind))
+    let bad = 0
+    for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) {
+      const a = f[i], c = f[j]
+      if (Math.min(a.x + a.sx, c.x + c.sx) - Math.max(a.x, c.x) > 0.05 && Math.min(a.y + a.sy, c.y + c.sy) - Math.max(a.y, c.y) > 0.05 && Math.min(a.z + a.sz, c.z + c.sz) - Math.max(a.z, c.z) > 0.05) bad++
+    }
+    expect(bad).toBe(0)
+  })
+})

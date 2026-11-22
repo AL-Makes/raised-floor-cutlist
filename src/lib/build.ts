@@ -217,21 +217,25 @@ export function buildFloor(input: Params): Build {
     const frontT = sec.drawerFront ? 3.5 : sec.shareFront ? 0 : T
     const sharedEdge = layout.sections.filter((o) => o !== sec && Math.abs(o.joistX[o.joistX.length - 1] + o.joistT[o.joistT.length - 1] - sec.joistX[0]) < 0.05).reduce((a, o) => a + Math.max(0, Math.min(o.rect.y + o.rect.l, sec.rect.y + sec.rect.l) - Math.max(o.rect.y, sec.rect.y)), 0) >= sec.rect.l - 0.05
     const inner = Array.from({ length: Math.max(0, n - 2) }, (_, i) => i + 1)
-    const drawerIdx = sec.drawerFront ? [0, ...inner, n - 1].filter((k) => !(k === 0 && sharedEdge)) : []
+    const dCells = layout.cells.filter((c) => c.section === sec.index && c.type === 'drawer')
+    const touches = (k: number) => dCells.some((c) => Math.abs(c.x + c.w - sec.joistX[k]) < 0.1 || Math.abs(c.x - (sec.joistX[k] + sec.joistT[k])) < 0.1)
+    const drawerIdx = sec.drawerFront ? [0, ...inner, n - 1].filter((k) => !(k === 0 && sharedEdge) && touches(k)) : []
+    const dFront = sec.drawerFront ? frontT : 0
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       if (k === 0 && sharedEdge) return
       const t = sec.joistT[k]
-      const drawerJoist = sec.drawerFront
-      const jy = rim || sec.drawerFront ? rect.y : rect.y + frontT
-      const jl = rim || drawerJoist ? rect.l : rect.l - frontT - T
+      const drawerJoist = drawerIdx.includes(k)
+      const jy = drawerJoist || (rim && !sec.drawerFront) ? rect.y : rect.y + frontT
+      const jl = drawerJoist ? rect.l : rim ? rect.l - dFront : rect.l - frontT - T
       placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: drawerJoist ? depth - 1.5 : depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
       deckScrewLen += jl
     })
-    const rimLens = sec.drawerFront ? [] : [0, n - 1].filter((k) => !(k === 0 && sharedEdge)).map(() => rect.l)
-    const rimCount = sec.drawerFront ? drawerIdx.length - inner.length : rimLens.length
+    const placedEnds = [0, n - 1].filter((k) => !(k === 0 && sharedEdge))
+    const rimLens = placedEnds.filter((k) => !drawerIdx.includes(k)).map(() => rect.l - dFront)
+    const rimCount = placedEnds.length
     const divTotal = inner.length
     const mult = p.reinforce.doubleJoists ? 2 : 1
     joistCount += rimCount + divTotal * mult
@@ -241,7 +245,9 @@ export function buildFloor(input: Params): Build {
     rimLens.forEach((len) => member(jname, 1, len))
     if (sec.drawerFront) {
       if (drawerIdx.length) member(jname + ' (drawer support, front face to back rim)', drawerIdx.length * mult, rect.l)
-    } else if (divTotal > 0) member(jname + ' (interior, between front & back rims)', divTotal * mult, rect.l - frontT - T)
+    }
+    const stdInner = inner.filter((k) => !drawerIdx.includes(k)).length
+    if (stdInner > 0) member(jname + ' (interior, between front & back rims)', stdInner * mult, rect.l - frontT - T)
     if (drawerIdx.length) {
       const dTotal = drawerIdx.length
       const capL = rect.l - 3.5
@@ -259,8 +265,8 @@ export function buildFloor(input: Params): Build {
     }
 
     const nJ = sec.joistX.length
-    const endL = sharedEdge || sec.drawerFront ? 0 : sec.joistT[0]
-    const innerW = rect.w - endL - (sec.drawerFront ? 0 : sec.joistT[nJ - 1])
+    const endL = sharedEdge || drawerIdx.includes(0) ? 0 : sec.joistT[0]
+    const innerW = rect.w - endL - (drawerIdx.includes(nJ - 1) ? 0 : sec.joistT[nJ - 1])
     const backY = rect.y + rect.l - T
     const runPieces = (between = false): { x: number; len: number }[] => {
       const x0 = rect.x + endL
