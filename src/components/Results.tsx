@@ -1,13 +1,17 @@
 import { buildFloor, type Build } from '../lib/build'
+import { estimateCost } from '../lib/cost'
 import { crowdScenario, maxWebOc, SCENARIO, type Structural } from '../lib/structural'
 import { matSchedule, type TatamiArrangement } from '../lib/tatami'
 import { estimateWeight } from '../lib/weight'
 import { formatLength, type UnitSystem } from '../lib/units'
 
-export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiArrangement['mats']; units: UnitSystem }) {
+const money = (v: number) => `$${v.toFixed(2)}`
+
+export function CutListTab({ build, mats, units, onPrice }: { build: Build; mats: TatamiArrangement['mats']; units: UnitSystem; onPrice?: (key: string, val: number | undefined) => void }) {
   const f = (v: number) => formatLength(v, units)
   const groups = [...new Set(build.parts.map((p) => p.group))]
   const sched = matSchedule(mats)
+  const cost = estimateCost(build, mats, units)
   return (
     <div className="tab">
       <h3>Cut list</h3>
@@ -91,6 +95,106 @@ export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiA
 
       <h3>Assembly order (pocket-screw joinery)</h3>
       <ol>{build.assembly.map((s, i) => <li key={i}>{s}</li>)}</ol>
+
+      <h3>Financial report (estimated build cost)</h3>
+      <div className="stats">
+        <div><b>{money(cost.total)}</b><span>estimated total build price</span></div>
+        {cost.groups.map((g) => (
+          <div key={g.group}><b>{money(g.subtotal)}</b><span>{g.group}</span></div>
+        ))}
+      </div>
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr><th>Group</th><th>Item</th><th>Qty</th><th>Unit</th><th>Unit price ($)</th><th>Subtotal</th></tr>
+          </thead>
+          <tbody>
+            {cost.groups.flatMap((g) =>
+              g.items.map((it, idx) => (
+                <tr key={it.key}>
+                  <td>{idx === 0 ? <b>{g.group}</b> : ''}</td>
+                  <td>{it.label}{it.notes && <> <small>({it.notes})</small></>}</td>
+                  <td><b>{it.qty}</b></td>
+                  <td>{it.unit}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      style={{ width: '5.5rem' }}
+                      aria-label={`Price for ${it.label}`}
+                      value={build.params.prices?.[it.key] ?? it.unitPrice}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        const num = raw === '' ? 0 : Number(raw)
+                        if (onPrice && Number.isFinite(num) && num >= 0) onPrice(it.key, num)
+                      }}
+                    />
+                  </td>
+                  <td><b>{money(it.total)}</b></td>
+                </tr>
+              )),
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+export function CostTab({ build, mats, units, onPrice, onResetPrices }: { build: Build; mats: TatamiArrangement['mats']; units: UnitSystem; onPrice: (key: string, val: number | undefined) => void; onResetPrices: () => void }) {
+  const cost = estimateCost(build, mats, units)
+  const hasCustom = Object.keys(build.params.prices ?? {}).length > 0
+  return (
+    <div className="tab">
+      <h3>Financial report & build cost estimator</h3>
+      <div className="stats">
+        <div><b>{money(cost.total)}</b><span>estimated total build price</span></div>
+        {cost.groups.map((g) => (
+          <div key={g.group}><b>{money(g.subtotal)}</b><span>{g.group}</span></div>
+        ))}
+      </div>
+      <p className="legend">
+        Enter your local unit prices below (e.g. 8 ft 2x4 lumber, plywood sheets, tatami mats, motorized lift table column, bins, or hardware). Group subtotals and the estimated build price update automatically.
+        {hasCustom && (
+          <> <button className="small" onClick={onResetPrices}>Reset default prices</button></>
+        )}
+      </p>
+      {cost.groups.map((g) => (
+        <div key={g.group} className="tablewrap">
+          <h4>{g.group} — {money(g.subtotal)}</h4>
+          <table>
+            <thead>
+              <tr><th>Item</th><th>Qty</th><th>Unit</th><th>Unit price ($)</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+              {g.items.map((it) => (
+                <tr key={it.key}>
+                  <td>{it.label}{it.notes && <> <small>({it.notes})</small></>}</td>
+                  <td><b>{it.qty}</b></td>
+                  <td>{it.unit}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      style={{ width: '6rem' }}
+                      aria-label={`Unit price for ${it.label}`}
+                      value={build.params.prices?.[it.key] ?? it.unitPrice}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        const num = raw === '' ? 0 : Number(raw)
+                        if (Number.isFinite(num) && num >= 0) onPrice(it.key, num)
+                      }}
+                    />
+                  </td>
+                  <td><b>{money(it.total)}</b></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   )
 }

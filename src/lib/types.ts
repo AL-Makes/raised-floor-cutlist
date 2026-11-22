@@ -107,6 +107,8 @@ export interface Params {
   tatamiShort: number
   /** lower-left corners of square tatami mats replaced by motorized lift tables */
   liftTables: { x: number; y: number }[]
+  /** custom unit prices keyed by cost item key (e.g. 'lumber:2x4', 'tatami:Full mat', 'lift:column') */
+  prices?: Record<string, number>
 }
 
 export type MaterialKind = 'lumber' | 'sheet'

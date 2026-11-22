@@ -6,6 +6,7 @@ import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
 import { analyze, crowdScenario, maxWebOc, plyCapacity } from './structural'
 import { matSchedule, suggestTatami } from './tatami'
+import { estimateCost } from './cost'
 import { estimateWeight } from './weight'
 import { formatInches, parseImperial, parseLength } from './units'
 
@@ -793,5 +794,28 @@ describe('long runs', () => {
     expect(rim.length).toBeGreaterThan(1)
     const lens = rim.map((q) => q.length)
     expect(Math.max(...lens)).toBeLessThanOrEqual(96.01)
+  })
+})
+
+describe('financial report & cost estimator', () => {
+  it('groups costs into categories and updates when custom unit prices are entered', () => {
+    const d = defaultParams()
+    const p = { ...d, finalHeight: 20, liftTables: [{ x: 36, y: 36 }] }
+    const b = buildFloor(p)
+    const mats = suggestTatami(b.geometry.rects, b.params)[0].mats.filter((m) => !(Math.abs(m.x - 36) < 0.01 && Math.abs(m.y - 36) < 0.01))
+    const c1 = estimateCost(b, mats)
+    expect(c1.total).toBeGreaterThan(0)
+    expect(c1.groups.some((g) => g.group === 'Lumber')).toBe(true)
+    expect(c1.groups.some((g) => g.group === 'Plywood & sheet goods')).toBe(true)
+    expect(c1.groups.some((g) => g.group === 'Tatami mats')).toBe(true)
+    expect(c1.groups.some((g) => g.group === 'Motorized lift table')).toBe(true)
+    expect(c1.groups.some((g) => g.group === 'Storage bins')).toBe(true)
+    expect(c1.groups.some((g) => g.group === 'Hardware & underlay')).toBe(true)
+
+    const b2 = buildFloor({ ...p, prices: { 'lumber:2x4': 10, 'lift:column': 500 } })
+    const c2 = estimateCost(b2, mats)
+    expect(c2.total).toBeGreaterThan(c1.total)
+    const liftGroup = c2.groups.find((g) => g.group === 'Motorized lift table')!
+    expect(liftGroup.subtotal).toBeCloseTo(500, 2)
   })
 })

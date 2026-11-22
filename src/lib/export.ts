@@ -1,4 +1,5 @@
 import type { Build } from './build'
+import { estimateCost } from './cost'
 import { matSchedule, type Mat } from './tatami'
 import { formatLength, type UnitSystem } from './units'
 
@@ -25,5 +26,15 @@ export function toCsv(b: Build, mats: Mat[], units: UnitSystem): string {
     rows.push(['Tatami', 'Qty', 'Length', 'Width'].map(q).join(','))
     for (const m of matSchedule(mats)) rows.push([m.name, m.qty, f(m.w), f(m.l)].map(q).join(','))
   }
+  const cost = estimateCost(b, mats, units)
+  rows.push('')
+  rows.push(['Financial report', 'Group', 'Item', 'Qty', 'Unit', 'Unit Price ($)', 'Subtotal ($)'].map(q).join(','))
+  for (const g of cost.groups) {
+    for (const it of g.items) {
+      rows.push(['Item', g.group, it.label, it.qty, it.unit, it.unitPrice.toFixed(2), it.total.toFixed(2)].map(q).join(','))
+    }
+    rows.push(['Group Subtotal', g.group, '', '', '', '', g.subtotal.toFixed(2)].map(q).join(','))
+  }
+  rows.push(['Estimated Build Price', 'Total', '', '', '', '', cost.total.toFixed(2)].map(q).join(','))
   return rows.join('\r\n')
 }

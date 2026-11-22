@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputPanel } from './components/InputPanel'
-import { CutListTab, LoadTab } from './components/Results'
+import { CostTab, CutListTab, LoadTab } from './components/Results'
 import { TatamiTab } from './components/TatamiTab'
 import { Viewer3D, LAYER_LABELS, FEATURE_KEYS, defaultView, type Layer, type LayerKey, type ViewOptions } from './components/Viewer3D'
 import { buildFloor, defaultParams, type Build } from './lib/build'
@@ -14,7 +14,7 @@ import type { Params } from './lib/types'
 import type { UnitSystem } from './lib/units'
 import './App.css'
 
-type Tab = '3d' | 'tatami' | 'cut' | 'load'
+type Tab = '3d' | 'tatami' | 'cut' | 'cost' | 'load'
 
 const STORE = 'raised-floor-cutlist:v1'
 function loadSaved(): { params?: Partial<Params>; units?: UnitSystem; tab?: Tab; view?: Partial<ViewOptions> } {
@@ -176,7 +176,7 @@ export default function App() {
             </ul>
           )}
           <nav className="tabs">
-            {([['3d', '3D view'], ['tatami', 'Tatami'], ['cut', 'Cut list'], ['load', 'Load & weak points']] as [Tab, string][]).map(([id, label]) => (
+            {([['3d', '3D view'], ['tatami', 'Tatami'], ['cut', 'Cut list'], ['cost', 'Cost report'], ['load', 'Load & weak points']] as [Tab, string][]).map(([id, label]) => (
               <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
                 {label}
                 {id === 'load' && <i className={`dot ${worst}`} />}
@@ -248,7 +248,23 @@ export default function App() {
               }
             />
           )}
-          {tab === 'cut' && <CutListTab build={build} mats={matsNoLift} units={units} />}
+          {tab === 'cut' && (
+            <CutListTab
+              build={build}
+              mats={matsNoLift}
+              units={units}
+              onPrice={(k, v) => setParams((q) => ({ ...q, prices: { ...q.prices, ...(v === undefined ? {} : { [k]: v }) } }))}
+            />
+          )}
+          {tab === 'cost' && (
+            <CostTab
+              build={build}
+              mats={matsNoLift}
+              units={units}
+              onPrice={(k, v) => setParams((q) => ({ ...q, prices: { ...q.prices, ...(v === undefined ? {} : { [k]: v }) } }))}
+              onResetPrices={() => setParams((q) => ({ ...q, prices: {} }))}
+            />
+          )}
           {tab === 'load' && (
             <LoadTab
               onWebOc={(n) => setParams((q) => ({ ...q, webOc: n }))}

@@ -67,6 +67,7 @@ export function defaultParams(): Params {
     tatamiLong: 72,
     tatamiShort: 36,
     liftTables: [],
+    prices: {},
   }
 }
 
