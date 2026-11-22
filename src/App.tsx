@@ -8,6 +8,7 @@ import { toCsv } from './lib/export'
 import { analyze } from './lib/structural'
 import { suggestTatami } from './lib/tatami'
 import { floorRects } from './lib/layout'
+import { isHatch } from './lib/types'
 import type { Params } from './lib/types'
 import type { UnitSystem } from './lib/units'
 import './App.css'
@@ -148,7 +149,7 @@ export default function App() {
                 </>)}
               </div>
               <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d, moves: {} } : { ...q, crossAdjust: q.crossAdjust + d, moves: {} }))}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))} onToggleHatch={(key) => setParams((q) => {
-                              const cur = q.features.hatches ? build.layout.cells.filter((c) => c.type === 'bin').map((c) => c.key) : q.hatchCells ?? []
+                              const cur = q.features.hatches ? build.layout.cells.filter((c) => isHatch(q, c)).map((c) => c.key) : q.hatchCells ?? []
                               const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]
                               return { ...q, features: { ...q.features, hatches: false }, hatchCells: next }
                             })} />

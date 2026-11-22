@@ -149,6 +149,7 @@ export interface Placement {
 export type CellType = 'bin' | 'drawer' | 'service'
 
 export function isHatch(p: Pick<Params, 'features' | 'hatchCells'>, c: Cell): boolean {
+  if (c.type === 'service') return (p.hatchCells ?? []).includes(c.key)
   return c.type === 'bin' && (p.features.hatches || (p.hatchCells ?? []).includes(c.key))
 }
 

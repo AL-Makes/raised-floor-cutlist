@@ -324,7 +324,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
         </Html>
       )}
       {cutMode &&
-        build.layout.cells.filter((c) => c.type === 'bin').map((c) => {
+        build.layout.cells.filter((c) => c.type !== 'drawer').map((c) => {
           const on = isHatch(build.params, c)
           const hot = hoverCell === c.key
           return (
