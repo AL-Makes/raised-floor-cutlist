@@ -175,17 +175,21 @@ function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem 
   const tex = useMemo(() => {
     const tall = p.sy > p.sx
     const PPI = 24 // texture pixels per world unit, so text is the same physical size on every block
-    const W = Math.max(64, Math.round(p.sx * PPI))
-    const H = Math.max(64, Math.round(p.sy * PPI))
+    const W = Math.max(8, Math.round(p.sx * PPI))
+    const H = Math.max(8, Math.round(p.sy * PPI))
     const c = document.createElement('canvas')
     c.width = W
     c.height = H
     const g = c.getContext('2d')!
     // labels run along the long side of the bin
     if (tall) { g.translate(W / 2, H / 2); g.rotate(Math.PI / 2); g.translate(-W / 2, -H / 2) }
-    const lh = tall ? W : H
+    const lw = (tall ? H : W) * 0.94
+    const lh = (tall ? W : H) * 0.94
     const lines = [`${formatLength(Math.max(p.sx, p.sy), units)} × ${formatLength(Math.min(p.sx, p.sy), units)}`, `H ${formatLength(p.sz, units)}`]
-    const fs = Math.min(2 * PPI, lh / 4)
+    let fs = 2 * PPI
+    const widest = (f: number) => { g.font = `bold ${f}px sans-serif`; return Math.max(...lines.map((t) => g.measureText(t).width)) + f / 3 }
+    // shrink until every line fits on the top face
+    while (fs > 3 && (widest(fs) > lw || fs * 1.2 * lines.length > lh)) fs *= 0.93
     g.font = `bold ${fs}px sans-serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
