@@ -89,6 +89,7 @@ function Box({ p, color, opacity = 1, onOver, onOut }: { p: Placement; color: st
       position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}
       onPointerOver={onOver ? (e) => { e.stopPropagation(); onOver() } : undefined}
       onPointerOut={onOut}
+      renderOrder={opacity < 1 ? 5 : 0}
     >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
       <meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1} />
@@ -111,7 +112,7 @@ function builtUp(p: Placement): { chord: Placement[]; web: Placement[] } {
 }
 
 /** Dimensions printed flat on the surface, as a transparent canvas texture lying over the object's footprint. */
-function DimPlane({ p, y, units, onTop }: { p: Placement; y: number; units: UnitSystem; onTop: boolean }) {
+function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem }) {
   const tex = useMemo(() => {
     const W = 512
     const H = Math.max(96, Math.min(1024, Math.round((W * p.sy) / p.sx)))
@@ -139,9 +140,9 @@ function DimPlane({ p, y, units, onTop }: { p: Placement; y: number; units: Unit
     return t
   }, [p.kind, p.sx, p.sy, p.sz, units])
   return (
-    <mesh position={[p.x + p.sx / 2, y, -(p.y + p.sy / 2)]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null} renderOrder={onTop ? 10 : 0}>
+    <mesh position={[p.x + p.sx / 2, y, -(p.y + p.sy / 2)]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null} renderOrder={1}>
       <planeGeometry args={[p.sx, p.sy]} />
-      <meshBasicMaterial map={tex} transparent depthWrite={false} depthTest={!onTop} toneMapped={false} />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
     </mesh>
   )
 }
@@ -242,7 +243,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
       })}
       {build.placements.map((p, i) => {
         if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
-        return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} onTop={false} />
+        return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
