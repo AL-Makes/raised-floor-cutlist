@@ -4,7 +4,7 @@ import { closeOutline, moveCorner, moveEdge, normalizeFloor, setEdgeLength, vali
 import { solveHeight } from './height'
 import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
-import { analyze, plyCapacity } from './structural'
+import { analyze, maxWebOc, plyCapacity } from './structural'
 import { matSchedule, suggestTatami } from './tatami'
 import { estimateWeight } from './weight'
 import { formatInches, parseImperial, parseLength } from './units'
@@ -695,5 +695,20 @@ describe('structure weight', () => {
     const withLift = mk(144, 96, [{ x: 0, y: 0 }])
     expect(withLift.rows.some((r) => r.label.startsWith('Motorized'))).toBe(true)
     expect(withLift.total).toBeGreaterThan(base.total + 40)
+  })
+})
+
+describe('web optimizer', () => {
+  it('fewer webs at wider spacing, lighter structure, within chord limit', () => {
+    const d = defaultParams()
+    const mk = (webOc: number) => buildFloor({ ...d, floor: { shape: 'rect', width: 144, length: 73 } as never, webOc })
+    const b = mk(16)
+    const rec = maxWebOc(b)
+    expect(rec).toBeGreaterThanOrEqual(16)
+    expect(rec).toBeLessThanOrEqual(24)
+    const c = mk(rec)
+    const webs = (x: typeof b) => x.parts.filter((q) => q.name.includes('vertical web')).reduce((s, q) => s + q.qty, 0)
+    expect(webs(c)).toBeLessThan(webs(b))
+    expect(estimateWeight(c, []).total).toBeLessThan(estimateWeight(b, []).total)
   })
 })

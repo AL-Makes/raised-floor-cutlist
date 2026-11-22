@@ -69,6 +69,8 @@ export interface Params {
   casterH: number
   /** solid = one deep board on edge; builtup = 2x4 top + bottom chords with vertical 2x4 webs */
   joistStyle: 'solid' | 'builtup'
+  /** centre-to-centre spacing of the vertical webs in built-up joists, inches */
+  webOc: number
   maxSpacing: number
   features: Features
   trimSides: TrimSides

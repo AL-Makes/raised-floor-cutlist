@@ -1,5 +1,5 @@
-import type { Build } from '../lib/build'
-import type { Structural } from '../lib/structural'
+import { buildFloor, type Build } from '../lib/build'
+import { maxWebOc, SCENARIO, SCENARIO_LB, type Structural } from '../lib/structural'
 import { matSchedule, type TatamiArrangement } from '../lib/tatami'
 import { estimateWeight } from '../lib/weight'
 import { formatLength, type UnitSystem } from '../lib/units'
@@ -95,9 +95,15 @@ export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiA
   )
 }
 
-export function LoadTab({ s, build, apply, mats, units }: { s: Structural; build: Build; apply: (id: string) => void; mats: TatamiArrangement['mats']; units: UnitSystem }) {
+export function LoadTab({ s, build, apply, mats, units, onWebOc }: { s: Structural; build: Build; apply: (id: string) => void; onWebOc: (n: number) => void; mats: TatamiArrangement['mats']; units: UnitSystem }) {
   const p = build.params
   const w = estimateWeight(build, mats)
+  const builtup = p.joistStyle === 'builtup'
+  const recWeb = maxWebOc(build)
+  const curWeb = p.webOc > 0 ? p.webOc : 16
+  const recWeight = builtup && recWeb !== curWeb ? estimateWeight(buildFloor({ ...p, webOc: recWeb }), mats).total : w.total
+  const area = build.geometry.rects.reduce((a, r) => a + r.w * r.l, 0) / 144
+  const crowdPsf = SCENARIO_LB / Math.max(area, 1)
   const wt = (lb: number) => (units === 'metric' ? `${Math.round(lb * 0.45359)} kg` : `${Math.round(lb)} lb`)
   return (
     <div className="tab">
@@ -105,6 +111,21 @@ export function LoadTab({ s, build, apply, mats, units }: { s: Structural; build
       <div className="stats"><div><b>{wt(w.total)}</b><span>total dead weight</span></div></div>
       <ul>{w.rows.map((r) => <li key={r.label}><b>{wt(r.lb)}</b> - {r.label} {r.note && <small>({r.note})</small>}</li>)}</ul>
       <p className="legend">Counts framing, plywood, drawer boxes, trim, tatami and table assemblies. Does not count bins, anything stored in them, the TV or TV stand.</p>
+      {builtup && (
+        <>
+          <h3>Vertical web optimizer</h3>
+          <p>
+            Design case: {SCENARIO.people} people ({SCENARIO.personLb} lb each) + TV ({SCENARIO.tvLb} lb) + TV stand ({SCENARIO.standLb} lb) = <b>{SCENARIO_LB} lb</b>, about {Math.round(crowdPsf)} psf if spread over the whole floor (design target {p.designLoadPsf} psf, {p.pointLoadLb} lb point load).
+          </p>
+          <p>
+            Webs are now <b>{curWeb}"</b> apart. Most spacing the plywood-bearing 2x4 chord allows: <b>{recWeb}"</b>.
+            {recWeb !== curWeb && <> Going to {recWeb}" changes the structure weight from {wt(w.total)} to {wt(recWeight)}. </>}
+            {recWeb > curWeb && <button className="small" onClick={() => onWebOc(recWeb)}>Apply {recWeb}" spacing</button>}
+            {recWeb < curWeb && <button className="small" onClick={() => onWebOc(recWeb)}>Tighten to {recWeb}"</button>}
+            {recWeb === curWeb && <>Already at the optimum.</>}
+          </p>
+        </>
+      )}
       <h3>Load capacity (estimate)</h3>
       <div className="stats">
         <div><b>{Math.round(s.minPsf)} psf</b><span>weakest deck / hatch span (L/360)</span></div>

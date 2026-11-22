@@ -245,6 +245,7 @@ export default function App() {
           {tab === 'cut' && <CutListTab build={build} mats={matsNoLift} units={units} />}
           {tab === 'load' && (
             <LoadTab
+              onWebOc={(n) => setParams((q) => ({ ...q, webOc: n }))}
               mats={mats}
               units={units}
               s={structural}

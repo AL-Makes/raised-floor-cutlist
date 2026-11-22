@@ -48,6 +48,25 @@ export function joistCapacityPsf(thickness: number, depth: number, span: number,
   return lbPerFt / (spacing / 12)
 }
 
+/** Crowd and furniture the raised floor is expected to carry. */
+export const SCENARIO = { people: 6, personLb: 200, tvLb: 60, standLb: 120 }
+export const SCENARIO_LB = SCENARIO.people * SCENARIO.personLb + SCENARIO.tvLb + SCENARIO.standLb
+
+/**
+ * Largest web spacing (in, even steps, 8-24) for built-up joists. The plywood bears on the top 2x4 chord, which is only 1-1/2" thick
+ * and spans between webs: check it in bending under the uniform load on its tributary width and under half a point load (1.5x safety).
+ */
+export function maxWebOc(b: Build): number {
+  const p = b.params
+  const allow = (FB_LUMBER / 1.5) * ((3.5 * 1.5 * 1.5) / 6)
+  const trib = b.layout.cellMinX + b.layout.dividerT
+  const w = (p.designLoadPsf / 144) * trib
+  const sUniform = Math.sqrt((8 * allow) / Math.max(w, 1e-6))
+  const sPoint = (4 * allow) / (Math.max(p.pointLoadLb, 250) * 0.5)
+  const s = Math.min(24, sUniform, sPoint)
+  return Math.max(8, Math.floor(s / 2) * 2)
+}
+
 export type Status = 'ok' | 'warn' | 'fail'
 
 export interface CellAnalysis {

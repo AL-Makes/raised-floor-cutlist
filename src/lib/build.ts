@@ -53,6 +53,7 @@ export function defaultParams(): Params {
     trimSides: { front: true, back: true, left: true, right: true },
     reinforce: { doubleJoists: false },
     heightOption: 0,
+    webOc: WEB_OC,
     designLoadPsf: 40,
     pointLoadLb: 300,
     supportCount: 0,
@@ -204,13 +205,14 @@ export function buildFloor(input: Params): Build {
   }
   const T = layout.joistW
   const builtup = p.joistStyle === 'builtup'
+  const webOc = p.webOc > 0 ? p.webOc : WEB_OC
   /** one frame member: a solid board on edge, or two flat 2x4 chords with vertical 2x4 webs pocket-screwed between them */
   const member = (name: string, qty: number, length: number, solidPk = 0) => {
     if (qty <= 0 || length <= 0) return
     if (!builtup) return lumber('Frame', name, jointKey, qty, length, option?.joist.d ?? depth, 1.5, ripNote, solidPk)
-    const webs = Math.max(2, Math.ceil(length / WEB_OC) + 1)
+    const webs = Math.max(2, Math.ceil(length / webOc) + 1)
     lumber('Frame', `${name} - top & bottom chord (2x4 flat)`, '2x4', qty * 2, length, 3.5, 1.5, 'Run the full length: one on top, one on the bottom')
-    lumber('Frame', `${name} - vertical web (2x4)`, '2x4', qty * webs, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, `Pocket-screw to top and bottom chord, about ${WEB_OC}" apart`, 4)
+    lumber('Frame', `${name} - vertical web (2x4)`, '2x4', qty * webs, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, `Pocket-screw to top and bottom chord, about ${webOc}" apart`, 4)
   }
   const ripNote = option?.ripTo ? `Rip to ${option.ripTo.toFixed(3)}" wide` : undefined
 
@@ -648,7 +650,7 @@ export function buildFloor(input: Params): Build {
       : `Cut the joists, rims and cross blocks. Drill pocket holes in every block, rim${p.features.drawers ? ' and drawer header' : ''} end (2 per end).`,
     `Assemble each section on the floor: pocket-screw rims and blocks between the joists, checking square by measuring diagonals.`,
     builtup
-      ? 'Build each joist as a ladder: lay the bottom chord flat, pocket-screw the webs upright about 16" apart (one at each end), then pocket-screw the top chord on. Make all joists identical.'
+      ? `Build each joist as a ladder: lay the bottom chord flat, pocket-screw the webs upright about ${webOc}" apart (one at each end), then pocket-screw the top chord on. Make all joists identical.`
       : layers.length ? 'Glue and screw the build-up strips under each joist before standing the frame up.' : 'No build-up strips needed for this height.',
     'Set the frame in place, level it with shims, then glue and screw sections together where they meet.',
     ul > 0 ? `Before the frame goes down, roll out the ${r3(ul)}" acoustic underlay wall to wall, seams butted and taped.` : '',
