@@ -247,6 +247,8 @@ export function buildFloor(input: Params): Build {
     }
     const stdInner = inner.filter((k) => !drawerIdx.includes(k)).length
     if (stdInner > 0) member(jname + ' (interior, between front & back rims)', stdInner * mult, rect.l - frontT - T)
+    const frontRims = sec.drawerFront ? placedEnds.filter((k) => !drawerIdx.includes(k)).length : 0
+    if (frontRims) lumber('Frame', 'Front end vertical web (2x4, end support at the front face)', '2x4', frontRims * mult, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, 'Full-height web at the front end of an end support, pocket-screwed to both chords', 4)
     if (drawerIdx.length) {
       const dTotal = drawerIdx.length
       const capL = rect.l - 3.5
