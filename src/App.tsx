@@ -24,7 +24,6 @@ function loadSaved(): { params?: Partial<Params>; units?: UnitSystem; tab?: Tab;
 }
 
 export default function App() {
-  const [deckMode, setDeckMode] = useState<'cut' | 'access'>('cut')
   const [layersOpen, setLayersOpen] = useState(() => localStorage.getItem('raised-floor-cutlist:layersOpen') !== '0')
   useEffect(() => {
     try {
@@ -152,23 +151,10 @@ export default function App() {
                 const cur = q.secAdjust?.[s] ?? { x: 0, y: 0 }
                 const nx = kind === 'joist' ? { ...cur, x: cur.x + d } : { ...cur, y: cur.y + d }
                 return { ...q, secAdjust: { ...q.secAdjust, [s]: nx }, moves: {} }
-              })}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))}               onToggleAccess={(key) => setParams((q) => {
-                                            const cur = q.accessPanels ?? []
-                                            return { ...q, accessPanels: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] }
-                                          })} onToggleCut={(s, axis, pos) => setParams((q) => {
-                                            const cur = q.deckCuts ?? []
-                                            const has = cur.some((c) => c.s === s && c.axis === axis && Math.abs(c.pos - pos) < 0.01)
-                                            return { ...q, deckCuts: has ? cur.filter((c) => !(c.s === s && c.axis === axis && Math.abs(c.pos - pos) < 0.01)) : [...cur, { s, axis, pos }] }
-                                          })} deckMode={deckMode} />
+              })}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))} />
               <div className="hud">
-                              {view.layers.deck.visible && (
-                                <>
-                                  <button type="button" className="layertoggle" style={{ fontWeight: deckMode === 'cut' ? 700 : 400 }} onClick={() => setDeckMode('cut')}>Cut points</button>
-                                  <button type="button" className="layertoggle" style={{ fontWeight: deckMode === 'access' ? 700 : 400 }} onClick={() => setDeckMode('access')}>Access panels</button>
-                                </>
-                              )}
                 {Object.keys(params.moves ?? {}).length > 0 && <button type="button" className="layertoggle" onClick={() => setParams((q) => ({ ...q, moves: {} }))}>Reset joist positions</button>}
-                                            {view.layers.deck.visible ? (deckMode === 'cut' ? 'Plywood on: click a joist line to cut the plywood there (joist editing is off) -' : 'Plywood on: click a panel to make it lift out for access (joist editing is off) -') : 'Drag a joist to move it -'}
+                                            Drag a joist to move it -
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf
               </div>
             </div>

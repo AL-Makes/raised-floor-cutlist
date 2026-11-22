@@ -85,10 +85,6 @@ export interface Params {
   secAdjust?: Record<number, { x: number; y: number }>
   /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
   moves: Record<string, number>
-  /** plywood cut lines along a joist (`axis` x = a joist, y = a cross joist); `pos` is its centre in plan inches */
-  deckCuts?: { s: number; axis: 'x' | 'y'; pos: number }[]
-  /** deck panels (keys from Placement.panel) that lift out for access */
-  accessPanels?: string[]
   tatamiPattern: TatamiPatternId
   /** thickness of the acoustic underlay (QEP natural cork is 6 mm, about 1/4") */
   underlayThickness: number
@@ -129,7 +125,6 @@ export type PlacementKind =
   | 'underlay'
   | 'header'
   | 'deck'
-  | 'hatch'
   | 'drawer'
   | 'drawerFace'
   | 'bin'

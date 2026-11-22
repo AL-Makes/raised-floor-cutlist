@@ -56,8 +56,6 @@ export function defaultParams(): Params {
     joistAdjust: 0,
     crossAdjust: 0,
     moves: {},
-    deckCuts: [],
-    accessPanels: [],
     tatamiPattern: 'brick',
     tatamiAnchor: 'bl',
     tatamiLong: 72,
@@ -196,8 +194,6 @@ export function buildFloor(input: Params): Build {
   const geometry = normalizeFloor(p.floor)
   if (geometry.error) warnings.push(`Floor shape problem: ${geometry.error}`)
   const layout = buildLayout(p)
-  const accessSet = new Set(p.accessPanels ?? [])
-  let accessCount = 0
   warnings.push(...layout.warnings)
   const readyDrawers = p.features.drawers && p.drawerKind === 'ikea'
   const ul = p.features.underlay ? p.underlayThickness : 0
@@ -337,14 +333,12 @@ export function buildFloor(input: Params): Build {
       )
       for (const pc of plan.pieces) {
         let parts: Rect[] = [{ x: rect.x + pc.x, y: rect.y + reg.y0 + pc.y, w: pc.w, l: pc.l }]
-        for (const cut of (p.deckCuts ?? []).filter((c) => c.s === sec.index)) parts = parts.flatMap((r) => splitAt(r, cut.axis, cut.pos))
         // deck panels are cut to match each filler piece exactly
         for (const f of layout.fillers) {
           for (const [axis, pos] of [['x', f.x], ['x', f.x + f.w], ['y', f.y], ['y', f.y + f.l]] as const)
             parts = parts.flatMap((r) => splitAt(r, axis, pos))
         }
         for (const r of parts) {
-          const key = `${sec.index}:${r3(r.x)}:${r3(r.y)}`
           const cx = r.x + r.w / 2
           const cy = r.y + r.l / 2
           const underFiller = layout.fillers.some((f) => cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.l)
@@ -356,15 +350,9 @@ export function buildFloor(input: Params): Build {
             heaviest = Math.max(heaviest, r.w * r.l * p.plyThickness * PLY_LB_PER_IN3 * 2)
             continue
           }
-          const access = accessSet.has(key)
-          if (access) {
-            accessCount++
-            sheet('Access panels', `Lift-out access panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w - 0.25, r.l - 0.25, 'Cut from the deck, not screwed down; lifts out to reach what is underneath. 1/8" clearance, finger pull')
-          } else {
-            sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l)
-            deckPanels++
-          }
-          placements.push({ kind: access ? 'hatch' : 'deck', x: r.x, y: r.y, z: S, sx: r.w, sy: r.l, sz: p.plyThickness, panel: key })
+          sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l)
+          deckPanels++
+          placements.push({ kind: 'deck', x: r.x, y: r.y, z: S, sx: r.w, sy: r.l, sz: p.plyThickness })
           heaviest = Math.max(heaviest, r.w * r.l * p.plyThickness * PLY_LB_PER_IN3)
         }
       }
@@ -533,7 +521,7 @@ export function buildFloor(input: Params): Build {
 
   const merged = mergeParts(parts).filter((x) => x.qty > 0 || (x.pockets ?? 0) > 0)
   const finalParts = merged.filter((x) => x.qty > 0)
-  const order = ['Frame', 'Deck', 'Access panels', 'Access hatches', 'Drawers', 'Edge trim']
+  const order = ['Frame', 'Deck', 'Access hatches', 'Drawers', 'Edge trim']
   finalParts.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || b.length - a.length)
   finalParts.forEach((x, i) => (x.id = String(i + 1)))
 
@@ -559,7 +547,6 @@ export function buildFloor(input: Params): Build {
   }
   if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `Needs about ${LIFT_DEPTH}" of depth below the deck for the retracted table and motor, plus a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
-  if (accessCount) hardware.push({ name: 'Recessed finger pulls', qty: accessCount, unit: 'pcs' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })
   if (serviceCells.length) hardware.push({ name: 'Cable pass-through grommets 1-1/2"', qty: cableHoles, unit: 'pcs', notes: 'Drill through joists / blocks to form a continuous cable chase from wall outlets to TV stand, table and heater' })
   if (serviceCells.length) hardware.push({ name: 'Cable clips / surface raceway', qty: serviceCells.length * 2, unit: 'pcs', notes: 'Keep cables off the slab; leave heater clearance' })
@@ -601,7 +588,6 @@ export function buildFloor(input: Params): Build {
     ul > 0 ? `Before the frame goes down, roll out the ${r3(ul)}" acoustic underlay wall to wall, seams butted and taped.` : '',
     p.features.drawers ? (readyDrawers ? 'Roll the IKEA boxes into the front cells and screw the plywood false fronts on with even 1/8" gaps.' : 'Install drawer slides, build drawer boxes (pocket screws), and fit the faces with even 1/8" gaps.') : '',
     `Lay the ${r3(p.plyThickness)}" plywood deck in ${deckPanels} panel(s), seams on joist/block centres, screws about every 8". Panels are not glued so they can be lifted.`,
-    accessCount ? 'Leave the lift-out access panels unscrewed (rest them on the joists with 1/8" clearance) and add finger pulls; screw down every other deck panel.' : '',
     p.features.edgeTrim ? 'Fit fascia trim on the selected exposed edges.' : '',
     'Lay the tatami mats following the chosen arrangement; screw plywood filler pieces down to the joists wherever the mats do not reach.',
     serviceCells.length ? 'Heavy-load / cable zones under the filler pieces: no bins or drawers. Add the sister joists and mid-cell blocks, drill 1-1/2" holes in line through joists and blocks for the cable chase, fit grommets, and run extension cables before screwing the fillers down.' : '',

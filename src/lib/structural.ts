@@ -161,12 +161,6 @@ export function analyze(b: Build): Structural {
         apply: (q) => ({ ...q, binLongAlongJoists: !q.binLongAlongJoists }),
       })
     }
-    if (p.accessPanels?.length) {
-      suggestions.push({
-        id: 'hatch-note',
-        text: 'Lift-out panels are not screwed down, so only their edges are held: keep each one a manageable size and glue a second 1/4" ply skin under wide ones.',
-      })
-    }
   }
 
   const spacingOC = b.layout.cellMinX + b.layout.dividerT

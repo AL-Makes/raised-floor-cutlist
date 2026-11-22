@@ -50,7 +50,7 @@ export const defaultView = (): ViewOptions => ({
 })
 
 function layerOf(kind: string): LayerKey {
-  if (kind === 'deck' || kind === 'hatch') return 'deck'
+  if (kind === 'deck') return 'deck'
   if (kind === 'trim' || kind === 'drawerFace') return 'side'
   if (kind === 'joist' || kind === 'buildup') return 'joists'
   if (kind === 'block') return 'cross'
@@ -68,7 +68,6 @@ const COLORS: Record<string, string> = {
   buildup: '#8f6b3a',
   header: '#a87c45',
   deck: '#e9d9b4',
-  hatch: '#dcc790',
   service: '#e0a030',
   drawer: '#9fb8c8',
   drawerFace: '#7da2bd',
@@ -213,10 +212,8 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onToggleCut, onToggleAccess, deckMode, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number) => void; onMove: (key: string, v: number) => void; onToggleCut: (s: number, axis: 'x' | 'y', pos: number) => void; onToggleAccess: (key: string) => void; deckMode: 'cut' | 'access'; units?: UnitSystem }) {
+export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number) => void; onMove: (key: string, v: number) => void; units?: UnitSystem }) {
   const [hover, setHoverState] = useState<Hover | null>(null)
-  const [hoverCell, setHoverCell] = useState<string | null>(null)
-  const downAt = useRef<[number, number] | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const endDrag = useMemo(() => () => setDrag(null), [])
   const timer = useRef<number | undefined>(undefined)
@@ -233,7 +230,6 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
   const ply = build.params.plyThickness
   const status = new Map(structural.cells.map((c) => [c.cell, c.status]))
   const L = opts.layers
-  const cutMode = L.deck.visible
   const front = g.front
 
   return (
@@ -254,16 +250,12 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
         const key = layerOf(p.kind)
         const layer = L[key]
         if (!layer.visible) return null
-        if (p.kind === 'hatch') {
-          const st = p.cell !== undefined ? status.get(p.cell) : undefined
-          return <Box key={i} p={p} color={opts.loadMap && st ? STATUS_COLOR[st] : COLORS.hatch} opacity={layer.opacity} />
-        }
-        const edit = p.kind === 'block' && !cutMode
+        const edit = p.kind === 'block'
         const id = `p${i}`
         const dragging = !!drag && !!p.ref && drag.ref.s === p.ref.s && drag.ref.axis === p.ref.axis && drag.ref.k === p.ref.k
         const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'
         const over = edit && !drag ? () => setHover({ id, kind: 'block', delta: -1, s: p.ref!.s, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
-        const down = p.ref && !cutMode
+        const down = p.ref
           ? (pt: { x: number; y: number; z: number }) => {
               setHoverState(null)
               const r = p.ref!
@@ -295,7 +287,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
         if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
         return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
-      {!cutMode && voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
+      {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
           key={v.id}
           position={[v.zone.x + v.zone.sx / 2, v.zone.z + v.zone.sz / 2, -(v.zone.y + v.zone.sy / 2)]}
@@ -324,66 +316,6 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
           </div>
         </Html>
       )}
-      {cutMode && deckMode === 'access' &&
-        build.placements.filter((q) => q.panel && (q.kind === 'deck' || q.kind === 'hatch')).map((q) => {
-          const on = q.kind === 'hatch'
-          const hot = hoverCell === q.panel
-          return (
-            <mesh
-              key={`pn${q.panel}`}
-              position={[q.x + q.sx / 2, q.z + q.sz + 0.1, -(q.y + q.sy / 2)]}
-              onPointerOver={(e) => { e.stopPropagation(); setHoverCell(q.panel!) }}
-              onPointerOut={() => setHoverCell((h) => (h === q.panel ? null : h))}
-              onPointerDown={(e) => { downAt.current = [e.clientX, e.clientY] }}
-              onPointerUp={(e) => { e.stopPropagation(); const d = downAt.current; if (d && Math.hypot(e.clientX - d[0], e.clientY - d[1]) < 8) onToggleAccess(q.panel!); downAt.current = null }}
-            >
-              <boxGeometry args={[q.sx - 0.3, 0.1, q.sy - 0.3]} />
-              <meshBasicMaterial color={on ? '#2ecc71' : '#3b82f6'} transparent opacity={hot ? 0.6 : on ? 0.4 : 0.01} depthWrite={false} />
-            </mesh>
-          )
-        })}
-      {cutMode && deckMode === 'cut' &&
-        build.layout.sections.flatMap((sec) => {
-          const lines: { id: string; axis: 'x' | 'y'; pos: number; cx: number; cy: number; sx: number; sy: number }[] = []
-          sec.joistX.forEach((jx, k) => {
-            if (k === 0 || k === sec.joistX.length - 1) return
-            const pos = jx + sec.joistT[k] / 2
-            lines.push({ id: `${sec.index}:x:${k}`, axis: 'x', pos, cx: pos, cy: sec.rect.y + sec.rect.l / 2, sx: 4, sy: sec.rect.l })
-          })
-          sec.blockY.forEach((by, k) => {
-            const pos = by + build.layout.joistW / 2
-            lines.push({ id: `${sec.index}:y:${k}`, axis: 'y', pos, cx: sec.rect.x + sec.rect.w / 2, cy: pos, sx: sec.rect.w, sy: 4 })
-          })
-          build.layout.cells.filter((c) => c.type === 'service' && c.section === sec.index).forEach((c, k) => {
-            const pos = c.y + c.l / 2
-            if (lines.some((l) => l.axis === 'y' && Math.abs(l.pos - pos) < 0.5)) return
-            lines.push({ id: `${sec.index}:m:${k}`, axis: 'y', pos, cx: sec.rect.x + sec.rect.w / 2, cy: pos, sx: sec.rect.w, sy: 4 })
-          })
-          return lines.map((ln) => {
-            const on = (build.params.deckCuts ?? []).some((c) => c.s === sec.index && c.axis === ln.axis && Math.abs(c.pos - ln.pos) < 0.01)
-            const hot = hoverCell === ln.id
-            const wide = ln.axis === 'x' ? [8, ln.sy] : [ln.sx, 8]
-            const thin = ln.axis === 'x' ? [2, ln.sy] : [ln.sx, 2]
-            return (
-              <group key={`cl${ln.id}`}>
-                <mesh position={[ln.cx, S + ply + 0.3, -ln.cy]} raycast={() => null} renderOrder={10}>
-                  <boxGeometry args={[thin[0], 0.1, thin[1]]} />
-                  <meshBasicMaterial color={on ? '#e53935' : '#3b82f6'} transparent opacity={hot ? 0.9 : on ? 0.9 : 0.35} depthWrite={false} depthTest={false} />
-                </mesh>
-                <mesh
-                  position={[ln.cx, S + ply, -ln.cy]}
-                  onPointerOver={(e) => { e.stopPropagation(); setHoverCell(ln.id) }}
-                  onPointerOut={() => setHoverCell((h) => (h === ln.id ? null : h))}
-                  onPointerDown={(e) => { downAt.current = [e.clientX, e.clientY] }}
-                  onPointerUp={(e) => { e.stopPropagation(); const d = downAt.current; if (d && Math.hypot(e.clientX - d[0], e.clientY - d[1]) < 8) onToggleCut(sec.index, ln.axis, ln.pos); downAt.current = null }}
-                >
-                  <boxGeometry args={[wide[0], 4, wide[1]]} />
-                  <meshBasicMaterial transparent opacity={hot ? 0.15 : 0} depthWrite={false} color="#3b82f6" />
-                </mesh>
-              </group>
-            )
-          })
-        })}
       {opts.loadMap &&
         L.deck.visible &&
         build.layout.cells.map((c) => {

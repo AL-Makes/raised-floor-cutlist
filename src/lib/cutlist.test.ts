@@ -376,7 +376,7 @@ describe('filler service zones', () => {
     const b = buildFloor(defaultParams())
     expect(b.layout.fillers.length).toBeGreaterThan(0)
     const f = b.layout.fillers[0]
-    const under = b.placements.filter((q) => q.kind === 'deck' && !q.panel && Math.abs(q.x - f.x) < 0.51 && Math.abs(q.y - f.y) < 0.51)
+    const under = b.placements.filter((q) => q.kind === 'deck' && Math.abs(q.x - f.x) < 0.51 && Math.abs(q.y - f.y) < 0.51)
     expect(under.length).toBeGreaterThan(0)
     expect(b.parts.some((i) => i.name.startsWith('Heavy-load reinforcing ply'))).toBe(true)
   })
@@ -393,20 +393,5 @@ describe('filler service zones', () => {
     }
     const base = buildFloor(defaultParams()).layout.cells.filter((c) => c.type === 'service').length
     expect(b.layout.cells.filter((c) => c.type === 'service').length).toBe(base)
-  })
-})
-
-describe('chosen access panels', () => {
-  it('only chosen bin cells get hatches', () => {
-    const p = defaultParams()
-    const base = buildFloor(p)
-    const sec = base.layout.sections[0]
-    const pos = sec.joistX[1] + sec.joistT[1] / 2
-    const cut = buildFloor({ ...p, deckCuts: [{ s: 0, axis: 'x', pos }] })
-    expect(cut.deckPanels).toBeGreaterThan(base.deckPanels)
-    const key = cut.placements.find((x) => x.kind === 'deck' && x.panel)!.panel!
-    const acc = buildFloor({ ...p, deckCuts: [{ s: 0, axis: 'x', pos }], accessPanels: [key] })
-    expect(acc.placements.filter((x) => x.kind === 'hatch').length).toBe(1)
-    expect(acc.deckPanels).toBe(cut.deckPanels - 1)
   })
 })
