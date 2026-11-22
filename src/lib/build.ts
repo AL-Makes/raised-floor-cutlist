@@ -525,16 +525,18 @@ export function buildFloor(input: Params): Build {
   if (liftZones.length) {
     const hit = (q: { x: number; y: number; sx: number; sy: number }, z: Rect) =>
       q.x < z.x + z.w - 0.01 && q.x + q.sx > z.x + 0.01 && q.y < z.y + z.l - 0.01 && q.y + q.sy > z.y + 0.01
+    // the pocket frame occupies a ring of one member thickness around each opening, so supports and bins stop at its outer edge
+    const ringZones = liftZones.map((z) => ({ x: z.x - T, y: z.y - T, w: z.w + 2 * T, l: z.l + 2 * T }))
     const next: Placement[] = []
     for (const q of placements) {
       if (q.kind === 'bin') {
-        if (liftZones.some((z) => hit(q, z))) {
+        if (ringZones.some((z) => hit(q, z))) {
           binCount--
           continue
         }
       } else if (q.kind === 'joist' || q.kind === 'block' || q.kind === 'buildup' || q.kind === 'deck' || q.kind === 'rim') {
         let pieces = [q]
-        for (const z of liftZones) pieces = pieces.flatMap((pc) => (hit(pc, z) ? subtractRect(pc, z) : [pc]))
+        for (const z of q.kind === 'deck' ? liftZones : ringZones) pieces = pieces.flatMap((pc) => (hit(pc, z) ? subtractRect(pc, z) : [pc]))
         next.push(...pieces)
         continue
       }
@@ -555,7 +557,14 @@ export function buildFloor(input: Params): Build {
       ]
       for (const m of frame) {
         if (m.skip || !inFloor(m.x + m.sx / 2, m.y + m.sy / 2)) continue
-        next.push({ kind: 'rim', x: m.x, y: m.y, z: bu, sx: m.sx, sy: m.sy, sz: depth })
+        // never let the frame overhang the floor outline
+        const fr = geometry.rects.find((r) => m.x + m.sx / 2 > r.x && m.x + m.sx / 2 < r.x + r.w && m.y + m.sy / 2 > r.y && m.y + m.sy / 2 < r.y + r.l)!
+        const mx0 = Math.max(m.x, fr.x)
+        const my0 = Math.max(m.y, fr.y)
+        const mx1 = Math.min(m.x + m.sx, fr.x + fr.w)
+        const my1 = Math.min(m.y + m.sy, fr.y + fr.l)
+        if (mx1 - mx0 < 0.01 || my1 - my0 < 0.01) continue
+        next.push({ kind: 'rim', x: mx0, y: my0, z: bu, sx: mx1 - mx0, sy: my1 - my0, sz: depth })
         if (m.side) sides++
         else ends++
       }
@@ -578,7 +587,8 @@ export function buildFloor(input: Params): Build {
       next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.plyThickness, lift: zi })
       next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S + p.plyThickness, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.tatamiThickness, lift: zi, liftMat: true })
       sheet('Deck', `Lift table top (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, z.w - 0.25, z.l - 0.25, `Screwed to the column's top plate; carries the ${r3(p.tatamiShort)}" square tatami mat`)
-    }    placements.splice(0, placements.length, ...next)
+    }
+    placements.splice(0, placements.length, ...next)
     if (falseFloors) {
       member('Lift false-floor post (2x4)', falseFloors * 4, falseFloorPost, 4)
       sheet('Deck', `False floor under lift table (${r3(p.plyThickness)}" ply)`, p.plyThickness, falseFloors, p.tatamiShort - 0.25, p.tatamiShort - 0.25, 'Carried on four 2x4 posts; the motorized column bolts to this platform')

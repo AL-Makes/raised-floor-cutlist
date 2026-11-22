@@ -416,6 +416,21 @@ describe('motorized lift tables', () => {
   })
 })
 
+describe('lift table support geometry', () => {
+  const ov = (a: any, b: any) => a.x < b.x + b.sx - 0.01 && a.x + a.sx > b.x + 0.01 && a.y < b.y + b.sy - 0.01 && a.y + a.sy > b.y + 0.01 && a.z < b.z + b.sz - 0.01 && a.z + a.sz > b.z + 0.01
+  it('frame, joists, blocks and rims never overlap and stay inside the floor', () => {
+    for (const [x, y] of [[36, 36], [0, 0], [36, 0], [20, 50], [72, 36]]) {
+      for (const drawers of [false, true]) {
+        const d = defaultParams()
+        const b = buildFloor({ ...d, finalHeight: 20, features: { ...d.features, drawers }, liftTables: [{ x, y }] })
+        const st = b.placements.filter((q) => ['joist', 'block', 'buildup', 'rim'].includes(q.kind))
+        for (let i = 0; i < st.length; i++) for (let j = i + 1; j < st.length; j++) expect(ov(st[i], st[j])).toBe(false)
+        for (const q of st) expect(q.x).toBeGreaterThanOrEqual(-0.01)
+        for (const q of b.placements.filter((q) => q.kind === 'bin' || q.kind === 'drawer')) for (const s of st) expect(ov(q, s)).toBe(false)
+      }
+    }
+  })
+})
 describe('drawer back support stays in drawer bays', () => {
   it('no bay under a filler gets a drawer row or its back joist', () => {
     for (const w of [139.25, 120, 100]) {
