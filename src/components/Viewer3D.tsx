@@ -273,6 +273,49 @@ function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem 
   )
 }
 
+/** Overall dimension drawn flat on the ground: a red measuring line with end ticks and a label. */
+function FlatDim({ x, y, sx, sy, text }: { x: number; y: number; sx: number; sy: number; text: string }) {
+  const tex = useMemo(() => {
+    const tall = sy > sx
+    const PPI = 24
+    const W = Math.max(8, Math.round(sx * PPI))
+    const H = Math.max(8, Math.round(sy * PPI))
+    const c = document.createElement('canvas')
+    c.width = W
+    c.height = H
+    const g = c.getContext('2d')!
+    if (tall) { g.translate(W, 0); g.rotate(Math.PI / 2) }
+    const lw = tall ? H : W
+    const lh = tall ? W : H
+    const fs = Math.min(lh * 0.5, 3 * PPI)
+    g.strokeStyle = '#c0392b'
+    g.fillStyle = '#c0392b'
+    g.lineWidth = Math.max(2, fs / 8)
+    if (lw > lh * 1.5) {
+      g.beginPath()
+      g.moveTo(g.lineWidth, lh / 2); g.lineTo(lw - g.lineWidth, lh / 2)
+      g.moveTo(g.lineWidth, lh * 0.2); g.lineTo(g.lineWidth, lh * 0.8)
+      g.moveTo(lw - g.lineWidth, lh * 0.2); g.lineTo(lw - g.lineWidth, lh * 0.8)
+      g.stroke()
+    }
+    g.font = `bold ${fs}px sans-serif`
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    const tw = g.measureText(text).width + fs
+    g.fillRect(lw / 2 - tw / 2, lh / 2 - fs * 0.65, tw, fs * 1.3)
+    g.fillStyle = '#fff'
+    g.fillText(text, lw / 2, lh / 2)
+    const t = new CanvasTexture(c)
+    t.anisotropy = 4
+    return t
+  }, [sx, sy, text])
+  return (
+    <mesh position={[x, 0.06, -y]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null} renderOrder={1}>
+      <planeGeometry args={[sx, sy]} />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  )
+}
 function findVoids(build: Build): Void[] {
   const ref = build.placements.find((q) => q.kind === 'joist' || q.kind === 'rim')
   if (!ref) return []
@@ -441,6 +484,13 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         if (!opts.dims || p.kind !== 'bin' || !L[layerOf(p.kind)].visible) return null
         return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
+      {opts.dims && (
+        <group>
+          <FlatDim x={cx} y={-8} sx={g.width} sy={12} text={`Width ${formatLength(g.width, units)}`} />
+          <FlatDim x={-8} y={g.length / 2} sx={12} sy={g.length} text={`Depth ${formatLength(g.length, units)}`} />
+          <FlatDim x={-8} y={-8} sx={12} sy={12} text={`H ${formatLength(build.params.finalHeight, units)}`} />
+        </group>
+      )}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
           key={v.id}

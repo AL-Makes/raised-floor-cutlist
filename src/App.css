@@ -116,3 +116,4 @@ th { background: #f4f1ea; }
 @keyframes demobar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .demo-cursor { position: fixed; left: -12px; top: -12px; width: 24px; height: 24px; border-radius: 50%; background: rgba(230, 126, 34, 0.35); border: 2px solid #e67e22; z-index: 60; pointer-events: none; box-shadow: 0 0 0 2px #fff; }
 .demo-cursor.click, .demo-cursor.down { background: rgba(230, 126, 34, 0.9); }
+.overall-dim { background: #c0392b; color: #fff; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; pointer-events: none; }
