@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputPanel } from './components/InputPanel'
 import { CutListTab, LoadTab } from './components/Results'
 import { TatamiTab } from './components/TatamiTab'
@@ -23,7 +23,19 @@ function loadSaved(): { params?: Partial<Params>; units?: UnitSystem; tab?: Tab;
   }
 }
 
+const DEMO_STEPS: { at: number; text: string }[] = [
+  { at: 0, text: '1. Enter any floor shape and an IKEA bin - the frame is laid out around the bin size' },
+  { at: 1800, text: '2. Switch drawers on - supports, headers and frames rebuild automatically' },
+  { at: 3600, text: '3. Tatami mat layout, with lift-out tables' },
+  { at: 5400, text: '4. Full cut list with quantities, ready for CSV or print' },
+  { at: 7200, text: '5. Load check flags weak spots and suggests fixes' },
+  { at: 9000, text: 'Back to your design - this was just a demo' },
+]
+
 export default function App() {
+  const [demo, setDemo] = useState<number | null>(null)
+  const demoTimers = useRef<number[]>([])
+  const demoSaved = useRef<{ params: Params; tab: Tab; view: ViewOptions } | null>(null)
   const [layersOpen, setLayersOpen] = useState(() => localStorage.getItem('raised-floor-cutlist:layersOpen') !== '0')
   useEffect(() => {
     try {
@@ -74,6 +86,38 @@ export default function App() {
     </div>
   )
 
+  const stopDemo = () => {
+    demoTimers.current.forEach((t) => window.clearTimeout(t))
+    demoTimers.current = []
+    const s = demoSaved.current
+    demoSaved.current = null
+    if (s) {
+      setParams(s.params)
+      setTab(s.tab)
+      setView(s.view)
+    }
+    setDemo(null)
+  }
+  useEffect(() => () => demoTimers.current.forEach((t) => window.clearTimeout(t)), [])
+  const startDemo = () => {
+    if (demo !== null) return
+    demoSaved.current = { params, tab, view }
+    const base: Params = { ...params, features: { ...params.features, drawers: false } }
+    const dv = view
+    const acts: (() => void)[] = [
+      () => { setParams(base); setTab('3d'); setView({ ...dv, dims: true, layers: { ...dv.layers, deck: { ...dv.layers.deck, visible: false }, tatami: { ...dv.layers.tatami, visible: false } } }) },
+      () => setParams({ ...base, features: { ...base.features, drawers: true } }),
+      () => setTab('tatami'),
+      () => setTab('cut'),
+      () => setTab('load'),
+      () => stopDemo(),
+    ]
+    DEMO_STEPS.forEach((st, i) => {
+      demoTimers.current.push(window.setTimeout(() => { setDemo(i); acts[i]() }, st.at))
+    })
+    demoTimers.current.push(window.setTimeout(() => stopDemo(), 10200))
+  }
+
   const build = useMemo(() => buildFloor(params), [params])
   const structural = useMemo(() => analyze(build), [build])
   const tatamiOptions = useMemo(() => suggestTatami(floorRects(build.params), params), [build.params, params])
@@ -106,6 +150,7 @@ export default function App() {
             <button className={units === 'imperial' ? 'on' : ''} onClick={() => setUnits('imperial')}>in</button>
             <button className={units === 'metric' ? 'on' : ''} onClick={() => setUnits('metric')}>mm</button>
           </div>
+          <button className={demo !== null ? 'on' : ''} onClick={demo !== null ? stopDemo : startDemo}>{demo !== null ? 'Stop demo' : 'Demo'}</button>
           <button onClick={csv}>CSV</button>
           <button onClick={() => window.print()}>Print</button>
         </div>
@@ -207,6 +252,12 @@ export default function App() {
           )}
         </div>
       </main>
+      {demo !== null && (
+        <div className="demo-cap" onClick={stopDemo} title="Click to stop">
+          <span>{DEMO_STEPS[demo].text}</span>
+          <i style={{ animationDuration: '10.2s' }} />
+        </div>
+      )}
     </div>
   )
 }

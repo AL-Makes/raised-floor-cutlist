@@ -110,3 +110,7 @@ th { background: #f4f1ea; }
 .edge-row.front{border-color:#e67e22;background:#fff4e8}
 .draw-typed .inline{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
 .draw-typed input{width:5rem}
+
+.demo-cap { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: min(92vw, 720px); background: rgba(45, 36, 24, 0.95); color: #fff; padding: 0.8rem 1.1rem 1rem; border-radius: 10px; font-size: 1.05rem; z-index: 50; cursor: pointer; box-shadow: 0 6px 24px rgba(0,0,0,0.35); overflow: hidden; }
+.demo-cap i { position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: #e3a65b; transform-origin: left; animation: demobar linear forwards; }
+@keyframes demobar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
