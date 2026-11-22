@@ -345,6 +345,21 @@ function findVoids(build: Build): Void[] {
         })
       }
     })
+    if (sec.exact || sec.fixed) return
+    sec.cols.forEach((col, ci) => {
+      if (col.w < 3) return
+      const gx = Math.min(T, col.w * 0.5)
+      const y0 = rect.y + T
+      const l = rect.l - 2 * T
+      out.push({
+        id: `j${si}-${ci}`,
+        kind: 'joist',
+        s: si,
+        c: ci,
+        ghost: { kind: 'joist', x: col.x + col.w / 2 - gx / 2, y: y0, z, sx: gx, sy: l, sz },
+        zone: { kind: 'joist', x: col.x + col.w / 2 - col.w * 0.15, y: y0, z, sx: col.w * 0.3, sy: l, sz },
+      })
+    })
   })
   return out
 }
