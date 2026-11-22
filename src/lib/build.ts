@@ -309,10 +309,15 @@ export function buildFloor(input: Params): Build {
       } else if (innerW <= MAX_RUN + 0.01) segs.push([0, innerW])
       else {
         const cuts = sec.joistX.slice(1, -1).map((jx, i) => jx + sec.joistT[i + 1] / 2 - x0)
+        // equal pieces: each splice goes on the joist nearest the even division point, unless that would leave a piece over 8 ft
+        const n = Math.ceil(innerW / MAX_RUN - 0.0001)
         let start = 0
-        for (let i = 0; i < cuts.length; i++) {
-          const nextCut = cuts[i + 1] ?? innerW
-          if (nextCut - start > MAX_RUN + 0.01 && cuts[i] - start > 0.01) { segs.push([start, cuts[i]]); start = cuts[i] }
+        for (let k = 1; k < n; k++) {
+          const ideal = (innerW * k) / n
+          const ok = cuts.filter((c) => c - start > 0.01 && c - start <= MAX_RUN + 0.01 && innerW - c <= (n - k) * MAX_RUN + 0.01)
+          const cut = ok.length ? ok.reduce((a, c) => (Math.abs(c - ideal) < Math.abs(a - ideal) ? c : a)) : ideal
+          segs.push([start, cut])
+          start = cut
         }
         segs.push([start, innerW])
       }

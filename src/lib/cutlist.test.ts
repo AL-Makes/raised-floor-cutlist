@@ -757,3 +757,14 @@ describe('deleting supports', () => {
     expect(rows.length).toBeGreaterThan(fewer.length)
   })
 })
+
+describe('long runs', () => {
+  it('splices runs over 8 ft into pieces of 8 ft or less', () => {
+    const d = defaultParams()
+    const b = buildFloor({ ...d, floor: { shape: 'rect', width: 170, length: 100 } as never, features: { ...d.features, drawers: false } })
+    const rim = b.parts.filter((q) => q.name.startsWith('Back rim'))
+    expect(rim.length).toBeGreaterThan(1)
+    const lens = rim.map((q) => q.length)
+    expect(Math.max(...lens)).toBeLessThanOrEqual(96.01)
+  })
+})
