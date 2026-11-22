@@ -162,6 +162,7 @@ export function buildFloor(input: Params): Build {
   let crossLines = 0
   let supportPads = 0
 
+  const MAX_RUN = 96
   const lumber = (
     group: string,
     name: string,
@@ -174,6 +175,12 @@ export function buildFloor(input: Params): Build {
     pk = 0,
   ) => {
     if (qty <= 0 || length <= 0) return
+    if (group === 'Frame' && length > MAX_RUN + 0.01) {
+      const nPieces = Math.ceil(length / MAX_RUN)
+      qty *= nPieces
+      length = length / nPieces
+      notes = (notes ? notes + ' - ' : '') + `Over 8 ft, so spliced from ${nPieces} pieces: stagger the splices and join with a 2x4 sister or plywood gusset`
+    }
     parts.push({ id: '', group, name, kind: 'lumber', material, qty, length, width, thickness, notes, pockets: pk * qty })
     pockets += pk * qty
   }
