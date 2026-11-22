@@ -280,15 +280,17 @@ export function buildFloor(input: Params): Build {
       else lumber('Frame', `Build-up strip (${l.name})`, l.material, qty, rect.l, 3.5, l.t, 'Glue + screw under each joist')
     }
 
-    const innerW = rect.w - 2 * T
+    const nJ = sec.joistX.length
+    const endL = sec.joistT[0]
+    const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
-    placements.push({ kind: 'rim', x: rect.x + T, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
+    placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
     member('Back rim (between end joists)', 1, innerW, 4)
     if (sec.drawerFront) {
-      placements.push({ kind: 'header', x: rect.x + T, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
+      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
       lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
     } else {
-      placements.push({ kind: 'rim', x: rect.x + T, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
+      placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
       member('Front rim (between end joists)', 1, innerW, 4)
     }
 
@@ -306,15 +308,24 @@ export function buildFloor(input: Params): Build {
       ...sec.blockY.map((y) => y + T / 2 - rect.y),
       rect.l - T / 2,
     ]
-    const plan = planDeck(rect.w, rect.l, joistCenters, yCenters, p.sheetL, p.sheetW)
-    plan.unsupported.forEach((u) =>
-      unsupportedSeams.push({ axis: u.axis, pos: (u.axis === 'x' ? rect.x : rect.y) + u.pos, section: sec.index }),
-    )
-    for (const pc of plan.pieces) {
-      sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, pc.w, pc.l)
-      placements.push({ kind: 'deck', x: rect.x + pc.x, y: rect.y + pc.y, z: S, sx: pc.w, sy: pc.l, sz: p.plyThickness })
-      deckPanels++
-      heaviest = Math.max(heaviest, pc.w * pc.l * p.plyThickness * PLY_LB_PER_IN3)
+    const cutY = sec.drawerFront && sec.blockY.length ? sec.blockY[0] + T / 2 - rect.y : 0
+    const regions = cutY > 0
+      ? [
+          { y0: 0, l: cutY, yc: [] as number[] },
+          { y0: cutY, l: rect.l - cutY, yc: yCenters.filter((c) => c > cutY + 1e-6).map((c) => c - cutY) },
+        ]
+      : [{ y0: 0, l: rect.l, yc: yCenters }]
+    for (const reg of regions) {
+      const plan = planDeck(rect.w, reg.l, joistCenters, reg.yc, p.sheetL, p.sheetW)
+      plan.unsupported.forEach((u) =>
+        unsupportedSeams.push({ axis: u.axis, pos: u.axis === 'x' ? rect.x + u.pos : rect.y + reg.y0 + u.pos, section: sec.index }),
+      )
+      for (const pc of plan.pieces) {
+        sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, pc.w, pc.l)
+        placements.push({ kind: 'deck', x: rect.x + pc.x, y: rect.y + reg.y0 + pc.y, z: S, sx: pc.w, sy: pc.l, sz: p.plyThickness })
+        deckPanels++
+        heaviest = Math.max(heaviest, pc.w * pc.l * p.plyThickness * PLY_LB_PER_IN3)
+      }
     }
   })
 

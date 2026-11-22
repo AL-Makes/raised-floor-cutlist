@@ -62,7 +62,7 @@ export function divide(total: number, cellMin: number, dividerT: number, rimT = 
   return { n, fit, cell, fits: cell >= cellMin - 1e-9 }
 }
 
-/** Ready-made rolling box: long side runs along the joists so it pulls out toward the front. */
+/** Ready-made rolling box: long side runs across the front, short side pulls out toward the back. */
 export function rollingAxes(p: Pick<Params, 'rollingBox'>): { rx: number; ry: number } {
   return { rx: Math.max(p.rollingBox.w, p.rollingBox.d), ry: Math.min(p.rollingBox.w, p.rollingBox.d) }
 }
@@ -90,8 +90,10 @@ export function buildLayout(p: Params): Layout {
   // A lift table on the front drawer row takes priority: the drawers share only the front width left on either side of it.
   const liftZones = p.liftTables.map((l) => ({ x: l.x, y: l.y, w: p.tatamiShort, l: p.tatamiShort }))
   const f0 = geo.front
-  const pieces: { rect: Rect; plain: boolean }[] = geo.rects.flatMap((rect) => {
-    const onFront = drawers && !!f0 && Math.abs(rect.y - f0.y) < 1e-6 && rect.x >= f0.x1 - 1e-6 && rect.x + rect.w <= f0.x2 + 1e-6
+  const onFrontRow = (rect: Rect) =>
+    drawers && !!f0 && Math.abs(rect.y - f0.y) < 1e-6 && rect.x >= f0.x1 - 1e-6 && rect.x + rect.w <= f0.x2 + 1e-6
+  const liftPieces: { rect: Rect; plain: boolean; exact?: number }[] = geo.rects.flatMap((rect) => {
+    const onFront = onFrontRow(rect)
     const zs = liftZones
       .filter((z) => z.x >= rect.x - 0.01 && z.x + z.w <= rect.x + rect.w + 0.01 && z.y < rect.y + drawerLen && z.y + z.l > rect.y)
       .sort((a, b) => a.x - b.x)
@@ -107,22 +109,43 @@ export function buildLayout(p: Params): Layout {
     if (rect.x + rect.w - cursor > 0.5) out.push({ rect: { ...rect, x: cursor, w: rect.x + rect.w - cursor }, plain: false })
     return out
   })
+  // Ready-made drawers sit snug between joists (clearance split evenly each side), so the cells are exactly one
+  // box wide. Leftover width becomes a plain bin section if it is big enough, otherwise it widens the end joists.
+  const pieces: { rect: Rect; plain: boolean; exact?: number }[] = liftPieces.flatMap((pc) => {
+    if (!ready || pc.plain || !onFrontRow(pc.rect)) return [pc]
+    const r = pc.rect
+    const nFit = Math.max(1, Math.floor((r.w - 2 * T + dividerT) / (cellMinX + dividerT) + 1e-9))
+    const n = Math.max(1, Math.min(nFit, nFit + p.joistAdjust))
+    const W = 2 * T + n * cellMinX + (n - 1) * dividerT
+    const extra = r.w - W
+    if (extra < -1e-6) return [pc]
+    if (extra >= bx + p.clearance + 2 * T) {
+      return [
+        { rect: { ...r, w: W }, plain: false, exact: n },
+        { rect: { ...r, x: r.x + W, w: extra }, plain: true },
+      ]
+    }
+    return [{ ...pc, exact: n }]
+  })
 
-  pieces.forEach(({ rect, plain }, si) => {
+  pieces.forEach(({ rect, plain, exact }, si) => {
     const dx = divide(rect.w, cellMinX, dividerT, T, p.joistAdjust)
     const cols: Section['cols'] = []
+    const ex = exact ? (rect.w - (2 * T + exact * cellMinX + (exact - 1) * dividerT)) / 2 : 0
+    const nCols = exact ?? dx.n
+    const cellW = exact ? cellMinX : dx.cell
     const joistX: number[] = [rect.x]
-    const joistT: number[] = [T]
-    for (let i = 0; i < dx.n; i++) {
-      const x = rect.x + T + i * (dx.cell + dividerT)
-      cols.push({ x, w: dx.cell })
-      if (i < dx.n - 1) {
-        joistX.push(x + dx.cell)
+    const joistT: number[] = [T + ex]
+    for (let i = 0; i < nCols; i++) {
+      const x = rect.x + T + ex + i * (cellW + dividerT)
+      cols.push({ x, w: cellW })
+      if (i < nCols - 1) {
+        joistX.push(x + cellW)
         joistT.push(dividerT)
       }
     }
-    joistX.push(rect.x + rect.w - T)
-    joistT.push(T)
+    joistX.push(rect.x + rect.w - T - ex)
+    joistT.push(T + ex)
 
     const f = geo.front
     const drawerFront =

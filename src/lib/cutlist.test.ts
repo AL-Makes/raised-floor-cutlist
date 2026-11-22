@@ -281,6 +281,23 @@ describe('dragging walls and ready-made drawers', () => {
     expect(validatePolygon(L)).toBeUndefined()
     expect(L).toHaveLength(6)
   })
+  it('ready-made drawers sit 1/4" off each joist and the deck over them stops at the middle of the next cross joist', () => {
+    const base = defaultParams()
+    const p = { ...base, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const }
+    const b = buildFloor(p)
+    const sec = b.layout.sections[0]
+    const dr = b.placements.filter((q) => q.kind === 'drawer')
+    expect(dr.length).toBeGreaterThan(0)
+    for (const d of dr) {
+      const left = sec.joistX.findIndex((jx, k) => Math.abs(jx + sec.joistT[k] - (d.x - 0.25)) < 1e-6)
+      expect(left).toBeGreaterThanOrEqual(0)
+      expect(sec.joistX[left + 1]).toBeCloseTo(d.x + d.sx + 0.25)
+    }
+    const cross = sec.blockY[0] + b.layout.joistW / 2
+    const front = b.placements.filter((q) => q.kind === 'deck' && Math.abs(q.y - sec.rect.y) < 1e-6 && q.x < sec.rect.x + sec.rect.w - 1e-6)
+    expect(front.length).toBeGreaterThan(0)
+    for (const f of front) expect(f.y + f.sy).toBeCloseTo(cross)
+  })
   it('sizes joist spacing from an IKEA rolling box and drops the drawer cut parts', () => {
     const base = defaultParams()
     const p = { ...base, finalHeight: 20, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const, rollingBox: { id: 'x', w: 24, d: 36, h: 8 } }
