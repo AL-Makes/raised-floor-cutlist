@@ -242,7 +242,7 @@ export function buildFloor(input: Params): Build {
     if (sec.drawerFront) {
       placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
       lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
-    } else {
+    } else if (!sec.shareFront) {
       placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
       member('Front rim (between end joists)', 1, innerW, 4)
     }

@@ -29,6 +29,7 @@ export interface Section {
   colBlocks: number[][]
   /** true when the section's front edge (y = 0) carries drawers */
   drawerFront: boolean
+  shareFront?: boolean
   /** true when main joist positions are dictated by drawer widths */
   exact: boolean
   /** plywood filler section: joists only at the filler edges, fixed deck */
@@ -147,15 +148,15 @@ export function buildLayout(p: Params): Layout {
   })
 
   // the drawer row is its own frame; its parallel joists are independent of the ones behind the cross joist that closes it
+  const shareFront = new WeakSet<Rect>()
   const split: typeof pieces = pieces.flatMap((pc) => {
     const fr0 = geo.front
     const isFront = drawers && !pc.plain && !pc.exact && !pc.fixed && !!fr0 && Math.abs(pc.rect.y - fr0.y) < 1e-6 && pc.rect.x >= fr0.x1 - 1e-6 && pc.rect.x + pc.rect.w <= fr0.x2 + 1e-6
     const cut = drawerLen + T
     if (!isFront || pc.rect.l - cut < cellMinY + 2 * T) return [pc]
-    return [
-      { ...pc, rect: { ...pc.rect, l: cut } },
-      { ...pc, rect: { ...pc.rect, y: pc.rect.y + cut, l: pc.rect.l - cut } },
-    ]
+    const rear = { ...pc.rect, y: pc.rect.y + cut, l: pc.rect.l - cut }
+    shareFront.add(rear)
+    return [{ ...pc, rect: { ...pc.rect, l: cut } }, { ...pc, rect: rear }]
   })
   split.forEach(({ rect, plain, exact, fixed }, si) => {
     const fr = geo.front
@@ -243,8 +244,9 @@ export function buildLayout(p: Params): Layout {
           })
         }
       } else {
+        const lead = shareFront.has(rect) ? 0 : T
         const dy = divide(rect.l, cellMinY, T, T, adj)
-        const cells = tweak(evenCells(rect.y + T, rect.l - 2 * T, dy.n), extra)
+        const cells = tweak(evenCells(rect.y + lead, rect.l - lead - T, dy.n), extra)
         cells.forEach((c, j) => {
           rows.push({ y: c.y, l: c.l, drawer: false })
           if (j < cells.length - 1) blockY.push(c.y + c.l)
@@ -309,7 +311,7 @@ export function buildLayout(p: Params): Layout {
 
     // every bay between two main joists keeps its own cross joists, so adding or removing one never touches the neighbours
     const colData = cols.map((col, ci) => (fixed ? { rows, blockY } : calcRows(p.crossAdjust, p.colAdjust?.[`${si}:${ci}`] ?? 0, col)))
-    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, exact: !!exact, fixed: !!fixed, applied })
+    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, shareFront: shareFront.has(rect), exact: !!exact, fixed: !!fixed, applied })
     cols.forEach((col, ci) => {
       colData[ci].rows.forEach((row, ri) => {
         const key = `${si}:${ci}:${ri}`
