@@ -257,13 +257,29 @@ export function buildFloor(input: Params): Build {
     const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
     placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
-    member('Back rim (between end joists)', 1, innerW, 4)
+    const runPieces = (): number[] => {
+      if (innerW <= MAX_RUN + 0.01) return [innerW]
+      const cuts = sec.joistX.slice(1, -1).map((jx, i) => jx + sec.joistT[i + 1] / 2 - (rect.x + endL))
+      const out: number[] = []
+      let start = 0
+      for (let i = 0; i < cuts.length; i++) {
+        const nextCut = cuts[i + 1] ?? innerW
+        if (nextCut - start > MAX_RUN + 0.01 && cuts[i] - start > 0.01) { out.push(cuts[i] - start); start = cuts[i] }
+      }
+      out.push(innerW - start)
+      return out
+    }
+    const splitRun = (name: string, pk: number, mk: (nm: string, q: number, len: number, pk: number) => void) => {
+      const pcs = runPieces()
+      pcs.forEach((len) => mk(pcs.length > 1 ? name + ' (spliced over a joist)' : name, 1, len, pk))
+    }
+    splitRun('Back rim (between end joists)', 4, member)
     if (sec.drawerFront) {
       placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
-      lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
+      splitRun('Drawer header (2x4 laid flat)', 4, (nm, q, len, pk) => lumber('Frame', nm, '2x4', q, len, 3.5, 1.5, 'Sits flush under deck at the front opening', pk))
     } else if (!sec.shareFront) {
       placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
-      member('Front rim (between end joists)', 1, innerW, 4)
+      splitRun('Front rim (between end joists)', 4, member)
     }
     sec.cols.forEach((col, ci) => {
       const ext = sharedEdge && ci === 0 ? sec.joistT[0] : 0
