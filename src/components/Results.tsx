@@ -1,6 +1,7 @@
 import type { Build } from '../lib/build'
 import type { Structural } from '../lib/structural'
 import { matSchedule, type TatamiArrangement } from '../lib/tatami'
+import { estimateWeight } from '../lib/weight'
 import { formatLength, type UnitSystem } from '../lib/units'
 
 export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiArrangement['mats']; units: UnitSystem }) {
@@ -94,10 +95,16 @@ export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiA
   )
 }
 
-export function LoadTab({ s, build, apply }: { s: Structural; build: Build; apply: (id: string) => void }) {
+export function LoadTab({ s, build, apply, mats, units }: { s: Structural; build: Build; apply: (id: string) => void; mats: TatamiArrangement['mats']; units: UnitSystem }) {
   const p = build.params
+  const w = estimateWeight(build, mats)
+  const wt = (lb: number) => (units === 'metric' ? `${Math.round(lb * 0.45359)} kg` : `${Math.round(lb)} lb`)
   return (
     <div className="tab">
+      <h3>Structure weight (estimate)</h3>
+      <div className="stats"><div><b>{wt(w.total)}</b><span>total dead weight</span></div></div>
+      <ul>{w.rows.map((r) => <li key={r.label}><b>{wt(r.lb)}</b> - {r.label} {r.note && <small>({r.note})</small>}</li>)}</ul>
+      <p className="legend">Counts framing, plywood, drawer boxes, trim, tatami and table assemblies. Does not count bins, anything stored in them, the TV or TV stand.</p>
       <h3>Load capacity (estimate)</h3>
       <div className="stats">
         <div><b>{Math.round(s.minPsf)} psf</b><span>weakest deck / hatch span (L/360)</span></div>

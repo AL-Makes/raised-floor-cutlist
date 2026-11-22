@@ -245,6 +245,8 @@ export default function App() {
           {tab === 'cut' && <CutListTab build={build} mats={matsNoLift} units={units} />}
           {tab === 'load' && (
             <LoadTab
+              mats={mats}
+              units={units}
               s={structural}
               build={build}
               apply={(id) => {

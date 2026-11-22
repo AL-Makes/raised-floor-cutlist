@@ -6,6 +6,7 @@ import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
 import { analyze, plyCapacity } from './structural'
 import { matSchedule, suggestTatami } from './tatami'
+import { estimateWeight } from './weight'
 import { formatInches, parseImperial, parseLength } from './units'
 
 describe('units', () => {
@@ -675,5 +676,24 @@ describe('plywood seams sit on support centres', () => {
             expect(total === 0 || hit / total > 0.6).toBe(true)          }
         }
     }
+  })
+})
+describe('structure weight', () => {
+  const mk = (w: number, l: number, lifts: { x: number; y: number }[] = []) => {
+    const d = defaultParams()
+    const b = buildFloor({ ...d, floor: { shape: 'rect', width: w, length: l } as never, liftTables: lifts })
+    const mats = suggestTatami(b.geometry.rects, b.params)[0].mats
+    return estimateWeight(b, mats)
+  }
+  it('is positive and grows with area', () => {
+    const a = mk(96, 72).total
+    expect(a).toBeGreaterThan(100)
+    expect(mk(144, 96).total).toBeGreaterThan(a)
+  })
+  it('counts the lift table assembly', () => {
+    const base = mk(144, 96)
+    const withLift = mk(144, 96, [{ x: 0, y: 0 }])
+    expect(withLift.rows.some((r) => r.label.startsWith('Motorized'))).toBe(true)
+    expect(withLift.total).toBeGreaterThan(base.total + 40)
   })
 })
