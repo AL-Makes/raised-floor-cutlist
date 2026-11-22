@@ -276,7 +276,7 @@ export function buildFloor(input: Params): Build {
       let x = rect.x + endL
       const pcs = runPieces()
       pcs.forEach((len, i) => {
-        const g = pcs.length > 1 ? 0.15 : 0
+        const g = 0
         const a = i > 0 ? g : 0
         const b = i < pcs.length - 1 ? g : 0
         placements.push({ kind, x: x + a, y, z, sx: len - a - b, sy, sz } as never)
@@ -307,7 +307,7 @@ export function buildFloor(input: Params): Build {
     if (!['joist', 'rim', 'buildup', 'block'].includes(q.kind) || q.sy <= MAX_RUN + 0.01) continue
     const nP = Math.ceil(q.sy / MAX_RUN)
     const len = q.sy / nP
-    const pcs = Array.from({ length: nP }, (_, k) => ({ ...q, y: q.y + k * len + (k > 0 ? 0.15 : 0), sy: len - (k > 0 ? 0.15 : 0) - (k < nP - 1 ? 0.15 : 0) }))
+    const pcs = Array.from({ length: nP }, (_, k) => ({ ...q, y: q.y + k * len, sy: len }))
     placements.splice(i, 1, ...pcs)
   }
 
