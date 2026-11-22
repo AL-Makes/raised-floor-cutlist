@@ -425,6 +425,7 @@ export function buildFloor(input: Params): Build {
     let sides = 0
     let ends = 0
     for (const z of liftZones) {
+      const zi = liftZones.indexOf(z)
       const frame = [
         { x: z.x - T, y: z.y, sx: T, sy: z.l, side: true, skip: layout.sections.some((s) => Math.abs(s.rect.x + s.rect.w - z.x) < 0.01 && s.rect.y <= z.y + 0.01 && s.rect.y + s.rect.l >= z.y + z.l - 0.01) },
         { x: z.x + z.w, y: z.y, sx: T, sy: z.l, side: true, skip: layout.sections.some((s) => Math.abs(s.rect.x - (z.x + z.w)) < 0.01 && s.rect.y <= z.y + 0.01 && s.rect.y + s.rect.l >= z.y + z.l - 0.01) },
@@ -438,8 +439,8 @@ export function buildFloor(input: Params): Build {
         else ends++
       }
       const bodyBottom = Math.max(0, S - LIFT_DEPTH)
-      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: bodyBottom, sx: z.w - 0.25, sy: z.l - 0.25, sz: S - bodyBottom })
-      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S + p.plyThickness, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.tatamiThickness })
+      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: bodyBottom, sx: z.w - 0.25, sy: z.l - 0.25, sz: S - bodyBottom, lift: zi })
+      next.push({ kind: 'lift', x: z.x + 0.125, y: z.y + 0.125, z: S + p.plyThickness, sx: z.w - 0.25, sy: z.l - 0.25, sz: p.tatamiThickness, lift: zi })
     }
     placements.splice(0, placements.length, ...next)
     member('Lift pocket frame (side, along joists)', sides, p.tatamiShort, 4)

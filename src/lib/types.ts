@@ -150,6 +150,8 @@ export interface Placement {
   sy: number
   sz: number
   cell?: number
+  /** index of the lift table this piece belongs to */
+  lift?: number
   /** this bin is half of a split bin */
   split?: 'x' | 'y'
   /** movable joist: section, axis the joist is moved along, and index within the section */

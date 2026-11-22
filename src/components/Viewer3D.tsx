@@ -121,6 +121,52 @@ function DragController({ drag, onMove, onEnd }: { drag: Drag | null; onMove: (k
   return null
 }
 
+interface Pull { key: string; dir: 'out' | 'up'; max: number; start: number; base: number; anchor: [number, number, number] }
+
+function PullController({ pull, onMove, onEnd }: { pull: Pull | null; onMove: (key: string, v: number) => void; onEnd: () => void }) {
+  const { camera, gl, raycaster, controls } = useThree()
+  useEffect(() => {
+    if (!pull) return
+    const oc = controls as unknown as { enabled: boolean } | null
+    if (oc) oc.enabled = false
+    const look = new Vector3()
+    camera.getWorldDirection(look)
+    const normal = pull.dir === 'out' ? new Vector3(0, 1, 0) : new Vector3(look.x, 0, look.z).normalize()
+    const plane = new Plane().setFromNormalAndCoplanarPoint(normal, new Vector3(...pull.anchor))
+    const hit = new Vector3()
+    const move = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect()
+      raycaster.setFromCamera({ x: ((ev.clientX - r.left) / r.width) * 2 - 1, y: -((ev.clientY - r.top) / r.height) * 2 + 1 } as never, camera)
+      if (!raycaster.ray.intersectPlane(plane, hit)) return
+      const v = (pull.dir === 'out' ? hit.z : hit.y) - pull.start
+      onMove(pull.key, Math.min(pull.max, Math.max(0, pull.base + v)))
+    }
+    const up = () => onEnd()
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      if (oc) oc.enabled = true
+    }
+  }, [pull, camera, gl, raycaster, controls, onMove, onEnd])
+  return null
+}
+
+function PullArrow({ pos, dir, onOver, onOut, onDown }: { pos: [number, number, number]; dir: 'out' | 'up'; onOver: () => void; onOut: () => void; onDown: (pt: { x: number; y: number; z: number }) => void }) {
+  return (
+    <group position={pos} rotation={dir === 'out' ? [Math.PI / 2, 0, 0] : [0, 0, 0]} onPointerOver={(e) => { e.stopPropagation(); onOver() }} onPointerOut={onOut} onPointerDown={(e) => { e.stopPropagation(); onDown(e.point) }}>
+      <mesh position={[0, 5, 0]} renderOrder={10}>
+        <cylinderGeometry args={[0.7, 0.7, 8, 16]} />
+        <meshStandardMaterial color="#2d8cff" transparent opacity={0.55} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, 11, 0]} renderOrder={10}>
+        <coneGeometry args={[2, 5, 16]} />
+        <meshStandardMaterial color="#2d8cff" transparent opacity={0.55} depthWrite={false} />
+      </mesh>
+    </group>
+  )
+}
 function CamCmd({ cmd, target, span }: { cmd: { current: ((v: string) => void) | null }; target: [number, number, number]; span: number }) {
   const { camera, controls } = useThree() as { camera: { position: { set: (x: number, y: number, z: number) => void } }; controls: { target: { set: (x: number, y: number, z: number) => void }; update: () => void } | null }
   cmd.current = (v) => {
@@ -258,6 +304,14 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
   const [hover, setHoverState] = useState<Hover | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const endDrag = useMemo(() => () => setDrag(null), [])
+  const [pulls, setPulls] = useState<Record<string, number>>({})
+  const [armed, setArmed] = useState<string | null>(null)
+  const [pull, setPull] = useState<Pull | null>(null)
+  const endPull = useMemo(() => () => setPull(null), [])
+  const movePull = useMemo(() => (k: string, v: number) => setPulls((q) => ({ ...q, [k]: v })), [])
+  const armTimer = useRef<number | undefined>(undefined)
+  const arm = (k: string) => { window.clearTimeout(armTimer.current); setArmed(k) }
+  const disarm = () => { if (pull) return; window.clearTimeout(armTimer.current); armTimer.current = window.setTimeout(() => setArmed(null), 600) }
   const timer = useRef<number | undefined>(undefined)
   const setHover = (h: Hover) => { window.clearTimeout(timer.current); setHoverState(h) }
   const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHoverState(null), 700) }
@@ -274,7 +328,25 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
   const memberOf = new Map(members.filter((m) => m.kind !== 'pad').map((m) => [m.index, m]))
   const L = opts.layers
   const front = g.front
-
+  const pullKey = (p: Placement) => (p.lift !== undefined ? `l${p.lift}` : (p.kind === 'drawer' || p.kind === 'drawerFace') && p.cell !== undefined ? `d${p.cell}` : undefined)
+  const placed = build.placements.map((p) => {
+    const k = pullKey(p)
+    const v = k ? pulls[k] ?? 0 : 0
+    return !v ? p : k![0] === 'l' ? { ...p, z: p.z + v } : { ...p, y: p.y - v }
+  })
+  const armInfo = (() => {
+    if (!armed) return null
+    const mine = placed.filter((p) => pullKey(p) === armed)
+    if (armed[0] === 'l') {
+      const top = mine.reduce<Placement | undefined>((a, b) => (!a || b.z > a.z ? b : a), undefined)
+      if (!top) return null
+      return { dir: 'up' as const, max: 24, anchor: [top.x + top.sx / 2, top.z + top.sz + 1, -(top.y + top.sy / 2)] as [number, number, number] }
+    }
+    const face = mine.find((p) => p.kind === 'drawerFace')
+    const box = mine.find((p) => p.kind === 'drawer')
+    if (!face || !box) return null
+    return { dir: 'out' as const, max: box.sy, anchor: [face.x + face.sx / 2, face.z + face.sz / 2, -(face.y) + 1] as [number, number, number] }
+  })()
   return (
     <div style={{ position: 'absolute', inset: 0 }} onContextMenu={(e) => {
       e.preventDefault()
@@ -289,6 +361,16 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
       <OrbitControls target={[cx, S / 2, cz]} makeDefault mouseButtons={{ LEFT: 0, MIDDLE: 2 }} />
       <CamCmd cmd={camCmd} target={[cx, S / 2, cz]} span={span} />
       <DragController drag={drag} onMove={onMove} onEnd={endDrag} />
+      <PullController pull={pull} onMove={movePull} onEnd={endPull} />
+      {armInfo && (L.drawers.visible || L.lift.visible) && (pull ? pull.key === armed : true) && (
+        <PullArrow
+          pos={armInfo.anchor}
+          dir={armInfo.dir}
+          onOver={() => arm(armed!)}
+          onOut={disarm}
+          onDown={(pt) => { const k = armed!; setPull({ key: k, dir: armInfo.dir, max: armInfo.max, start: armInfo.dir === 'out' ? pt.z : pt.y, base: pulls[k] ?? 0, anchor: [pt.x, pt.y, pt.z] }) }}
+        />
+      )}
       <gridHelper args={[span * 2.5, 20, '#888', '#ccc']} position={[cx, -0.05, cz]} />
       {front && (
         <mesh position={[(front.x1 + front.x2) / 2, 0.15, 3]}>
@@ -296,7 +378,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
           <meshStandardMaterial color="#e67e22" />
         </mesh>
       )}
-      {build.placements.map((p, i) => {
+      {placed.map((p, i) => {
         const key = layerOf(p.kind)
         const layer = L[key]
         if (!layer.visible) return null
@@ -304,6 +386,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
         const id = `p${i}`
         const dragging = !!drag && !!p.ref && drag.ref.s === p.ref.s && drag.ref.axis === p.ref.axis && drag.ref.k === p.ref.k
         const mem = memberOf.get(i)
+        const pk = pullKey(p)
         const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : mem ? STATUS_COLOR[mem.status] : COLORS[p.kind] ?? '#999'
         const over = edit && !drag ? () => setHover({ id, kind: 'block', delta: -1, s: p.ref!.s, c: p.ref!.c ?? 0, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
         const down = DRAG_ENABLED && p.ref
@@ -328,15 +411,15 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
             p={p}
             color={binSel && p.kind === 'bin' && p.cell === binSel.cell ? '#4fa3e0' : color}
             opacity={layer.opacity}
-            onOver={over}
-            onOut={edit ? leave : undefined}
+            onOver={pk && (p.kind === 'drawerFace' || p.lift !== undefined) ? () => arm(pk) : over}
+            onOut={pk && (p.kind === 'drawerFace' || p.lift !== undefined) ? disarm : edit ? leave : undefined}
             onDown={down}
             onClick={p.kind === 'bin' && p.cell !== undefined ? () => setBinSel({ cell: p.cell!, split: p.split, pos: [p.x + p.sx / 2, p.z + p.sz + 1, -(p.y + p.sy / 2)] }) : undefined}
             onContext={p.kind === 'bin' && p.cell !== undefined ? () => { ctxBin.current = { cell: p.cell!, split: p.split } } : undefined}
           />
         )
       })}
-      {build.placements.map((p, i) => {
+      {placed.map((p, i) => {
         if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
         return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
