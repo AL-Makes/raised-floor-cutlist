@@ -726,9 +726,9 @@ describe('underlay compresses the supports', () => {
 })
 
 describe('drawer clearance', () => {
-  it('drawer box top is 6" below the top of the supports', () => {
+  it('drawer box top is 6" below the top of the supports when height allows', () => {
     const d = defaultParams()
-    const b = buildFloor({ ...d, floor: { shape: 'rect', width: 144, length: 73 } as never, features: { ...d.features, drawers: true } })
+    const b = buildFloor({ ...d, floor: { shape: 'rect', width: 144, length: 73 } as never, features: { ...d.features, drawers: true }, finalHeight: 30 })
     const box = b.placements.filter((q) => q.kind === 'drawer' && q.sz > 3)
     expect(box.length).toBeGreaterThan(0)
     for (const q of box) expect(b.supportHeight - (q.z + q.sz)).toBeCloseTo(6, 5)
