@@ -150,7 +150,7 @@ export default function App() {
                 </label>
                 </>)}
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onSplit={(key, mode) => setParams((q) => {
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onDrawer={(key, on) => setParams((q) => ({ ...q, drawerOff: { ...q.drawerOff, [key]: !on }, heightOption: 0 }))} onSplit={(key, mode) => setParams((q) => {
                 const next = { ...q.binSplit }
                 if (mode) next[key] = mode
                 else delete next[key]

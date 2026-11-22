@@ -306,7 +306,7 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units = 'imperial' }: { build: Build; structural?: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawer, units = 'imperial' }: { build: Build; structural?: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; onDrawer: (key: string, on: boolean) => void; units?: UnitSystem }) {
   const [binSel, setBinSel] = useState<{ cell: number; split?: 'x' | 'y'; pos: [number, number, number] } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; bin?: { cell: number; split?: 'x' | 'y' } } | null>(null)
   const ctxBin = useRef<{ cell: number; split?: 'x' | 'y' } | undefined>(undefined)
@@ -322,6 +322,10 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
   const armTimer = useRef<number | undefined>(undefined)
   const arm = (k: string) => { window.clearTimeout(armTimer.current); setArmed(k) }
   const disarm = () => { if (pull) return; window.clearTimeout(armTimer.current); armTimer.current = window.setTimeout(() => setArmed(null), 600) }
+  const [bay, setBayState] = useState<number | null>(null)
+  const bayTimer = useRef<number | undefined>(undefined)
+  const setBay = (c: number) => { window.clearTimeout(bayTimer.current); setBayState(c) }
+  const leaveBay = () => { window.clearTimeout(bayTimer.current); bayTimer.current = window.setTimeout(() => setBayState(null), 700) }
   const timer = useRef<number | undefined>(undefined)
   const setHover = (h: Hover) => { window.clearTimeout(timer.current); setHoverState(h) }
   const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHoverState(null), 700) }
@@ -425,8 +429,8 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
             p={p}
             color={binSel && p.kind === 'bin' && p.cell === binSel.cell ? '#4fa3e0' : color}
             opacity={layer.opacity}
-            onOver={pk && (p.kind === 'cutout' || p.kind === 'drawer' || p.lift !== undefined) ? () => arm(pk) : over}
-            onOut={pk && (p.kind === 'cutout' || p.kind === 'drawer' || p.lift !== undefined) ? disarm : edit ? leave : undefined}
+            onOver={pk && (p.kind === 'cutout' || p.kind === 'drawer' || p.lift !== undefined) ? () => { arm(pk); if (p.cell !== undefined && p.lift === undefined) setBay(p.cell) } : over}
+            onOut={pk && (p.kind === 'cutout' || p.kind === 'drawer' || p.lift !== undefined) ? () => { disarm(); leaveBay() } : edit ? leave : undefined}
             onDown={down}
             onClick={p.kind === 'bin' && p.cell !== undefined ? () => setBinSel({ cell: p.cell!, split: p.split, pos: [p.x + p.sx / 2, p.z + p.sz + 1, -(p.y + p.sy / 2)] }) : undefined}
             onContext={p.kind === 'bin' && p.cell !== undefined ? () => { ctxBin.current = { cell: p.cell!, split: p.split } } : undefined}
@@ -448,7 +452,27 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       ))}
-      {hover?.ghost && (
+      {L.drawers.visible && build.params.features.drawers && build.layout.cells.filter((c) => c.drawerBay).map((c) => {
+        const on = c.type === 'drawer'
+        const pull0 = pulls[`d${c.index}`] ?? 0
+        return (
+          <group key={`bay${c.index}`}>
+            {!on && (
+              <mesh position={[c.x + c.w / 2, S / 2, -(c.y + c.l / 2)]} onPointerOver={(e) => { e.stopPropagation(); setBay(c.index) }} onPointerOut={leaveBay}>
+                <boxGeometry args={[c.w, S, c.l]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              </mesh>
+            )}
+            {bay === c.index && (
+              <Html position={[c.x + c.w / 2, S * 0.85, -(c.y) + 2 + pull0]} center zIndexRange={[20, 0]}>
+                <div className="binpop" onPointerEnter={() => setBay(c.index)} onPointerLeave={leaveBay}>
+                  <button onClick={() => { onDrawer(c.key, !on); setBayState(null) }}>{on ? 'Delete drawer' : 'Add drawer'}</button>
+                </div>
+              </Html>
+            )}
+          </group>
+        )
+      })}      {hover?.ghost && (
         <mesh position={[hover.ghost.x + hover.ghost.sx / 2, hover.ghost.z + hover.ghost.sz / 2, -(hover.ghost.y + hover.ghost.sy / 2)]} raycast={() => null}>
           <boxGeometry args={[hover.ghost.sx, hover.ghost.sz, hover.ghost.sy]} />
           <meshStandardMaterial color="#2ecc71" transparent opacity={0.5} depthWrite={false} />
