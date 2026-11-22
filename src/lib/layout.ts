@@ -192,37 +192,62 @@ export function buildLayout(p: Params): Layout {
     const f = geo.front
     const drawerFront0 =
       drawers && !plain && !!f && Math.abs(rect.y - f.y) < 1e-6 && rect.x >= f.x1 - 1e-6 && rect.x + rect.w <= f.x2 + 1e-6
-    // rows between cross joists for one bay (column); each bay can carry its own count
-    const calcRows = (adj: number, col?: { x: number; w: number }) => {
+    // rows between cross joists for one bay (column). The global count (adj) spaces joists evenly; a bay's own extra
+    // joists are then added by splitting the widest cell (or removed by merging the narrowest pair), so the others stay put.
+    const calcRows = (adj: number, extra = 0, col?: { x: number; w: number }) => {
       // a bay only gets the drawer row (and its back support) when it is not under a filler
       const drawerFront = drawerFront0 && !(col && overFiller(col.x, rect.y, col.w, drawerLen))
       const rows: Section['rows'] = []
       const blockY: number[] = []
+      const evenCells = (start: number, span: number, n: number) => {
+        const cell = (span - (n - 1) * T) / n
+        return Array.from({ length: n }, (_, j) => ({ y: start + j * (cell + T), l: cell }))
+      }
+      const tweak = (cells: { y: number; l: number }[], k: number) => {
+        let out = cells
+        const start = cells[0].y
+        const span = cells[cells.length - 1].y + cells[cells.length - 1].l - start
+        for (let i = 0; i < Math.abs(k); i++) {
+          if (k > 0) {
+            let w = 0
+            out.forEach((c, j) => { if (c.l > out[w].l) w = j })
+            if (out[w].l >= 2 * cellMinY + T - 1e-9) {
+              const half = (out[w].l - T) / 2
+              out = [...out.slice(0, w), { y: out[w].y, l: half }, { y: out[w].y + half + T, l: half }, ...out.slice(w + 1)]
+            } else out = evenCells(start, span, out.length + 1)
+          } else if (out.length > 1) {
+            let m = 0
+            for (let j = 0; j + 1 < out.length; j++) if (out[j].l + out[j + 1].l < out[m].l + out[m + 1].l) m = j
+            out = [...out.slice(0, m), { y: out[m].y, l: out[m].l + T + out[m + 1].l }, ...out.slice(m + 2)]
+          }
+        }
+        return out
+      }
       if (drawerFront) {
         let dLen = drawerLen
         const remaining = rect.l - T - dLen - T
         const fitRows = Math.max(0, Math.floor((remaining + T) / (cellMinY + T) + 1e-9))
-        const nRows = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + adj) : 0
+        const n0 = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + adj) : 0
+        const nRows = n0 === 0 ? (remaining > 0 ? Math.max(0, adj + extra) : 0) : n0
         if (nRows === 0) {
           dLen = rect.l - T
           rows.push({ y: rect.y, l: dLen, drawer: true })
         } else {
           rows.push({ y: rect.y, l: dLen, drawer: true })
           blockY.push(rect.y + dLen)
-          const cellY = (remaining - (nRows - 1) * T) / nRows
-          for (let j = 0; j < nRows; j++) {
-            const y = rect.y + dLen + T + j * (cellY + T)
-            rows.push({ y, l: cellY, drawer: false })
-            if (j < nRows - 1) blockY.push(y + cellY)
-          }
+          const cells = n0 === 0 ? evenCells(rect.y + dLen + T, remaining, nRows) : tweak(evenCells(rect.y + dLen + T, remaining, n0), extra)
+          cells.forEach((c, j) => {
+            rows.push({ y: c.y, l: c.l, drawer: false })
+            if (j < cells.length - 1) blockY.push(c.y + c.l)
+          })
         }
       } else {
         const dy = divide(rect.l, cellMinY, T, T, adj)
-        for (let j = 0; j < dy.n; j++) {
-          const y = rect.y + T + j * (dy.cell + T)
-          rows.push({ y, l: dy.cell, drawer: false })
-          if (j < dy.n - 1) blockY.push(y + dy.cell)
-        }
+        const cells = tweak(evenCells(rect.y + T, rect.l - 2 * T, dy.n), extra)
+        cells.forEach((c, j) => {
+          rows.push({ y: c.y, l: c.l, drawer: false })
+          if (j < cells.length - 1) blockY.push(c.y + c.l)
+        })
       }
       return { rows, blockY }
     }
@@ -282,7 +307,7 @@ export function buildLayout(p: Params): Layout {
     }
 
     // every bay between two main joists keeps its own cross joists, so adding or removing one never touches the neighbours
-    const colData = cols.map((col, ci) => (fixed ? { rows, blockY } : calcRows(p.crossAdjust + (p.colAdjust?.[`${si}:${ci}`] ?? 0), col)))
+    const colData = cols.map((col, ci) => (fixed ? { rows, blockY } : calcRows(p.crossAdjust, p.colAdjust?.[`${si}:${ci}`] ?? 0, col)))
     sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, exact: !!exact, fixed: !!fixed, applied })
     cols.forEach((col, ci) => {
       colData[ci].rows.forEach((row, ri) => {

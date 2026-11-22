@@ -361,6 +361,14 @@ describe('drawer back support stays in drawer bays', () => {
 })
 
 describe('per-bay cross joists', () => {
+  it('adding one joist keeps the existing joists where they are', () => {
+    const p = { ...defaultParams(), crossAdjust: -3 }
+    p.floor = { ...p.floor, length: 120 }
+    const a = buildFloor(p).layout.sections[0].colBlocks[1]
+    const b = buildFloor({ ...p, colAdjust: { '0:1': 1 } }).layout.sections[0].colBlocks[1]
+    expect(b.length).toBe(a.length + 1)
+    a.forEach((y) => expect(b.some((v) => Math.abs(v - y) < 1e-6)).toBe(true))
+  })
   it('adding or removing a cross joist only changes its own bay; main joists stay continuous', () => {
     const p = defaultParams()
     const a = buildFloor(p).layout.sections[0]
