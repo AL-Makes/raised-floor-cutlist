@@ -230,7 +230,7 @@ export function buildFloor(input: Params): Build {
       const t = sec.joistT[k]
       const drawerJoist = !rim && sec.drawerFront
       const jy = rim || sec.drawerFront ? rect.y : rect.y + frontT
-      const jl = rim ? rect.l + endExtra(k) : drawerJoist ? rect.l - T : rect.l - frontT - T
+      const jl = rim ? rect.l + endExtra(k) : drawerJoist ? rect.l : rect.l - frontT - T
       placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: drawerJoist ? depth - 1.5 : depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
@@ -246,11 +246,11 @@ export function buildFloor(input: Params): Build {
     const jname = builtup ? 'Joist' : `Joist (${jointKey} on edge)`
     rimLens.forEach((len) => member(jname, 1, len))
     if (sec.drawerFront) {
-      if (drawerIdx.length) member(jname + ' (drawer support, front face to back rim)', drawerIdx.length * mult, rect.l - T)
+      if (drawerIdx.length) member(jname + ' (drawer support, front face to back rim)', drawerIdx.length * mult, rect.l)
     } else if (divTotal > 0) member(jname + ' (interior, between front & back rims)', divTotal * mult, rect.l - frontT - T)
     if (drawerIdx.length) {
       const dTotal = drawerIdx.length
-      const capL = rect.l - T - 3.5
+      const capL = rect.l - 3.5
       drawerIdx.forEach((k) => {
         const jx = sec.joistX[k]
         placements.push({ kind: 'header', x: jx + sec.joistT[k] / 2 - 1.75, y: rect.y + 3.5, z: S - 1.5, sx: 3.5, sy: capL, sz: 1.5 })
@@ -268,10 +268,14 @@ export function buildFloor(input: Params): Build {
     const endL = sharedEdge ? 0 : sec.joistT[0]
     const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
-    const runPieces = (): { x: number; len: number }[] => {
+    const runPieces = (between = false): { x: number; len: number }[] => {
       const x0 = rect.x + endL
       const segs: number[][] = []
-      if (innerW <= MAX_RUN + 0.01) segs.push([0, innerW])
+      if (between && drawerIdx.length) {
+        let st = 0
+        for (const k of drawerIdx) { const a = sec.joistX[k] - x0; if (a > st + 0.01) segs.push([st, a]); st = a + sec.joistT[k] }
+        if (innerW > st + 0.01) segs.push([st, innerW])
+      } else if (innerW <= MAX_RUN + 0.01) segs.push([0, innerW])
       else {
         const cuts = sec.joistX.slice(1, -1).map((jx, i) => jx + sec.joistT[i + 1] / 2 - x0)
         let start = 0
@@ -286,15 +290,15 @@ export function buildFloor(input: Params): Build {
         return Array.from({ length: nP }, (_, k) => ({ x: a + (k * (b - a)) / nP, len: (b - a) / nP }))
       })
     }
-    const splitRun = (name: string, pk: number, mk: (nm: string, q: number, len: number, pk: number) => void) => {
-      const pcs = runPieces()
+    const splitRun = (name: string, pk: number, mk: (nm: string, q: number, len: number, pk: number) => void, between = false) => {
+      const pcs = runPieces(between)
       pcs.forEach((pc) => mk(pcs.length > 1 ? name + ' (spliced over a joist)' : name, 1, pc.len, pk))
     }
-    const pushRun = (kind: string, y: number, z: number, sy: number, sz: number) => {
-      runPieces().forEach((pc) => placements.push({ kind, x: rect.x + endL + pc.x, y, z, sx: pc.len, sy, sz } as never))
+    const pushRun = (kind: string, y: number, z: number, sy: number, sz: number, between = false) => {
+      runPieces(between).forEach((pc) => placements.push({ kind, x: rect.x + endL + pc.x, y, z, sx: pc.len, sy, sz } as never))
     }
-    pushRun('rim', backY, bu, T, depth)
-    splitRun('Back rim (between end joists)', 4, member)
+    pushRun('rim', backY, bu, T, depth, true)
+    splitRun('Back rim (between end joists)', 4, member, true)
     if (sec.drawerFront) {
       pushRun('header', rect.y, S - 1.5, 3.5, 1.5)
       splitRun('Drawer header (2x4 laid flat)', 4, (nm, q, len, pk) => lumber('Frame', nm, '2x4', q, len, 3.5, 1.5, 'Sits flush under deck at the front opening', pk))
