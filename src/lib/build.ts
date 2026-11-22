@@ -263,8 +263,9 @@ export function buildFloor(input: Params): Build {
       const frames: { x: number; w: number }[] = []
       for (let k = 0; k < n - 1; k++) {
         const x0 = sec.joistX[k] + sec.joistT[k]
-        const w = sec.joistX[k + 1] - x0
-        if (w > 0.5 && !dCells.some((c) => Math.abs(c.x - x0) < 0.1)) frames.push({ x: x0, w })
+        const xs = k === 0 && sharedEdge ? rect.x : x0
+        const w = sec.joistX[k + 1] - xs
+        if (w > 0.5 && !dCells.some((c) => Math.abs(c.x - x0) < 0.1)) frames.push({ x: xs, w })
       }
       const vh = Math.max(0.5, S - 1.5 - 1.5)
       frames.forEach((fr) => {
