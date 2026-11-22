@@ -64,7 +64,7 @@ export function divide(total: number, cellMin: number, dividerT: number, rimT = 
 
 /** Ready-made rolling box: long side runs along the joists so it pulls out toward the front. */
 export function rollingAxes(p: Pick<Params, 'rollingBox'>): { rx: number; ry: number } {
-  return { rx: Math.min(p.rollingBox.w, p.rollingBox.d), ry: Math.max(p.rollingBox.w, p.rollingBox.d) }
+  return { rx: Math.max(p.rollingBox.w, p.rollingBox.d), ry: Math.min(p.rollingBox.w, p.rollingBox.d) }
 }
 
 export function buildLayout(p: Params): Layout {

@@ -285,7 +285,7 @@ describe('dragging walls and ready-made drawers', () => {
     const base = defaultParams()
     const p = { ...base, finalHeight: 20, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const, rollingBox: { id: 'x', w: 24, d: 36, h: 8 } }
     const lay = buildLayout(p)
-    expect(lay.cellMinX).toBeCloseTo(24 + p.clearance)
+    expect(lay.cellMinX).toBeCloseTo(36 + p.clearance)
     const b = buildFloor(p)
     expect(b.parts.some((x) => x.name === 'Drawer side')).toBe(false)
     expect(b.hardware.some((h) => /rolling box/i.test(h.name))).toBe(true)
