@@ -207,8 +207,8 @@ export function buildFloor(input: Params): Build {
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       const t = sec.joistT[k]
-      const jy = rim ? rect.y : rect.y + frontT
-      const jl = rim ? rect.l : rect.l - frontT - T
+      const jy = rect.y + frontT
+      const jl = rect.l - frontT - T
       placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
@@ -221,26 +221,24 @@ export function buildFloor(input: Params): Build {
     crossLines += Math.max(0, ...sec.colBlocks.map((b) => b.length))
     supportPads += p.supportCount > 1 ? (rimCount + divTotal * mult) * p.supportCount : 0
     const jname = builtup ? 'Joist' : `Joist (${jointKey} on edge)`
-    member(jname, rimCount, rect.l)
-    if (divTotal > 0) member(jname + ' (interior, between front & back rims)', divTotal * mult, rect.l - frontT - T)
+    member(jname, rimCount + divTotal * mult, rect.l - frontT - T)
     for (const l of layers) {
       const qty = rimCount + divTotal * mult
       if (l.material.startsWith('ply-strip')) sheet('Frame', `Build-up strip (${l.name})`, l.t, qty, rect.l, 3.5, 'Glue + screw under each joist')
       else lumber('Frame', `Build-up strip (${l.name})`, l.material, qty, rect.l, 3.5, l.t, 'Glue + screw under each joist')
     }
 
-    const nJ = sec.joistX.length
-    const endL = sec.joistT[0]
-    const innerW = rect.w - endL - sec.joistT[nJ - 1]
+    const endL = 0
+    const innerW = rect.w
     const backY = rect.y + rect.l - T
     placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
-    member('Back rim (between end joists)', 1, innerW, 4)
+    member('Back rim (full width)', 1, innerW, 4)
     if (sec.drawerFront) {
       placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
       lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
     } else {
       placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
-      member('Front rim (between end joists)', 1, innerW, 4)
+      member('Front rim (full width)', 1, innerW, 4)
     }
     sec.cols.forEach((col, ci) => {
       sec.colBlocks[ci].forEach((by, bk) => {
