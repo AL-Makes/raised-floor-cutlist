@@ -87,6 +87,8 @@ export interface Params {
   secAdjust?: Record<number, { x: number; y: number }>
   /** per-bay extra cross joists, keyed section:column; main joists stay continuous */
   colAdjust?: Record<string, number>
+  /** bin cells split into two smaller bins, keyed by cell key; x = side by side, y = one behind the other */
+  binSplit?: Record<string, 'x' | 'y'>
   /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
   moves: Record<string, number>
   tatamiPattern: TatamiPatternId
@@ -146,6 +148,8 @@ export interface Placement {
   sy: number
   sz: number
   cell?: number
+  /** this bin is half of a split bin */
+  split?: 'x' | 'y'
   /** movable joist: section, axis the joist is moved along, and index within the section */
   ref?: { s: number; axis: 'x' | 'y'; k: number; c?: number }
 }

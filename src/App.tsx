@@ -147,7 +147,12 @@ export default function App() {
                 </label>
                 </>)}
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d, s, c) => setParams((q) => {
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onSplit={(key, mode) => setParams((q) => {
+                const next = { ...q.binSplit }
+                if (mode) next[key] = mode
+                else delete next[key]
+                return { ...q, binSplit: next }
+              })} onAdjust={(kind, d, s, c) => setParams((q) => {
                 if (kind === 'joist') {
                   const cur = q.secAdjust?.[s] ?? { x: 0, y: 0 }
                   return { ...q, secAdjust: { ...q.secAdjust, [s]: { ...cur, x: cur.x + d } }, moves: {} }

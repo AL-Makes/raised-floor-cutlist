@@ -118,13 +118,14 @@ function DragController({ drag, onMove, onEnd }: { drag: Drag | null; onMove: (k
   return null
 }
 
-function Box({ p, color, opacity = 1, onOver, onOut, onDown }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void }) {
+function Box({ p, color, opacity = 1, onOver, onOut, onDown, onClick }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void; onClick?: () => void }) {
   return (
     <mesh
       position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}
       onPointerOver={onOver ? (e) => { e.stopPropagation(); onOver() } : undefined}
       onPointerOut={onOut}
       onPointerDown={onDown ? (e) => { e.stopPropagation(); onDown(e.point) } : undefined}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
       renderOrder={opacity < 1 ? 5 : 0}
     >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
@@ -216,7 +217,8 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSplit, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number, s: number, c: number) => void; onMove: (key: string, v: number) => void; onSplit: (key: string, mode: 'x' | 'y' | null) => void; units?: UnitSystem }) {
+  const [binSel, setBinSel] = useState<{ cell: number; split?: 'x' | 'y'; pos: [number, number, number] } | null>(null)
   const [hover, setHoverState] = useState<Hover | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const endDrag = useMemo(() => () => setDrag(null), [])
@@ -279,11 +281,12 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
           <Box
             key={i}
             p={p}
-            color={color}
+            color={binSel && p.kind === 'bin' && p.cell === binSel.cell ? '#4fa3e0' : color}
             opacity={layer.opacity}
             onOver={over}
             onOut={edit ? leave : undefined}
             onDown={down}
+            onClick={p.kind === 'bin' && p.cell !== undefined ? () => setBinSel({ cell: p.cell!, split: p.split, pos: [p.x + p.sx / 2, p.z + p.sz + 1, -(p.y + p.sy / 2)] }) : undefined}
           />
         )
       })}
@@ -308,6 +311,27 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
           <meshStandardMaterial color="#2ecc71" transparent opacity={0.5} depthWrite={false} />
         </mesh>
       )}
+      {binSel && (() => {
+        const cell = build.layout.cells[binSel.cell]
+        if (!cell) return null
+        const half = (n: number) => (n - 0.5) / 2 >= 4
+        const go = (m: 'x' | 'y' | null) => { onSplit(cell.key, m); setBinSel(null) }
+        return (
+          <Html position={binSel.pos} center zIndexRange={[20, 0]}>
+            <div className="binpop">
+              {binSel.split ? (
+                <button onClick={() => go(null)}>Recombine</button>
+              ) : (
+                <>
+                  <button disabled={!half(build.layout.binX)} title="Two bins side by side" onClick={() => go('x')}>Split ↔</button>
+                  <button disabled={!half(build.layout.binY)} title="Two bins one behind the other" onClick={() => go('y')}>Split ↕</button>
+                </>
+              )}
+              <button onClick={() => setBinSel(null)}>×</button>
+            </div>
+          </Html>
+        )
+      })()}
       {hover && (
         <Html position={hover.pos} center zIndexRange={[20, 0]}>
           <div className="jhit" onPointerEnter={keep} onPointerLeave={leave} onClick={() => act(hover)}>

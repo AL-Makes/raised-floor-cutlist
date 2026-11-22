@@ -10,6 +10,7 @@ import type { FloorSpec, Params, Part, Placement, Rect } from './types'
 /** Structural plywood, roughly 34 lb per cubic foot. */
 const PLY_LB_PER_IN3 = 34 / 1728
 const LIFT_DEPTH = 8
+const MIN_SPLIT = 4
 
 function subtractRect(q: Placement, z: Rect): Placement[] {
   const out: Placement[] = []
@@ -267,26 +268,29 @@ export function buildFloor(input: Params): Build {
     heaviest = Math.max(heaviest, q.w * q.l * ply * PLY_LB_PER_IN3 * (under ? 2 : 1))
   }
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
-  let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY, 0)
+  const splitMode = (c: { key: string }) => {
+    const m = p.binSplit?.[c.key]
+    return m === 'x' && (layout.binX - 0.5) / 2 >= MIN_SPLIT ? 'x' : m === 'y' && (layout.binY - 0.5) / 2 >= MIN_SPLIT ? 'y' : undefined
+  }
+  let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY * (c.type !== 'service' && splitMode(c) ? 2 : 1), 0)
 
   const slotPos = (start: number, size: number, n: number, item: number, k: number) => start + (size / n) * k + (size / n - item) / 2
+  // one bin footprint, or two half-size bins when the cell is split
+  const pushBin = (c: { key: string; index: number }, x: number, y: number, z: number) => {
+    const mode = splitMode(c)
+    const base: Placement = { kind: 'bin', x, y, z, sx: layout.binX, sy: layout.binY, sz: p.bin.h, cell: c.index }
+    if (!mode) return placements.push(base)
+    const hx = mode === 'x' ? (layout.binX - 0.5) / 2 : layout.binX
+    const hy = mode === 'y' ? (layout.binY - 0.5) / 2 : layout.binY
+    placements.push({ ...base, sx: hx, sy: hy, split: mode })
+    placements.push({ ...base, x: mode === 'x' ? x + layout.binX - hx : x, y: mode === 'y' ? y + layout.binY - hy : y, sx: hx, sy: hy, split: mode })
+  }
   layout.cells.forEach((c) => {
     if (c.type === 'bin') {
       for (let ix = 0; ix < c.binsX; ix++)
-        for (let iy = 0; iy < c.binsY; iy++)
-          placements.push({
-            kind: 'bin',
-            x: slotPos(c.x, c.w, c.binsX, layout.binX, ix),
-            y: slotPos(c.y, c.l, c.binsY, layout.binY, iy),
-            z: 0,
-            sx: layout.binX,
-            sy: layout.binY,
-            sz: p.bin.h,
-            cell: c.index,
-          })
+        for (let iy = 0; iy < c.binsY; iy++) pushBin(c, slotPos(c.x, c.w, c.binsX, layout.binX, ix), slotPos(c.y, c.l, c.binsY, layout.binY, iy), 0)
     }
   })
-
   const boxT = DRAWER_WALL
   let slides = 0
   if (readyDrawers) {
@@ -313,16 +317,7 @@ export function buildFloor(input: Params): Build {
       placements.push({ kind: 'drawer', x: c.x + DRAWER_SLIDE, y: c.y + DRAWER_FACE_T, z: 0.5, sx: boxW, sy: boxLen, sz: boxH, cell: c.index })
       placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
       for (let ix = 0; ix < c.binsX; ix++)
-        placements.push({
-          kind: 'bin',
-          x: slotPos(c.x + DRAWER_SLIDE, boxW, c.binsX, layout.binX, ix),
-          y: c.y + DRAWER_FACE_T + (boxLen - layout.binY) / 2,
-          z: 0.5 + boxT,
-          sx: layout.binX,
-          sy: layout.binY,
-          sz: p.bin.h,
-          cell: c.index,
-        })
+        pushBin(c, slotPos(c.x + DRAWER_SLIDE, boxW, c.binsX, layout.binX, ix), c.y + DRAWER_FACE_T + (boxLen - layout.binY) / 2, 0.5 + boxT)
     }
   }
 
@@ -456,6 +451,8 @@ export function buildFloor(input: Params): Build {
   }
   if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `Needs about ${LIFT_DEPTH}" of depth below the deck for the retracted table and motor, plus a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
+  const smallBins = placements.filter((q) => q.kind === 'bin' && q.split)
+  if (smallBins.length) hardware.push({ name: `Smaller bins, about ${r3(smallBins[0].sx)}" x ${r3(smallBins[0].sy)}" x ${r3(p.bin.h)}" (purchased; sized to fit)`, qty: smallBins.length, unit: 'pcs', notes: 'Split bins: pick the nearest IKEA size that fits each half' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })
   if (accessCount) hardware.push({ name: 'Recessed finger pulls', qty: accessCount, unit: 'pcs' })
   if (serviceCells.length) hardware.push({ name: 'Cable pass-through grommets 1-1/2"', qty: cableHoles, unit: 'pcs', notes: 'Drill through joists / blocks to form a continuous cable chase from wall outlets to TV stand, table and heater' })
