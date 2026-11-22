@@ -22,7 +22,7 @@ export interface ViewOptions {
 export const LAYER_LABELS: Record<LayerKey, string> = {
   tatami: 'Tatami layer',
   deck: 'Plywood layer',
-  side: 'Side panels / trim / drawer faces',
+  side: 'Side panels / trim',
   cross: 'Cross joists (side to side)',
   joists: 'Main joists (front to back)',
   frame: 'Rims & headers',
@@ -53,13 +53,13 @@ export const defaultView = (): ViewOptions => ({
 
 function layerOf(kind: string): LayerKey {
   if (kind === 'deck' || kind === 'hatch') return 'deck'
-  if (kind === 'trim' || kind === 'drawerFace') return 'side'
+  if (kind === 'trim') return 'side'
   if (kind === 'joist' || kind === 'buildup') return 'joists'
   if (kind === 'block') return 'cross'
   if (kind === 'lift') return 'lift'
   if (kind === 'service') return 'cross'
   if (kind === 'bin') return 'bins'
-  if (kind === 'drawer') return 'drawers'
+  if (kind === 'drawer' || kind === 'drawerFace') return 'drawers'
   if (kind === 'underlay') return 'underlay'
   return 'frame'
 }
