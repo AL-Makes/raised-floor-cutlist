@@ -305,7 +305,8 @@ describe('dragging walls and ready-made drawers', () => {
     const d = b.placements.find((q) => q.kind === 'drawer')!
     const f = b.placements.find((q) => q.kind === 'drawerFace')!
     const hdr = b.placements.find((q) => q.kind === 'header')
-    expect(f.z + f.sz).toBeCloseTo(b.supportHeight - 0.125)
+    expect(hdr!.y).toBeCloseTo(f.y)
+    expect(f.z + f.sz).toBeLessThanOrEqual(hdr!.z)
     expect(hdr!.z - (d.z + d.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
   })
   it('sizes joist spacing from an IKEA rolling box and drops the drawer cut parts', () => {

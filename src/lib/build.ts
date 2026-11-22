@@ -211,7 +211,7 @@ export function buildFloor(input: Params): Build {
   layout.sections.forEach((sec) => {
     const { rect } = sec
     const n = sec.joistX.length
-    const frontT = sec.drawerFront ? 3.5 + DRAWER_FACE_T : T
+    const frontT = sec.drawerFront ? 3.5 : T
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       const t = sec.joistT[k]
@@ -244,7 +244,7 @@ export function buildFloor(input: Params): Build {
     placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
     member('Back rim (between end joists)', 1, innerW, 4)
     if (sec.drawerFront) {
-      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y + DRAWER_FACE_T, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
+      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
       lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
     } else {
       placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
@@ -312,15 +312,15 @@ export function buildFloor(input: Params): Build {
   let slides = 0
   if (readyDrawers) {
     const { rx, ry } = rollingAxes(p)
-    const faceH = S - 0.25
+    const faceH = S - 1.5 - 0.25
     for (const c of drawerCells) {
       sheet('Drawers', 'Drawer false front (screws to the IKEA box)', DRAWER_FACE_T, 1, c.w - 0.25, faceH, 'Screw from inside of the IKEA box front')
       placements.push({ kind: 'drawer', x: c.x + (c.w - rx) / 2, y: c.y + DRAWER_FACE_T, z: 0.25, sx: rx, sy: ry, sz: p.rollingBox.h, cell: c.index })
       placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: DRAWER_FACE_T, sz: faceH, cell: c.index })
     }
   } else if (p.features.drawers) {
-    const faceH = S - 0.25
-    const boxH = S - 3
+    const faceH = S - 1.5 - 0.25
+    const boxH = faceH - 1.25
     for (const c of drawerCells) {
       const boxW = c.w - 2 * DRAWER_SLIDE
       const boxL = layout.binY + p.clearance + 2 * boxT
