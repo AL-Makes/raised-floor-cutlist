@@ -261,7 +261,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, unit
           ? (pt: { x: number; y: number; z: number }) => {
               setHoverState(null)
               const r = p.ref!
-              setDrag({ ref: r, start: r.axis === 'x' ? pt.x : -pt.z, base: build.params.moves?.[`${r.s}:${r.axis}:${r.k}`] ?? 0, planeY: pt.y })
+              setDrag({ ref: r, start: r.axis === 'x' ? pt.x : -pt.z, base: build.layout.sections[r.s]?.applied[`${r.s}:${r.axis}:${r.k}`] ?? 0, planeY: pt.y })
             }
           : undefined
         if (build.params.joistStyle === 'builtup' && (p.kind === 'joist' || p.kind === 'rim' || p.kind === 'block') && p.sz >= 3.2) {

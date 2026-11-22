@@ -28,6 +28,8 @@ export interface Section {
   drawerFront: boolean
   /** true when main joist positions are dictated by drawer widths */
   exact: boolean
+  /** joist offsets actually applied after clamping, keyed like Params.moves */
+  applied: Record<string, number>
 }
 
 export interface Layout {
@@ -182,6 +184,7 @@ export function buildLayout(p: Params): Layout {
     }
 
     const mv = p.moves ?? {}
+    const applied: Record<string, number> = {}
     // manual joist moves: shift a joist, clamp so neighbours keep a full cell, then rebuild the cells between joists
     const lowK = drawerFront ? 1 : 0
     if (blockY.some((_, k) => k >= lowK && mv[`${si}:y:${k}`])) {
@@ -192,6 +195,7 @@ export function buildLayout(p: Params): Layout {
         const lo = prevEdge + cellMinY
         const hi = (k + 1 < base.length ? base[k + 1] : end) - T - cellMinY
         blockY[k] = Math.min(Math.max(base[k] + (mv[`${si}:y:${k}`] ?? 0), lo), Math.max(lo, hi))
+        applied[`${si}:y:${k}`] = blockY[k] - base[k]
       }
       rows.length = 0
       let start = rect.y + T
@@ -213,6 +217,7 @@ export function buildLayout(p: Params): Layout {
         const lo = joistX[k - 1] + joistT[k - 1] + cellMinX
         const hi = base[k + 1] - joistT[k] - cellMinX
         joistX[k] = Math.min(Math.max(base[k] + (mv[`${si}:x:${k}`] ?? 0), lo), Math.max(lo, hi))
+        applied[`${si}:x:${k}`] = joistX[k] - base[k]
       }
       joistX[last] = end
       cols.length = 0
@@ -222,7 +227,7 @@ export function buildLayout(p: Params): Layout {
       }
     }
 
-    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact })
+    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact, applied })
     for (const row of rows) {
       for (const col of cols) {
         const type = row.drawer ? 'drawer' : 'bin'
