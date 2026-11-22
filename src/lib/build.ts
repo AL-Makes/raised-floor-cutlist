@@ -203,13 +203,16 @@ export function buildFloor(input: Params): Build {
   layout.sections.forEach((sec) => {
     const { rect } = sec
     const n = sec.joistX.length
+    const frontT = sec.drawerFront ? 3.5 : T
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       const t = sec.joistT[k]
-      placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: rect.y, z: bu, sx: t, sy: rect.l, sz: depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
-      if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: rect.y, z: 0, sx: t, sy: rect.l, sz: bu })
-      joistLf += rect.l / 12
-      deckScrewLen += rect.l
+      const jy = rim ? rect.y : rect.y + frontT
+      const jl = rim ? rect.l : rect.l - frontT - T
+      placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
+      if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
+      joistLf += jl / 12
+      deckScrewLen += jl
     })
     const rimCount = 2
     const divTotal = sec.joistX.length - 2
@@ -217,7 +220,9 @@ export function buildFloor(input: Params): Build {
     joistCount += rimCount + divTotal * mult
     crossLines += Math.max(0, ...sec.colBlocks.map((b) => b.length))
     supportPads += p.supportCount > 1 ? (rimCount + divTotal * mult) * p.supportCount : 0
-    member(builtup ? 'Joist' : `Joist (${jointKey} on edge)`, rimCount + divTotal * mult, rect.l)
+    const jname = builtup ? 'Joist' : `Joist (${jointKey} on edge)`
+    member(jname, rimCount, rect.l)
+    if (divTotal > 0) member(jname + ' (interior, between front & back rims)', divTotal * mult, rect.l - frontT - T)
     for (const l of layers) {
       const qty = rimCount + divTotal * mult
       if (l.material.startsWith('ply-strip')) sheet('Frame', `Build-up strip (${l.name})`, l.t, qty, rect.l, 3.5, 'Glue + screw under each joist')
@@ -225,22 +230,18 @@ export function buildFloor(input: Params): Build {
     }
 
     const nJ = sec.joistX.length
+    const endL = sec.joistT[0]
+    const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
-    for (let k = 0; k < nJ - 1; k++) {
-      const x0 = sec.joistX[k] + sec.joistT[k]
-      const w = sec.joistX[k + 1] - x0
-      if (w < 0.1) continue
-      placements.push({ kind: 'rim', x: x0, y: backY, z: bu, sx: w, sy: T, sz: depth })
-      member('Back rim (between joists)', 1, w, 4)
-      if (sec.drawerFront) {
-        placements.push({ kind: 'header', x: x0, y: rect.y, z: S - 1.5, sx: w, sy: 3.5, sz: 1.5 })
-        lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, w, 3.5, 1.5, 'Sits flush under deck at the front opening, between joists', 4)
-      } else {
-        placements.push({ kind: 'rim', x: x0, y: rect.y, z: bu, sx: w, sy: T, sz: depth })
-        member('Front rim (between joists)', 1, w, 4)
-      }
+    placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
+    member('Back rim (between end joists)', 1, innerW, 4)
+    if (sec.drawerFront) {
+      placements.push({ kind: 'header', x: rect.x + endL, y: rect.y, z: S - 1.5, sx: innerW, sy: 3.5, sz: 1.5 })
+      lumber('Frame', 'Drawer header (2x4 laid flat)', '2x4', 1, innerW, 3.5, 1.5, 'Sits flush under deck at the front opening', 4)
+    } else {
+      placements.push({ kind: 'rim', x: rect.x + endL, y: rect.y, z: bu, sx: innerW, sy: T, sz: depth })
+      member('Front rim (between end joists)', 1, innerW, 4)
     }
-
     sec.cols.forEach((col, ci) => {
       sec.colBlocks[ci].forEach((by, bk) => {
         placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth, ref: sec.colRows[ci]?.[0]?.drawer && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk, c: ci } })
