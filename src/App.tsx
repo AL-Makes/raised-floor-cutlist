@@ -14,11 +14,36 @@ import './App.css'
 
 type Tab = '3d' | 'tatami' | 'cut' | 'load'
 
+const STORE = 'raised-floor-cutlist:v1'
+function loadSaved(): { params?: Partial<Params>; units?: UnitSystem; tab?: Tab; view?: Partial<ViewOptions> } {
+  try {
+    return JSON.parse(localStorage.getItem(STORE) ?? '{}') ?? {}
+  } catch {
+    return {}
+  }
+}
+
 export default function App() {
-  const [params, setParams] = useState<Params>(defaultParams)
-  const [units, setUnits] = useState<UnitSystem>('imperial')
-  const [tab, setTab] = useState<Tab>('3d')
-  const [view, setView] = useState<ViewOptions>(defaultView)
+  const [saved] = useState(loadSaved)
+  const [params, setParams] = useState<Params>(() => {
+    const d = defaultParams()
+    return { ...d, ...saved.params, features: { ...d.features, ...saved.params?.features } }
+  })
+  const [units, setUnits] = useState<UnitSystem>(saved.units ?? 'imperial')
+  const [tab, setTab] = useState<Tab>(saved.tab ?? '3d')
+  const [view, setView] = useState<ViewOptions>(() => {
+    const d = defaultView()
+    const layers = { ...d.layers }
+    for (const k of Object.keys(layers) as LayerKey[]) layers[k] = { ...layers[k], ...saved.view?.layers?.[k] }
+    return { ...d, ...saved.view, layers }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({ params, units, tab, view }))
+    } catch {
+      /* storage unavailable */
+    }
+  }, [params, units, tab, view])
   const setLayer = (k: LayerKey, patch: Partial<Layer>) =>
     setView((v) => ({ ...v, layers: { ...v.layers, [k]: { ...v.layers[k], ...patch } } }))
 
