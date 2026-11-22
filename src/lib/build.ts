@@ -320,14 +320,19 @@ export function buildFloor(input: Params): Build {
       binCount -= c.binsX * c.binsY
       const boxW = c.w - 2 * DRAWER_SIDE_GAP
       const boxLen = Math.max(1, c.l - bt - DRAWER_BACK_GAP)
-      const wall = boxH - bt
-      sheet('Drawers', 'Drawer side', bt, 2, boxLen, wall, 'Screw + glue to front/back; sits on the bottom')
-      sheet('Drawers', 'Drawer front/back', bt, 2, boxW - 2 * bt, wall, 'Screw + glue between the sides')
-      sheet('Drawers', 'Drawer bottom', bt, 1, boxW, boxLen, 'Screw + glue under the box walls; casters mount below')
-      sheet('Drawers', 'Drawer face', bt, 1, c.w - 0.25, faceH, 'Screw from inside the drawer front; 1/8" gap each side')
+      const L = boxLen + bt
+      const bx = c.x + DRAWER_SIDE_GAP
+      sheet('Drawers', 'Drawer side', bt, 2, L, boxH, 'Full length: overlaps the ends of the front and back; screw + glue through the side into their end grain')
+      sheet('Drawers', 'Drawer front/back', bt, 2, boxW - 2 * bt, boxH, 'Fits between the sides. The front is screwed through from behind into the fascia cut-out piece')
+      sheet('Drawers', 'Drawer bottom', bt, 1, boxW - 2 * bt, L - 2 * bt, 'Sits inside all four walls, flush with their bottom edges; screw + glue. Casters mount underneath')
       casters += 4
-      placements.push({ kind: 'drawer', x: c.x + DRAWER_SIDE_GAP, y: c.y + bt, z: caster, sx: boxW, sy: boxLen, sz: boxH, cell: c.index })
-      placements.push({ kind: 'drawerFace', x: c.x + 0.125, y: c.y, z: 0.125, sx: c.w - 0.25, sy: bt, sz: faceH, cell: c.index })
+      const mk = (x: number, y: number, sx: number, sy: number, z: number, sz: number): Placement => ({ kind: 'drawer', x, y, z, sx, sy, sz, cell: c.index })
+      placements.push(mk(bx, c.y, bt, L, caster, boxH), mk(bx + boxW - bt, c.y, bt, L, caster, boxH))
+      placements.push(mk(bx + bt, c.y, boxW - 2 * bt, bt, caster, boxH), mk(bx + bt, c.y + L - bt, boxW - 2 * bt, bt, caster, boxH))
+      placements.push(mk(bx + bt, c.y + bt, boxW - 2 * bt, L - 2 * bt, caster, bt))
+      for (const wx of [bx + bt + 0.5, bx + boxW - bt - 1.3]) for (const wy of [c.y + bt + 1.5, c.y + L - bt - 3.5]) {
+        placements.push({ kind: 'wheel', x: wx, y: wy, z: 0, sx: 0.8, sy: Math.min(2, caster), sz: caster, cell: c.index })
+      }
       const sec = layout.sections[c.section]
       const kl = sec.joistX.findIndex((jx, k) => Math.abs(jx + sec.joistT[k] - c.x) < 0.05)
       const px0 = kl >= 0 ? sec.joistX[kl] + sec.joistT[kl] / 2 : c.x - T / 2
@@ -392,6 +397,7 @@ export function buildFloor(input: Params): Build {
         plain(cursor, a0)
         const ow = b.x1 - b.x0
         sheet('Edge trim', 'Front fascia piece with drawer opening', th, 1, a1 - a0, fullH, `Joist centre to joist centre. Cut an opening ${r3(ow)}" wide x ${r3(b.top)}" tall from the bottom edge, 1/2" beyond the drawer face each side and 1/2" above it`)
+        sheet('Edge trim', 'Drawer front (cut-out piece of the fascia)', th, 1, ow, b.top, 'The piece cut from the fascia opening IS the drawer front: screw it to the front of the drawer box, 1/2" reveal around it')
         placements.push({ ...base, kind: 'cutout', x: b.x0, sx: ow, sz: b.top, cell: b.cell })
         if (b.x0 > a0 + 1e-6) placements.push({ ...base, x: a0, sx: b.x0 - a0 })
         if (b.top < fullH - 1e-6) placements.push({ ...base, x: b.x0, sx: ow, z: b.top, sz: fullH - b.top })

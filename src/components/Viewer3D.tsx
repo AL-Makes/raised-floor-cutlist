@@ -59,7 +59,7 @@ function layerOf(kind: string): LayerKey {
   if (kind === 'lift') return 'lift'
   if (kind === 'service') return 'cross'
   if (kind === 'bin') return 'bins'
-  if (kind === 'drawer' || kind === 'drawerFace') return 'drawers'
+  if (kind === 'drawer' || kind === 'wheel') return 'drawers'
   if (kind === 'underlay') return 'underlay'
   return 'frame'
 }
@@ -73,7 +73,7 @@ const COLORS: Record<string, string> = {
   hatch: '#9ccf8f',
   service: '#e0a030',
   drawer: '#9fb8c8',
-  drawerFace: '#7da2bd',
+  wheel: '#2b2b2b',
   bin: '#3a7bd5',
   trim: '#d9c3a0',
   cutout: '#d9c3a0',
@@ -185,6 +185,16 @@ function CamCmd({ cmd, target, span }: { cmd: { current: ((v: string) => void) |
     controls?.update()
   }
   return null
+}
+
+function Wheel({ p }: { p: Placement }) {
+  const r = p.sz / 2
+  return (
+    <mesh position={[p.x + p.sx / 2, p.z + r, -(p.y + p.sy / 2)]} rotation={[0, 0, Math.PI / 2]}>
+      <cylinderGeometry args={[r, r, p.sx, 20]} />
+      <meshStandardMaterial color={COLORS.wheel} />
+    </mesh>
+  )
 }
 
 function Box({ p, color, opacity = 1, edge = '#3b2a14', onOver, onOut, onDown, onClick, onContext }: { p: Placement; color: string; opacity?: number; edge?: string; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void; onClick?: () => void; onContext?: () => void }) {
@@ -328,7 +338,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
   const memberOf = new Map(members.filter((m) => m.kind !== 'pad').map((m) => [m.index, m]))
   const L = opts.layers
   const front = g.front
-  const pullKey = (p: Placement) => (p.lift !== undefined ? `l${p.lift}` : (p.kind === 'drawer' || p.kind === 'drawerFace' || p.kind === 'cutout') && p.cell !== undefined ? `d${p.cell}` : undefined)
+  const pullKey = (p: Placement) => (p.lift !== undefined ? `l${p.lift}` : (p.kind === 'drawer' || p.kind === 'wheel' || p.kind === 'cutout') && p.cell !== undefined ? `d${p.cell}` : undefined)
   const placed = build.placements.map((p) => {
     const k = pullKey(p)
     const v = k ? pulls[k] ?? 0 : 0
@@ -342,10 +352,13 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
       if (!top) return null
       return { dir: 'up' as const, max: 24, anchor: [top.x + top.sx / 2, top.z + top.sz + 1, -(top.y + top.sy / 2)] as [number, number, number] }
     }
-    const face = mine.find((p) => p.kind === 'drawerFace')
-    const box = mine.find((p) => p.kind === 'drawer')
-    if (!face || !box) return null
-    return { dir: 'out' as const, max: box.sy, anchor: [face.x + face.sx / 2, face.z + face.sz / 2, -(face.y) + 1] as [number, number, number] }
+    const parts = mine.filter((p) => p.kind === 'drawer')
+    if (!parts.length) return null
+    const fy = Math.min(...mine.filter((p) => p.kind !== 'wheel').map((p) => p.y))
+    const x0 = Math.min(...parts.map((p) => p.x)), x1 = Math.max(...parts.map((p) => p.x + p.sx))
+    const z0 = Math.min(...parts.map((p) => p.z)), z1 = Math.max(...parts.map((p) => p.z + p.sz))
+    const max = Math.max(...parts.map((p) => p.y + p.sy)) - Math.min(...parts.map((p) => p.y))
+    return { dir: 'out' as const, max, anchor: [(x0 + x1) / 2, (z0 + z1) / 2, -fy + 1] as [number, number, number] }
   })()
   return (
     <div style={{ position: 'absolute', inset: 0 }} onContextMenu={(e) => {
@@ -405,14 +418,15 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
             </group>
           )
         }
+        if (p.kind === 'wheel') return <Wheel key={i} p={p} />
         return (
           <Box
             key={i}
             p={p}
             color={binSel && p.kind === 'bin' && p.cell === binSel.cell ? '#4fa3e0' : color}
             opacity={layer.opacity}
-            onOver={pk && (p.kind === 'drawerFace' || p.lift !== undefined) ? () => arm(pk) : over}
-            onOut={pk && (p.kind === 'drawerFace' || p.lift !== undefined) ? disarm : edit ? leave : undefined}
+            onOver={pk && (p.kind === 'cutout' || p.kind === 'drawer' || p.lift !== undefined) ? () => arm(pk) : over}
+            onOut={pk && (p.kind === 'cutout' || p.kind === 'drawer' || p.lift !== undefined) ? disarm : edit ? leave : undefined}
             onDown={down}
             onClick={p.kind === 'bin' && p.cell !== undefined ? () => setBinSel({ cell: p.cell!, split: p.split, pos: [p.x + p.sx / 2, p.z + p.sz + 1, -(p.y + p.sy / 2)] }) : undefined}
             onContext={p.kind === 'bin' && p.cell !== undefined ? () => { ctxBin.current = { cell: p.cell!, split: p.split } } : undefined}
@@ -420,7 +434,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
         )
       })}
       {placed.map((p, i) => {
-        if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
+        if (!opts.dims || p.kind !== 'bin' || !L[layerOf(p.kind)].visible) return null
         return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
       })}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (

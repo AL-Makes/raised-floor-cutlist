@@ -134,7 +134,7 @@ export type PlacementKind =
   | 'deck'
   | 'hatch'
   | 'drawer'
-  | 'drawerFace'
+  | 'wheel'
   | 'cutout'
   | 'bin'
   | 'trim'

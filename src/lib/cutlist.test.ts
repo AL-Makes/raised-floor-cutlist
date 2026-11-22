@@ -280,6 +280,16 @@ describe('dragging walls and plywood drawers', () => {
     expect(validatePolygon(L)).toBeUndefined()
     expect(L).toHaveLength(6)
   })
+  const boxes = (b: ReturnType<typeof buildFloor>) => {
+    const m = new Map<number, { x: number; y: number; z: number; sx: number; sy: number; sz: number }>()
+    for (const q of b.placements.filter((k) => k.kind === 'drawer')) {
+      const o = m.get(q.cell!)
+      if (!o) { m.set(q.cell!, { x: q.x, y: q.y, z: q.z, sx: q.sx, sy: q.sy, sz: q.sz }); continue }
+      const x0 = Math.min(o.x, q.x), y0 = Math.min(o.y, q.y), z0 = Math.min(o.z, q.z)
+      m.set(q.cell!, { x: x0, y: y0, z: z0, sx: Math.max(o.x + o.sx, q.x + q.sx) - x0, sy: Math.max(o.y + o.sy, q.y + q.sy) - y0, sz: Math.max(o.z + o.sz, q.z + q.sz) - z0 })
+    }
+    return [...m.values()]
+  }
   const drawerP = () => {
     const base = defaultParams()
     return { ...base, features: { ...base.features, drawers: true, edgeTrim: true } }
@@ -287,7 +297,7 @@ describe('dragging walls and plywood drawers', () => {
   it('plywood drawers fill the joist bay with 1" clear at each side and the back, front flush', () => {
     const b = buildFloor(drawerP())
     const sec = b.layout.sections[0]
-    const dr = b.placements.filter((q) => q.kind === 'drawer')
+    const dr = boxes(b)
     expect(dr.length).toBeGreaterThan(0)
     for (const d of dr) {
       const left = sec.joistX.findIndex((jx, k) => Math.abs(jx + sec.joistT[k] - (d.x - 1)) < 1e-6)
@@ -307,26 +317,20 @@ describe('dragging walls and plywood drawers', () => {
   it('raises the height so the drawer face is flush with the frame and the box has 1" above it', () => {
     const b = buildFloor({ ...drawerP(), finalHeight: 8 })
     expect(b.warnings.some((w) => /raised/i.test(w))).toBe(true)
-    const d = b.placements.find((q) => q.kind === 'drawer')!
-    const f = b.placements.find((q) => q.kind === 'drawerFace')!
+    const d = boxes(b)[0]
+    const f = b.placements.find((q) => q.kind === 'cutout')!
     const hdr = b.placements.find((q) => q.kind === 'header')
-    expect(hdr!.y).toBeCloseTo(f.y)
-    expect(hdr!.z - (f.z + f.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
+    expect(hdr!.y).toBeCloseTo(d.y)
+    expect(hdr!.z - (f.z + f.sz)).toBeGreaterThanOrEqual(0.5 - 1e-6)
     expect(hdr!.z - (d.z + d.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
   })
   it('cuts the front fascia in joist-centre to joist-centre pieces, each with a drawer opening', () => {
     const b = buildFloor(drawerP())
     const sec = b.layout.sections[0]
-    const faces = b.placements.filter((q) => q.kind === 'drawerFace')
+    const faces = boxes(b)
     const cuts = b.placements.filter((q) => q.kind === 'cutout')
     expect(cuts).toHaveLength(faces.length)
-    faces.forEach((f, i) => {
-      const c = cuts[i]
-      expect(f.x - c.x).toBeCloseTo(0.5)
-      expect(c.x + c.sx - (f.x + f.sx)).toBeCloseTo(0.5)
-      expect(c.sz - (f.z + f.sz)).toBeCloseTo(0.5)
-      expect(c.z).toBe(0)
-    })
+    cuts.forEach((c) => expect(c.z).toBe(0))
     const pieces = b.parts.filter((x) => x.name === 'Front fascia piece with drawer opening')
     expect(pieces.reduce((s, x) => s + x.qty, 0)).toBe(faces.length)
     const centres = sec.joistX.map((jx, k) => jx + sec.joistT[k] / 2)
@@ -521,3 +525,4 @@ describe('plywood coverage', () => {
     expect(area).toBeCloseTo(total, 0)
   })
 })
+
