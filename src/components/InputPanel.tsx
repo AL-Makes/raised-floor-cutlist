@@ -163,6 +163,22 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
           <LenInput label="Board thickness (plywood)" units={units} value={p.drawerBoardT} min={0.25} onChange={(v) => upd({ drawerBoardT: v, heightOption: 0 })} />
           <LenInput label="Caster wheel height" units={units} value={p.casterH} min={0} onChange={(v) => upd({ casterH: v, heightOption: 0 })} />
         </div>
+        {p.features.drawers && (() => {
+          const bays = build.layout.cells.filter((c) => c.drawerBay).sort((a, b) => a.x - b.x)
+          const on = bays.filter((c) => c.type === 'drawer').length
+          const setAll = (v: boolean) => upd({ drawerOff: v ? {} : Object.fromEntries(bays.map((c) => [c.key, true])), heightOption: 0 })
+          return (
+            <div>
+              <b>Drawers: {on} of {bays.length} bays</b>
+              <div>
+                <button onClick={() => setAll(true)}>All</button> <button onClick={() => setAll(false)}>None</button>
+              </div>
+              {bays.map((c, i) => (
+                <Check key={c.key} label={`Bay ${i + 1} - ${formatLength(c.w, units)} wide, ${formatLength(c.x, units)} from the left`} checked={c.type === 'drawer'} onChange={(v) => upd({ drawerOff: { ...p.drawerOff, [c.key]: !v }, heightOption: 0 })} hint="Unticked bays get storage bins instead, with a plain fascia" />
+              ))}
+            </div>
+          )
+        })()}
         <small>Each drawer fills the space between two joists, leaving 1" clear on both sides and at the back, with the front flush to the support. The front fascia is cut in pieces from joist centre to joist centre, each with a drawer opening.</small>
       </section>
       <section>

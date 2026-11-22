@@ -310,6 +310,14 @@ describe('dragging walls and plywood drawers', () => {
     expect(b.placements.some((q) => q.kind === 'bin' && q.sz > 0 && b.layout.cells.some((c) => c.type === 'drawer' && c.index === q.cell))).toBe(false)
     expect(b.hardware.find((h) => /Caster/.test(h.name))?.qty).toBe(dr.length * 4)
   })
+  it('lets you pick which front bays get a drawer', () => {
+    const all = buildFloor(drawerP())
+    const bays = all.layout.cells.filter((c) => c.drawerBay)
+    const b = buildFloor({ ...drawerP(), drawerOff: { [bays[0].key]: true } })
+    expect(boxes(b)).toHaveLength(boxes(all).length - 1)
+    expect(b.placements.filter((q) => q.kind === 'cutout')).toHaveLength(boxes(all).length - 1)
+    expect(b.placements.some((q) => q.kind === 'bin' && q.cell === bays[0].index)).toBe(true)
+  })
   it('uses the board thickness for the drawer parts', () => {
     const b = buildFloor({ ...drawerP(), drawerBoardT: 0.5 })
     expect(b.parts.filter((x) => x.group === 'Drawers').every((x) => x.thickness === 0.5)).toBe(true)

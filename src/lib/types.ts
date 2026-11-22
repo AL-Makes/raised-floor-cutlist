@@ -90,6 +90,7 @@ export interface Params {
   colAdjust?: Record<string, number>
   /** bin cells split into two smaller bins, keyed by cell key; x = side by side, y = one behind the other */
   binSplit?: Record<string, 'x' | 'y'>
+  drawerOff?: Record<string, boolean>
   /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
   moves: Record<string, number>
   tatamiPattern: TatamiPatternId
@@ -171,6 +172,7 @@ export interface Cell {
   l: number
   type: CellType
   fitsBin: boolean
+  drawerBay: boolean
   /** how many bins sit side by side (x) and one behind another (y) in this cell */
   binsX: number
   binsY: number

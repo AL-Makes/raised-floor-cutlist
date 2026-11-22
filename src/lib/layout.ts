@@ -287,7 +287,8 @@ export function buildLayout(p: Params): Layout {
     sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, exact: !!exact, fixed: !!fixed, applied })
     cols.forEach((col, ci) => {
       colData[ci].rows.forEach((row, ri) => {
-        const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer ? 'drawer' : 'bin'
+        const key = `::`
+        const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer && !p.drawerOff?.[key] ? 'drawer' : 'bin'
         const isSvc = type === 'service'
         const needL = row.drawer ? drawerLen - 0.01 : cellMinY
         const fitsBin = isSvc || (col.w >= cellMinX - 1e-6 && row.l >= needL - 1e-6)
@@ -302,7 +303,8 @@ export function buildLayout(p: Params): Layout {
           type,
           fitsBin,
           binsX: isSvc ? 0 : binsAcross(col.w),
-          binsY: isSvc ? 0 : row.drawer ? 1 : binsAlong(row.l),
+          binsY: isSvc ? 0 : type === 'drawer' ? 1 : binsAlong(row.l),
+          drawerBay: row.drawer && !isSvc,
         })
         if (!fitsBin) {
           warnings.push(
