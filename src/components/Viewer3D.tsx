@@ -76,7 +76,7 @@ const COLORS: Record<string, string> = {
   drawerFace: '#7da2bd',
   bin: '#3a7bd5',
   trim: '#6b4f2d',
-  cutout: '#e53935',
+  cutout: '#6b4f2d',
   backer: '#caa56c',
   lift: '#e67e22',
   underlay: '#7a8f5a',
@@ -322,7 +322,6 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
             </group>
           )
         }
-        if (p.kind === 'cutout') return <Box key={i} p={p} color={color} opacity={0.3} edge="#e53935" />
         return (
           <Box
             key={i}
