@@ -1,6 +1,8 @@
 import type { Params, Rect, TatamiPatternId } from './types'
 
 export const RES = 0.5
+/** how much a mat may be trimmed to fit before it counts as a plywood filler piece */
+const TRIM_TOL = 1.5
 
 export interface Mat {
   x: number
@@ -183,7 +185,22 @@ function tileRaw(rects: Rect[], id: TatamiPatternId, L: number, S: number): Mat[
           break
         }
       }
-      if (placed) continue
+      // a mat only slightly short of the space (e.g. floor trimmed by fascia panels) is planed down rather than becoming plywood filler
+      for (const [w, h] of prefs) {
+        let rw = 0
+        while (rw < Math.round(w / RES) && i + rw < g.nx && g.free[j * g.nx + i + rw]) rw++
+        let rh = 0
+        outer2: while (rh < Math.round(h / RES) && j + rh < g.ny) {
+          for (let a = 0; a < rw; a++) if (!g.free[(j + rh) * g.nx + i + a]) break outer2
+          rh++
+        }
+        if (rw * RES >= w - TRIM_TOL && rh * RES >= h - TRIM_TOL && rw > 0 && rh > 0) {
+          fill(i, j, rw, rh)
+          mats.push({ x, y, w: rw * RES, l: rh * RES, kind: w === L && h === S || w === S && h === L ? 'full' : 'square' })
+          placed = true
+          break
+        }
+      }      if (placed) continue
       const [pw, ph] = prefs[0]
       let rw = 0
       while (rw < Math.round(pw / RES) && i + rw < g.nx && g.free[j * g.nx + i + rw]) rw++

@@ -630,3 +630,13 @@ describe('joists not touching a drawer', () => {
     expect(bad).toBe(0)
   })
 })
+
+describe('edge trim toggle keeps the design', () => {
+  it('does not collapse into plywood filler when the trim shrinks the frame slightly', () => {
+    const p = defaultParams()
+    const mk = (t: boolean) => buildFloor({ ...p, floor: { shape: 'rect', width: 144.5, length: 73 } as never, finalHeight: 15, features: { ...p.features, drawers: true, edgeTrim: t } })
+    const on = mk(true)
+    expect(on.layout.cells.filter((c) => c.type === 'drawer')).toHaveLength(mk(false).layout.cells.filter((c) => c.type === 'drawer').length)
+    expect(on.binCount).toBeGreaterThan(0)
+  })
+})
