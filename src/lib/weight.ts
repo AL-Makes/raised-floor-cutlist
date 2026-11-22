@@ -23,8 +23,8 @@ export function estimateWeight(build: Build, mats: Mat[]): { rows: WeightRow[]; 
     build.parts.filter((x) => x.kind === 'lumber' && pred(x.name)).reduce((s, x) => s + x.qty * x.length * x.width * x.thickness * LUMBER_LB_PER_IN3, 0)
   const sheet = (pred: (g: string, n: string) => boolean) =>
     build.parts.filter((x) => x.kind === 'sheet' && pred(x.group, x.name)).reduce((s, x) => s + x.qty * x.length * x.width * x.thickness * PLY_LB_PER_IN3, 0)
-  const isLiftPly = (n: string) => n.startsWith('Lift table top') || n.startsWith('False floor under lift')
-  const isLiftPost = (n: string) => n.startsWith('Lift false-floor post')
+  const isLiftPly = (n: string) => n.startsWith('Lift table top') || n.startsWith('Lift column base plate') || n.startsWith('False floor under lift')
+  const isLiftPost = (n: string) => n.startsWith('Lift column top filler') || n.startsWith('Lift false-floor post')
 
   const tatamiArea = mats.filter((m) => m.kind !== 'cut').reduce((s, m) => s + m.w * m.l, 0)
   const fillerArea = mats.filter((m) => m.kind === 'cut').reduce((s, m) => s + m.w * m.l, 0)
@@ -42,7 +42,7 @@ export function estimateWeight(build: Build, mats: Mat[]): { rows: WeightRow[]; 
     rows.push({
       label: `Motorized table assembly x ${lifts}`,
       lb: lifts * LIFT_COLUMN_LB + sheet((_g, n) => isLiftPly(n)) + lumber((n) => isLiftPost(n)),
-      note: `column, motor and controller assumed ${LIFT_COLUMN_LB} lb each, plus its table top, false floor and posts. Its tatami mat is counted with the mats.`,
+      note: `column, motor and controller assumed ${LIFT_COLUMN_LB} lb each, plus its table top, base plate and top filler blocking. Its tatami mat is counted with the mats.`,
     })
   const out = rows.filter((r) => r.lb > 0.05)
   return { rows: out, total: out.reduce((s, r) => s + r.lb, 0) }

@@ -398,11 +398,23 @@ describe('motorized lift tables', () => {
     const base = buildFloor({ ...defaultParams(), finalHeight: 20 })
     const lifted = buildFloor({ ...defaultParams(), finalHeight: 20, liftTables: [{ x: 36, y: 36 }] })
     expect(lifted.binCount).toBeLessThan(base.binCount)
-    expect(lifted.placements.filter((q) => q.kind === 'lift')).toHaveLength(3)
-    const col = lifted.placements.find((q) => q.kind === 'lift' && Math.abs(q.sz - 12.4) < 0.01)!
-    const top = lifted.placements.find((q) => q.kind === 'lift' && q.sx > 30 && q.z > col.z)!
-    expect(col.z + col.sz).toBeCloseTo(top.z, 2)
-    expect(lifted.parts.some((x) => x.name.includes('False floor under lift table'))).toBe(true)
+    const liftParts = lifted.placements.filter((q) => q.kind === 'lift')
+    const basePlate = liftParts.find((q) => Math.abs(q.z) < 0.01 && Math.abs(q.sz - 0.75) < 0.01 && Math.abs(q.sx - 36) < 0.01 && Math.abs(q.sy - 36) < 0.01)!
+    expect(basePlate).toBeDefined()
+    const col = liftParts.find((q) => Math.abs(q.sz - 12.4) < 0.01 && Math.abs(q.sx - 6) < 0.01)!
+    expect(col.z).toBeCloseTo(0.75, 2)
+    const top = liftParts.find((q) => q.sx >= 35.9 && q.z > col.z && !q.liftMat)!
+    const mat = liftParts.find((q) => q.liftMat)!
+    expect(top.sx).toBeCloseTo(36, 2)
+    expect(top.sy).toBeCloseTo(36, 2)
+    expect(mat.sx).toBeCloseTo(36, 2)
+    expect(mat.sy).toBeCloseTo(36, 2)
+    expect(mat.z).toBeCloseTo(top.z + top.sz, 2)
+    const filler = liftParts.find((q) => Math.abs(q.sx - 6) < 0.01 && Math.abs(q.z - (col.z + col.sz)) < 0.01)!
+    expect(filler).toBeDefined()
+    expect(filler.z + filler.sz).toBeCloseTo(top.z, 2)
+    expect(lifted.parts.some((x) => x.name.includes('Lift column base plate'))).toBe(true)
+    expect(lifted.parts.some((x) => x.name.includes('Lift column top filler blocking'))).toBe(true)
     expect(lifted.hardware.some((h) => h.name.includes('Motorized lift table'))).toBe(true)
     expect(lifted.parts.some((x) => x.name.includes('Lift pocket frame'))).toBe(true)
     expect(lifted.placements.some((q) => q.kind === 'bin' && q.x < 72 && q.x + q.sx > 36 && q.y < 72 && q.y + q.sy > 36)).toBe(false)
