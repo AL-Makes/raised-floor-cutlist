@@ -381,6 +381,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
   const span = Math.max(g.width, g.length, 60)
   const S = build.supportHeight
   const ply = build.params.plyThickness
+  const ul = build.params.features.underlay ? build.params.underlayThickness : 0
   const members = useMemo(() => (opts.loadMap ? memberLoads(build) : []), [build, opts.loadMap])
   const memberOf = new Map(members.filter((m) => m.kind !== 'pad').map((m) => [m.index, m]))
   const L = opts.layers
@@ -515,13 +516,13 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         return (
           <group key={`bay${c.index}`}>
             {!on && (
-              <mesh position={[c.x + c.w / 2, S / 2, -(c.y + c.l / 2)]} onPointerOver={(e) => { e.stopPropagation(); setBay(c.index) }} onPointerOut={leaveBay}>
+              <mesh position={[c.x + c.w / 2, ul + S / 2, -(c.y + c.l / 2)]} onPointerOver={(e) => { e.stopPropagation(); setBay(c.index) }} onPointerOut={leaveBay}>
                 <boxGeometry args={[c.w, S, c.l]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
             )}
             {bay === c.index && (
-              <Html position={[c.x + c.w / 2, S * 0.85, -(c.y) + 2 + pull0]} center zIndexRange={[20, 0]}>
+              <Html position={[c.x + c.w / 2, ul + S * 0.85, -(c.y) + 2 + pull0]} center zIndexRange={[20, 0]}>
                 <div className="binpop" onPointerEnter={() => setBay(c.index)} onPointerLeave={leaveBay}>
                   <button onClick={() => { onDrawer(c.key, !on); setBayState(null) }}>{on ? 'Delete drawer' : 'Add drawer'}</button>
                 </div>
@@ -575,7 +576,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         })}
       {L.tatami.visible &&
         mats.map((m, i) => {
-          const pl: Placement = { kind: 'bin', x: m.x + 0.1, y: m.y + 0.1, z: S + ply, sx: m.w - 0.2, sy: m.l - 0.2, sz: build.params.tatamiThickness }
+          const pl: Placement = { kind: 'bin', x: m.x + 0.1, y: m.y + 0.1, z: S + ul + ply, sx: m.w - 0.2, sy: m.l - 0.2, sz: build.params.tatamiThickness }
           return <Box key={`m${i}`} p={pl} color={m.kind === 'cut' ? '#c9a66b' : '#b7c78a'} opacity={L.tatami.opacity} />
         })}
     </Canvas>

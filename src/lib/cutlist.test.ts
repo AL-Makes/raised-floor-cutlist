@@ -712,3 +712,15 @@ describe('web optimizer', () => {
     expect(estimateWeight(c, []).total).toBeLessThan(estimateWeight(b, []).total)
   })
 })
+
+describe('underlay compresses the supports', () => {
+  it('keeps final height and tatami/ply thickness; only the frame shrinks', () => {
+    const d = defaultParams()
+    const mk = (underlay: boolean) => buildFloor({ ...d, floor: { shape: 'rect', width: 144, length: 73 } as never, finalHeight: 20, features: { ...d.features, underlay } })
+    const a = mk(false), b = mk(true)
+    expect(a.supportHeight - b.supportHeight).toBeCloseTo(b.params.underlayThickness, 5)
+    const top = (x: typeof a) => Math.max(...x.placements.filter((q) => q.kind === 'deck').map((q) => q.z + q.sz)) + x.params.tatamiThickness
+    expect(top(b)).toBeCloseTo(20, 5)
+    expect(top(a)).toBeCloseTo(20, 5)
+  })
+})
