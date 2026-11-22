@@ -24,6 +24,14 @@ function loadSaved(): { params?: Partial<Params>; units?: UnitSystem; tab?: Tab;
 }
 
 export default function App() {
+  const [layersOpen, setLayersOpen] = useState(() => localStorage.getItem('raised-floor-cutlist:layersOpen') !== '0')
+  useEffect(() => {
+    try {
+      localStorage.setItem('raised-floor-cutlist:layersOpen', layersOpen ? '1' : '0')
+    } catch {
+      /* storage unavailable */
+    }
+  }, [layersOpen])
   const [saved] = useState(loadSaved)
   const [params, setParams] = useState<Params>(() => {
     const d = defaultParams()
@@ -106,6 +114,10 @@ export default function App() {
           {tab === '3d' && (
             <div className="viewer">
               <div className="toggles layers">
+                <button type="button" className="layertoggle" onClick={() => setLayersOpen(!layersOpen)}>
+                  {layersOpen ? '▾ Layers' : '▸ Layers'}
+                </button>
+                {layersOpen && (<>
                 {(Object.keys(LAYER_LABELS) as LayerKey[]).map((k) => (
                   <div key={k} className="layerrow">
                     <label>
@@ -132,6 +144,7 @@ export default function App() {
                   <input type="checkbox" checked={view.dims} onChange={(e) => setView({ ...view, dims: e.target.checked })} />
                   Bin / drawer dimensions
                 </label>
+                </>)}
               </div>
               <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d } : { ...q, crossAdjust: q.crossAdjust + d }))} />
               <div className="hud">
