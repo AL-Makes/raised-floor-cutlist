@@ -221,14 +221,20 @@ export function buildFloor(input: Params): Build {
     const endOf = (o: typeof sec, k: number) => (k === 0 ? o.joistX[0] : o.joistX[o.joistX.length - 1])
     const endExtra = (k: number) => (rear && Math.abs(endOf(rear, k === 0 ? 0 : 1) - endOf(sec, k)) < 0.05 ? rear.rect.l : 0)
     const endSkip = (k: number) => !!front && Math.abs(endOf(front, k === 0 ? 0 : 1) - endOf(sec, k)) < 0.05
+    const thru = (k: number) => !!rear && rear.joistX.some((x, i) => i > 0 && i < rear.joistX.length - 1 && Math.abs(x - sec.joistX[k]) < 0.05)
+    const inherited = (k: number) => !!front && front.joistX.some((x, i) => i > 0 && i < front.joistX.length - 1 && Math.abs(x - sec.joistX[k]) < 0.05)
+    const inner = Array.from({ length: Math.max(0, n - 2) }, (_, i) => i + 1).filter((k) => !inherited(k))
+    const drawerIdx = sec.drawerFront ? inner.filter((k) => !thru(k)) : []
+    const thruIdx = sec.drawerFront ? inner.filter((k) => thru(k)) : []
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       if (k === 0 && sharedEdge) return
       if (rim && endSkip(k)) return
+      if (!rim && inherited(k)) return
       const t = sec.joistT[k]
-      const drawerJoist = !rim && sec.drawerFront
-      const jy = rim || drawerJoist ? rect.y : rect.y + frontT
-      const jl = rim ? rect.l + endExtra(k) : drawerJoist ? rect.l - T : rect.l - frontT - T
+      const drawerJoist = !rim && sec.drawerFront && !thru(k)
+      const jy = rim || sec.drawerFront ? rect.y : rect.y + frontT
+      const jl = rim ? rect.l + endExtra(k) : drawerJoist ? rect.l - T : sec.drawerFront ? rect.l + rear!.rect.l - T : rect.l - frontT - T
       placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: drawerJoist ? depth - 1.5 : depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
@@ -236,22 +242,26 @@ export function buildFloor(input: Params): Build {
     })
     const rimLens = [0, n - 1].filter((k) => !(k === 0 && sharedEdge) && !endSkip(k)).map((k) => rect.l + endExtra(k))
     const rimCount = rimLens.length
-    const divTotal = sec.joistX.length - 2
+    const divTotal = inner.length
     const mult = p.reinforce.doubleJoists ? 2 : 1
     joistCount += rimCount + divTotal * mult
     crossLines += Math.max(0, ...sec.colBlocks.map((b) => b.length))
     supportPads += p.supportCount > 1 ? (rimCount + divTotal * mult) * p.supportCount : 0
     const jname = builtup ? 'Joist' : `Joist (${jointKey} on edge)`
     rimLens.forEach((len) => member(jname, 1, len))
-    if (divTotal > 0) member(jname + (sec.drawerFront ? ' (drawer support, front face to back rim)' : ' (interior, between front & back rims)'), divTotal * mult, sec.drawerFront ? rect.l - T : rect.l - frontT - T)
-    if (sec.drawerFront && divTotal > 0) {
+    if (sec.drawerFront) {
+      if (drawerIdx.length) member(jname + ' (drawer support, front face to back rim)', drawerIdx.length * mult, rect.l - T)
+      if (thruIdx.length) member(jname + ' (runs through, front face to back rim)', thruIdx.length * mult, rect.l + rear!.rect.l - T)
+    } else if (divTotal > 0) member(jname + ' (interior, between front & back rims)', divTotal * mult, rect.l - frontT - T)
+    if (drawerIdx.length) {
+      const dTotal = drawerIdx.length
       const capL = rect.l - T - 3.5
-      sec.joistX.forEach((jx, k) => {
-        if (k === 0 || k === n - 1) return
+      drawerIdx.forEach((k) => {
+        const jx = sec.joistX[k]
         placements.push({ kind: 'header', x: jx + sec.joistT[k] / 2 - 1.75, y: rect.y + 3.5, z: S - 1.5, sx: 3.5, sy: capL, sz: 1.5 })
       })
-      lumber('Frame', 'Drawer support cap (2x4 laid flat on top of each drawer support)', '2x4', divTotal * mult, capL, 3.5, 1.5, 'Screw down into the joist; carries the plywood above the drawers. The joist is cut 1-1/2" shorter in height under it', 4)
-      lumber('Frame', 'Drawer support extra vertical web (2x4)', '2x4', divTotal * mult, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, 'One extra web in each drawer support, near the front face, pocket-screwed to both chords', 4)
+      lumber('Frame', 'Drawer support cap (2x4 laid flat on top of each drawer support)', '2x4', dTotal * mult, capL, 3.5, 1.5, 'Screw down into the joist; carries the plywood above the drawers. The joist is cut 1-1/2" shorter in height under it', 4)
+      lumber('Frame', 'Drawer support extra vertical web (2x4)', '2x4', dTotal * mult, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, 'One extra web in each drawer support, near the front face, pocket-screwed to both chords', 4)
     }
     for (const l of layers) {
       const qty = rimCount + divTotal * mult

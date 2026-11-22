@@ -581,3 +581,13 @@ describe('plywood coverage', () => {
   })
 })
 
+
+describe('through joists', () => {
+  it('runs interior joists front to back when drawer and rear columns line up, with no drawer support special', () => {
+    const p = { ...defaultParams(), floor: { shape: 'poly' as const, width: 120, length: 73, notchW: 36, notchL: 36, frontEdge: 0, poly: [{ x: 0, y: 0 }, { x: 105, y: 0 }, { x: 105, y: 73 }, { x: 0, y: 73 }] }, features: { ...defaultParams().features, drawers: true }, finalHeight: 20 }
+    const b = buildFloor(p)
+    const js = b.placements.filter((q) => q.kind === 'joist' && q.sy > 60)
+    expect(js.length).toBeGreaterThan(0)
+    expect(b.parts.some((x) => /drawer support cap/i.test(x.name))).toBe(false)
+  })
+})
