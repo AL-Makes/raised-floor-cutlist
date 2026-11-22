@@ -257,7 +257,7 @@ export function buildLayout(p: Params): Layout {
     }
     const { rows, blockY } = calcRows(fixed ? 0 : p.crossAdjust)
     if (fixed) {
-      // under inaccessible filler: exactly one joist along each filler edge (running front to back), cross blocks only where panels meet
+      // under inaccessible filler: one joist along each filler side edge (running front to back); cross supports are free, no edge-to-edge joist is forced at the filler ends
       const fs = fillers.filter((f) => Math.min(f.x + f.w, rect.x + rect.w) - Math.max(f.x, rect.x) > 0.5 && Math.min(f.y + f.l, rect.y + rect.l) - Math.max(f.y, rect.y) > 0.5)
       const lines = (lo: number, hi: number, edges: number[], max: number) => {
         const pts = [...new Set(edges.map((e) => Math.round(e * 1000) / 1000))].filter((v) => v > lo + 2 * T && v < hi - 2 * T).sort((a, b) => a - b)
@@ -272,7 +272,7 @@ export function buildLayout(p: Params): Layout {
         return out
       }
       const xl = lines(rect.x, rect.x + rect.w, fs.flatMap((f) => [f.x, f.x + f.w]), p.sheetL)
-      const yl = lines(rect.y, rect.y + rect.l, fs.flatMap((f) => [f.y, f.y + f.l]), p.sheetL)
+      const yl = lines(rect.y, rect.y + rect.l, [], p.sheetL)
       joistX.length = 0
       joistT.length = 0
       joistX.push(rect.x, ...xl.map((x) => x - T / 2), rect.x + rect.w - T)
