@@ -35,7 +35,8 @@ export default function App() {
   const [saved] = useState(loadSaved)
   const [params, setParams] = useState<Params>(() => {
     const d = defaultParams()
-    return { ...d, ...saved.params, features: { ...d.features, ...saved.params?.features } }
+    const anchor = saved.params?.tatamiAnchor === 'br' ? 'br' : 'bl'
+    return { ...d, ...saved.params, tatamiAnchor: anchor, features: { ...d.features, ...saved.params?.features } }
   })
   const [units, setUnits] = useState<UnitSystem>(saved.units ?? 'imperial')
   const [tab, setTab] = useState<Tab>(saved.tab ?? '3d')

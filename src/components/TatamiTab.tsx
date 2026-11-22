@@ -3,11 +3,8 @@ import { TATAMI_FIT_MESSAGE, type TatamiAnchor, type TatamiArrangement } from '.
 import { formatLength, type UnitSystem } from '../lib/units'
 
 const ANCHORS: { id: TatamiAnchor; label: string }[] = [
-  { id: 'tl', label: 'Back-left' },
-  { id: 'tr', label: 'Back-right' },
   { id: 'bl', label: 'Front-left' },
   { id: 'br', label: 'Front-right' },
-  { id: 'center', label: 'Centered' },
 ]
 
 const FILL = { full: '#b7c78a', square: '#a9cf9a', cut: '#e6c97a' }
