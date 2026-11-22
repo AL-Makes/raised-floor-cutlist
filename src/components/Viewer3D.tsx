@@ -114,25 +114,25 @@ function builtUp(p: Placement): { chord: Placement[]; web: Placement[] } {
 /** Dimensions printed flat on the surface, as a transparent canvas texture lying over the object's footprint. */
 function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem }) {
   const tex = useMemo(() => {
-    const W = 512
-    const H = Math.max(96, Math.min(1024, Math.round((W * p.sy) / p.sx)))
+    const PPI = 24 // texture pixels per world unit, so text is the same physical size on every block
+    const W = Math.max(64, Math.round(p.sx * PPI))
+    const H = Math.max(64, Math.round(p.sy * PPI))
     const c = document.createElement('canvas')
     c.width = W
     c.height = H
     const g = c.getContext('2d')!
-    const lines = [p.kind === 'drawer' ? 'DRAWER' : 'BIN', `W ${formatLength(p.sx, units)}`, `D ${formatLength(p.sy, units)}`, `H ${formatLength(p.sz, units)}`]
-    const fs = Math.min(H / 4.6, W / 6.5)
+    const lines = [`${formatLength(p.sx, units)} × ${formatLength(p.sy, units)}`, `H ${formatLength(p.sz, units)}`]
+    const fs = 2 * PPI
     g.font = `bold ${fs}px sans-serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.lineJoin = 'round'
-    g.lineWidth = fs / 5
+    g.lineWidth = fs / 6
     g.strokeStyle = '#000'
     g.fillStyle = '#fff'
     lines.forEach((t, k) => {
-      const yy = H / 2 + (k - (lines.length - 1) / 2) * fs * 1.15
+      const yy = H / 2 + (k - (lines.length - 1) / 2) * fs * 1.2
       g.strokeText(t, W / 2, yy)
-      g.fillStyle = k === 0 ? '#ffd27a' : '#fff'
       g.fillText(t, W / 2, yy)
     })
     const t = new CanvasTexture(c)
