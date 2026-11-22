@@ -353,6 +353,11 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onTo
             const pos = by + build.layout.joistW / 2
             lines.push({ id: `${sec.index}:y:${k}`, axis: 'y', pos, cx: sec.rect.x + sec.rect.w / 2, cy: pos, sx: sec.rect.w, sy: 4 })
           })
+          build.layout.cells.filter((c) => c.type === 'service' && c.section === sec.index).forEach((c, k) => {
+            const pos = c.y + c.l / 2
+            if (lines.some((l) => l.axis === 'y' && Math.abs(l.pos - pos) < 0.5)) return
+            lines.push({ id: `${sec.index}:m:${k}`, axis: 'y', pos, cx: sec.rect.x + sec.rect.w / 2, cy: pos, sx: sec.rect.w, sy: 4 })
+          })
           return lines.map((ln) => {
             const on = (build.params.deckCuts ?? []).some((c) => c.s === sec.index && c.axis === ln.axis && Math.abs(c.pos - ln.pos) < 0.01)
             const hot = hoverCell === ln.id
