@@ -103,12 +103,39 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
   const panels: DeckPanel[] = []
   const unsupported: { axis: 'x' | 'y'; pos: number; section: number }[] = []
   const T = layout.joistW
-  const fillers = layout.fillers
+  // slivers (floor not a whole number of mats) get no plywood of their own; fillers stacked edge to edge merge into one zone
+  const groups: { r: Rect; idx: number[] }[] = []
+  layout.fillers.forEach((f, i) => {
+    if (f.w < 6 || f.l < 6) return
+    const svc = o.serviceFillers.includes(i)
+    const g = groups.find((g) => g.idx.some((k) => o.serviceFillers.includes(k)) === svc &&
+        ((Math.abs(g.r.x - f.x) < 0.5 && Math.abs(g.r.w - f.w) < 0.5 && Math.abs(g.r.y + g.r.l - f.y) < 0.5) || (Math.abs(g.r.y - f.y) < 0.5 && Math.abs(g.r.l - f.l) < 0.5 && Math.abs(g.r.x + g.r.w - f.x) < 0.5)),
+    )
+    if (g) {
+      g.r = { x: g.r.x, y: g.r.y, w: Math.max(g.r.x + g.r.w, f.x + f.w) - g.r.x, l: Math.max(g.r.y + g.r.l, f.y + f.l) - g.r.y }
+      g.idx.push(i)
+    } else groups.push({ r: { ...f }, idx: [i] })
+  })
+  const rawFillers = groups.map((g) => g.r)
 
   for (const sec of layout.sections) {
     const { rect } = sec
     const xs = sec.joistX.map((x, k) => x + sec.joistT[k] / 2)
     const ys = [rect.y + T / 2, ...sec.blockY.map((y) => y + T / 2), rect.y + rect.l - T / 2]
+
+    // a filler whose edge has no joist under it grows out to the nearest joist, so seams never fall over thin air and no area is left uncovered
+    const snap = (lo: number, hi: number, cs: number[], a: number, b: number) => {
+      const c = [...cs, a, b]
+      const s0 = Math.max(...c.filter((v) => v <= lo + 0.5), a)
+      const s1 = Math.min(...c.filter((v) => v >= hi - 0.5), b)
+      return [Math.max(a, Math.min(s0, lo)), Math.min(b, Math.max(s1, hi))]
+    }
+    const fillers = rawFillers.map((f) => {
+      if (!overlap(f, rect)) return f
+      const [x0, x1] = snap(f.x, f.x + f.w, xs, rect.x, rect.x + rect.w)
+      const [y0, y1] = snap(f.y, f.y + f.l, ys, rect.y, rect.y + rect.l)
+      return { x: x0, y: y0, w: x1 - x0, l: y1 - y0 }
+    })
 
     /** tile one zone into the fewest sheet pieces, seams on the section's supports */
     const tile = (z: Rect) => {
@@ -162,7 +189,7 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
     if (!touching.length) continue
     const area = touching.reduce((s, t) => s + t.z.w * t.z.l, 0)
     const wholeSection = area > rect.w * rect.l * 0.95
-    const anyService = touching.some((t) => o.serviceFillers.includes(t.fi))
+    const anyService = touching.some((t) => groups[t.fi].idx.some((i) => o.serviceFillers.includes(i)))
 
     if (wholeSection && !anyService) {
       for (const r of tile(rect)) panels.push({ ...r, kind: 'fixed', section: sec.index })
@@ -170,7 +197,7 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
     }
     for (const { fi, z } of touching) {
       const pieces = tile(z)
-      if (!o.serviceFillers.includes(fi)) {
+      if (!groups[fi].idx.some((i) => o.serviceFillers.includes(i))) {
         for (const r of pieces) panels.push({ ...r, kind: 'fixed', section: sec.index })
         continue
       }

@@ -445,3 +445,13 @@ describe('plywood seams', () => {
     }
   })
 })
+
+describe('plywood coverage', () => {
+  it('covers the whole floor when a filler edge has no joist', () => {
+    const d = defaultParams()
+    const b = buildFloor({ ...d, floor: { ...d.floor, shape: 'poly', poly: [{ x: 0, y: 0 }, { x: 139.25, y: 0 }, { x: 139.25, y: 73 }, { x: 0, y: 73 }] }, finalHeight: 15, joistStyle: 'builtup', drawerKind: 'ikea', features: { ...d.features, drawers: true } } as typeof d)
+    const total = b.layout.sections.reduce((s, c) => s + c.rect.w * c.rect.l, 0)
+    const area = b.placements.filter((q) => q.kind === 'deck' || q.kind === 'hatch').reduce((s, q) => s + q.sx * q.sy, 0)
+    expect(area).toBeCloseTo(total, 0)
+  })
+})
