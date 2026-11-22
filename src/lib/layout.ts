@@ -131,9 +131,9 @@ export function buildLayout(p: Params): Layout {
   pieces.forEach(({ rect, plain, exact }, si) => {
     const dx = divide(rect.w, cellMinX, dividerT, T, p.joistAdjust)
     const cols: Section['cols'] = []
-    const ex = exact ? (rect.w - (2 * T + exact * cellMinX + (exact - 1) * dividerT)) / 2 : 0
+    const ex = 0
     const nCols = exact ?? dx.n
-    const cellW = exact ? cellMinX : dx.cell
+    const cellW = exact ? (rect.w - 2 * T - (exact - 1) * dividerT) / exact : dx.cell
     const joistX: number[] = [rect.x]
     const joistT: number[] = [T + ex]
     for (let i = 0; i < nCols; i++) {
