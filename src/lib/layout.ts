@@ -212,9 +212,7 @@ export function buildLayout(p: Params): Layout {
             out = [...out.slice(0, w), { y: out[w].y, l: half }, { y: out[w].y + half + T, l: half }, ...out.slice(w + 1)]
           } else out = evenCells(start, span, out.length + 1)
         } else if (out.length > 1) {
-          let m = 0
-          for (let j = 0; j + 1 < out.length; j++) if (out[j].l + out[j + 1].l < out[m].l + out[m + 1].l) m = j
-          out = [...out.slice(0, m), { y: out[m].y, l: out[m].l + T + out[m + 1].l }, ...out.slice(m + 2)]
+          out = evenCells(start, span, out.length - 1)
         }
       }
       return out

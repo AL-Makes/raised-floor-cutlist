@@ -210,6 +210,7 @@ export default function App() {
                 return { ...q, binSplit: next }
               })} onAdjust={(kind, d, s, c, y) => setParams((q) => {
                 if (kind === 'joist') {
+                  if (d < 0 && (build.layout.sections[s]?.cols.length ?? 0) <= 1) return q
                   const cur = q.secAdjust?.[s] ?? { x: 0, y: 0 }
                   return { ...q, secAdjust: { ...q.secAdjust, [s]: { ...cur, x: cur.x + d } }, moves: {} }
                 }

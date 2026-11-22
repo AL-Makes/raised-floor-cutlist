@@ -743,3 +743,17 @@ describe('crowd scenario', () => {
     expect(crowdScenario(mk(-3)).people).toBe(1)
   })
 })
+
+describe('deleting supports', () => {
+  it('removing a cross support re-spaces the rest evenly', () => {
+    const d = defaultParams()
+    const base = { ...d, floor: { shape: 'rect', width: 144, length: 120 } as never, features: { ...d.features, drawers: false } }
+    const n = (extra: number) => buildFloor({ ...base, colAdjust: { '0:0': extra } }).layout.sections[0].colRows[0]
+    const rows = n(2)
+    const fewer = n(-1)
+    expect(fewer.length).toBe(n(0).length - 1)
+    const gaps = fewer.map((r) => r.l)
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.01)
+    expect(rows.length).toBeGreaterThan(fewer.length)
+  })
+})

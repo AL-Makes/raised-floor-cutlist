@@ -443,13 +443,13 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, onDrawe
         const key = p.liftMat ? 'tatami' : layerOf(p.kind)
         const layer = L[key]
         if (!layer.visible) return null
-        const edit = p.kind === 'block'
+        const edit = p.kind === 'block' || (p.kind === 'joist' && !!p.ref)
         const id = `p${i}`
         const dragging = !!drag && !!p.ref && drag.ref.s === p.ref.s && drag.ref.axis === p.ref.axis && drag.ref.k === p.ref.k
         const mem = memberOf.get(i)
         const pk = pullKey(p)
         const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : mem ? STATUS_COLOR[mem.status] : COLORS[p.kind] ?? '#999'
-        const over = edit && !drag ? () => setHover({ y: p.y + p.sy / 2, id, kind: 'block', delta: -1, s: p.ref!.s, c: p.ref!.c ?? 0, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
+        const over = edit && !drag ? () => setHover({ y: p.y + p.sy / 2, id, kind: p.kind === 'joist' ? 'joist' : 'block', delta: -1, s: p.ref!.s, c: p.ref!.c ?? 0, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
         const down = DRAG_ENABLED && p.ref
           ? (pt: { x: number; y: number; z: number }) => {
               setHoverState(null)
