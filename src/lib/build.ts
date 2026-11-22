@@ -494,7 +494,7 @@ export function buildFloor(input: Params): Build {
       const plain = (a: number, b: number) => {
         if (b - a < 1e-3) return
         sheet('Edge trim', 'Front fascia filler piece', th, 1, b - a, fullH, 'Plain panel between drawer pieces; seams land on a joist centre')
-        placements.push({ ...base, x: a, sx: b - a })
+        placements.push({ ...base, x: a, sx: b - a, seamless: true })
       }
       let cursor = base.x
       for (const b of mine) {
@@ -505,9 +505,9 @@ export function buildFloor(input: Params): Build {
         sheet('Edge trim', 'Front fascia piece with drawer opening', th, 1, a1 - a0, fullH, `Joist centre to joist centre. Cut an opening ${r3(ow)}" wide x ${r3(b.top)}" tall from the bottom edge, 1/2" beyond the drawer face each side and 1/2" above it`)
         sheet('Edge trim', 'Drawer front (cut-out piece of the fascia)', th, 1, ow, b.top, 'The piece cut from the fascia opening IS the drawer front: screw it to the front of the drawer box, 1/2" reveal around it')
         placements.push({ ...base, kind: 'cutout', x: b.x0, sx: ow, sz: b.top, cell: b.cell })
-        if (b.x0 > a0 + 1e-6) placements.push({ ...base, x: a0, sx: b.x0 - a0 })
-        if (b.top < fullH - 1e-6) placements.push({ ...base, x: b.x0, sx: ow, z: b.top, sz: fullH - b.top })
-        if (a1 > b.x1 + 1e-6) placements.push({ ...base, x: b.x1, sx: a1 - b.x1 })
+        if (b.x0 > a0 + 1e-6) placements.push({ ...base, x: a0, sx: b.x0 - a0, seamless: true })
+        if (b.top < fullH - 1e-6) placements.push({ ...base, x: b.x0, sx: ow, z: b.top, sz: fullH - b.top, seamless: true })
+        if (a1 > b.x1 + 1e-6) placements.push({ ...base, x: b.x1, sx: a1 - b.x1, seamless: true })
         cursor = a1
       }
       plain(cursor, end)

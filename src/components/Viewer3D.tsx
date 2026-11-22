@@ -211,7 +211,7 @@ function Box({ p, color, opacity = 1, edge = '#3b2a14', onOver, onOut, onDown, o
     >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
       <meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1} />
-      <Edges color={edge} threshold={15} />
+      {!p.seamless && <Edges color={edge} threshold={15} />}
     </mesh>
   )
 }

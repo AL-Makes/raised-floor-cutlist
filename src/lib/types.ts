@@ -158,6 +158,8 @@ export interface Placement {
   /** index of the lift table this piece belongs to */
   lift?: number
   liftMat?: boolean
+  /** drawn without outline so joins in one physical panel (the fascia) do not look like cuts */
+  seamless?: boolean
   /** this bin is half of a split bin */
   split?: 'x' | 'y'
   /** movable joist: section, axis the joist is moved along, and index within the section */
