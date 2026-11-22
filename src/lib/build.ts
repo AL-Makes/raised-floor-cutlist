@@ -277,22 +277,25 @@ export function buildFloor(input: Params): Build {
   }
   const drawerCells = layout.cells.filter((c) => c.type === 'drawer')
   const clr = p.clearance
-  // a split cell steps down to the next smaller standard IKEA footprint (never a stretched half-bin)
-  const smaller = (() => {
+  // a split cell steps down to the next smaller standard IKEA footprint (either way round) that really gives more bins
+  const fitSplit = (rw: number, rl: number, have: number) => {
     const long = Math.max(layout.binX, layout.binY)
-    const short = Math.min(layout.binX, layout.binY)
-    const s = STANDARD_BIN_FOOTPRINTS_MM.map(([l, w]) => [mmToIn(l), mmToIn(w)]).find(([l, w]) => l < long - 0.05 && w <= short + 0.05)
-    if (!s) return undefined
-    return layout.binX >= layout.binY ? { sx: s[0], sy: s[1] } : { sx: s[1], sy: s[0] }
-  })()
-  const splitMode = (c: { key: string }) => (p.binSplit?.[c.key] && smaller ? 'x' : undefined)
+    for (const [l0, w0] of STANDARD_BIN_FOOTPRINTS_MM) {
+      const l = mmToIn(l0)
+      const w = mmToIn(w0)
+      if (l >= long - 0.05) continue
+      const opts = [{ sx: l, sy: w }, { sx: w, sy: l }].map((o) => ({ ...o, nx: Math.floor((rw + 1e-6) / (o.sx + clr)), ny: Math.floor((rl + 1e-6) / (o.sy + clr)) }))
+      const best = opts.sort((a, b) => b.nx * b.ny - a.nx * a.ny)[0]
+      if (best.nx * best.ny > have) return best
+    }
+    return undefined
+  }
+  const splitMode = (c: { key: string; w: number; l: number; binsX: number; binsY: number }) => (p.binSplit?.[c.key] && fitSplit(c.w, c.l, c.binsX * c.binsY) ? 'x' : undefined)
   let binCount = layout.cells.reduce((s, c) => s + c.binsX * c.binsY, 0)
 
   const slotPos = (start: number, size: number, n: number, item: number, k: number) => start + (size / n) * k + (size / n - item) / 2
   const pushSplit = (c: { index: number; binsX: number; binsY: number }, mode: 'x' | 'y', rx: number, rw: number, ry: number, rl: number, _nxFixed: number, _nyFixed: number, z: number) => {
-    const { sx, sy } = smaller!
-    const nx = Math.max(1, Math.floor((rw + 1e-6) / (sx + clr)))
-    const ny = Math.max(1, Math.floor((rl + 1e-6) / (sy + clr)))
+    const { sx, sy, nx, ny } = fitSplit(rw, rl, c.binsX * c.binsY)!
     for (let ix = 0; ix < nx; ix++)
       for (let iy = 0; iy < ny; iy++) placements.push({ kind: 'bin', x: slotPos(rx, rw, nx, sx, ix), y: slotPos(ry, rl, ny, sy, iy), z, sx, sy, sz: p.bin.h, cell: c.index, split: mode })
     binCount += nx * ny - c.binsX * c.binsY
