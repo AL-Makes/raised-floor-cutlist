@@ -122,7 +122,8 @@ export function mergeParts(parts: Part[]): Part[] {
   return [...m.values()]
 }
 
-const DRAWER_TOP_EXTRA = 2.25 // 1" above the box + 1-1/2" flat header + 1/4" spare, less the 1/2" hatch allowance
+const DRAWER_CLEAR = 3 // drawer box top sits this far below the top of the supports (header + working clearance)
+const DRAWER_TOP_EXTRA = DRAWER_CLEAR - 0.5 + 0.25 // plus 1/4" spare, less the 1/2" hatch allowance
 
 export function buildFloor(input: Params): Build {
   const p: Params = { ...input, bin: resolveBin(input) }
@@ -145,7 +146,7 @@ export function buildFloor(input: Params): Build {
   let raisedHeight: number | undefined
   if (p.features.drawers && !height.fits) {
     const raised = Math.ceil((height.minFinalHeight + ul) * 8) / 8
-    warnings.push(`Final height raised from ${r3(p.finalHeight)}" to ${r3(raised)}" so the drawers fit (face flush with the frame, 1" above each drawer, 1/4" each side).`)
+    warnings.push(`Final height raised from ${r3(p.finalHeight)}" to ${r3(raised)}" so the drawers fit (face flush with the frame, " between the top of each drawer box and the top of the supports, 1/4" each side).`)
     raisedHeight = raised
     height = solveHeight({ ...heightIn, finalHeight: raised - ul })
   }
@@ -421,7 +422,7 @@ export function buildFloor(input: Params): Build {
   const bt = p.drawerBoardT
   const caster = p.casterH
   const faceH = Math.max(1, S - 1.5 - 1 - 0.125)
-  const boxH = Math.max(bt + 1, S - 1.5 - 1 - caster)
+  const boxH = Math.max(bt + 1, S - DRAWER_CLEAR - caster)
   let casters = 0
   const bays: { cell: number; y: number; px0: number; px1: number; x0: number; x1: number; top: number }[] = []
   if (p.features.drawers) {
