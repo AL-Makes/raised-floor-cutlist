@@ -111,7 +111,7 @@ function builtUp(p: Placement): { chord: Placement[]; web: Placement[] } {
 }
 
 /** Dimensions printed flat on the surface, as a transparent canvas texture lying over the object's footprint. */
-function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem }) {
+function DimPlane({ p, y, units, onTop }: { p: Placement; y: number; units: UnitSystem; onTop: boolean }) {
   const tex = useMemo(() => {
     const W = 512
     const H = Math.max(96, Math.min(1024, Math.round((W * p.sy) / p.sx)))
@@ -139,9 +139,9 @@ function DimPlane({ p, y, units }: { p: Placement; y: number; units: UnitSystem 
     return t
   }, [p.kind, p.sx, p.sy, p.sz, units])
   return (
-    <mesh position={[p.x + p.sx / 2, y, -(p.y + p.sy / 2)]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+    <mesh position={[p.x + p.sx / 2, y, -(p.y + p.sy / 2)]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null} renderOrder={onTop ? 10 : 0}>
       <planeGeometry args={[p.sx, p.sy]} />
-      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} depthTest={!onTop} toneMapped={false} />
     </mesh>
   )
 }
@@ -241,8 +241,8 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
         )
       })}
       {build.placements.map((p, i) => {
-        if (!opts.dims || L.deck.visible || L.tatami.visible || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
-        return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} />
+        if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
+        return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} onTop={L.deck.visible || L.tatami.visible} />
       })}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
