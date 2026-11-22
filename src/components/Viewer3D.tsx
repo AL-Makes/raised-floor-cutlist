@@ -53,7 +53,7 @@ export const defaultView = (): ViewOptions => ({
 
 function layerOf(kind: string): LayerKey {
   if (kind === 'deck' || kind === 'hatch') return 'deck'
-  if (kind === 'trim') return 'side'
+  if (kind === 'trim' || kind === 'cutout') return 'side'
   if (kind === 'joist' || kind === 'buildup') return 'joists'
   if (kind === 'block') return 'cross'
   if (kind === 'lift') return 'lift'
@@ -76,6 +76,7 @@ const COLORS: Record<string, string> = {
   drawerFace: '#7da2bd',
   bin: '#3a7bd5',
   trim: '#6b4f2d',
+  cutout: '#e53935',
   backer: '#caa56c',
   lift: '#e67e22',
   underlay: '#7a8f5a',
@@ -140,7 +141,7 @@ function CamCmd({ cmd, target, span }: { cmd: { current: ((v: string) => void) |
   return null
 }
 
-function Box({ p, color, opacity = 1, onOver, onOut, onDown, onClick, onContext }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void; onClick?: () => void; onContext?: () => void }) {
+function Box({ p, color, opacity = 1, edge = '#3b2a14', onOver, onOut, onDown, onClick, onContext }: { p: Placement; color: string; opacity?: number; edge?: string; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void; onClick?: () => void; onContext?: () => void }) {
   return (
     <mesh
       position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}
@@ -154,7 +155,7 @@ function Box({ p, color, opacity = 1, onOver, onOut, onDown, onClick, onContext 
     >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
       <meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1} />
-      <Edges color="#3b2a14" threshold={15} />
+      <Edges color={edge} threshold={15} />
     </mesh>
   )
 }
@@ -321,6 +322,7 @@ export function Viewer3D({ build, mats, opts, onAdjust, onMove, onSplit, units =
             </group>
           )
         }
+        if (p.kind === 'cutout') return <Box key={i} p={p} color={color} opacity={0.3} edge="#e53935" />
         return (
           <Box
             key={i}

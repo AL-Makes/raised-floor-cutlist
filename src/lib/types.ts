@@ -134,6 +134,7 @@ export type PlacementKind =
   | 'hatch'
   | 'drawer'
   | 'drawerFace'
+  | 'cutout'
   | 'bin'
   | 'trim'
   | 'backer'

@@ -394,6 +394,7 @@ export function buildFloor(input: Params): Build {
       let cursor = base.x
       const end = base.x + base.sx
       for (const c of cuts) {
+        placements.push({ ...base, kind: 'cutout', x: c.x0, sx: c.x1 - c.x0, sz: c.top })
         if (c.x0 > cursor + 1e-6) placements.push({ ...base, x: cursor, sx: c.x0 - cursor })
         if (c.top < fullH - 1e-6) placements.push({ ...base, x: c.x0, sx: c.x1 - c.x0, z: c.top, sz: fullH - c.top })
         cursor = Math.max(cursor, c.x1)
