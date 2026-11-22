@@ -123,6 +123,11 @@ export default function App() {
   const build = useMemo(() => buildFloor(params), [params])
   buildRef.current = build
   const structural = useMemo(() => analyze(build), [build])
+
+  // the final-height slider always shows the real height: when drawers force a raise, write it back so later changes (underlay, tatami) stay inside it
+  useEffect(() => {
+    if (build.raisedHeight && build.raisedHeight > params.finalHeight + 1e-6) setParams((q) => ({ ...q, finalHeight: build.raisedHeight!, heightOption: 0 }))
+  }, [build.raisedHeight, params.finalHeight])
   const tatamiOptions = useMemo(() => suggestTatami(floorRects(build.params), params), [build.params, params])
   const tatami = tatamiOptions.find((o) => o.id === params.tatamiPattern) ?? tatamiOptions[0]
   const mats = tatami?.mats ?? []

@@ -87,6 +87,8 @@ export interface Build {
   height: HeightSolution
   option?: HeightOption
   supportHeight: number
+  /** set when the drawers need more height than the final-height slider allows */
+  raisedHeight?: number
   parts: Part[]
   hardware: { name: string; qty: number; unit: string; notes?: string }[]
   placements: Placement[]
@@ -140,9 +142,11 @@ export function buildFloor(input: Params): Build {
     style: p.joistStyle,
   }
   let height = solveHeight(heightIn)
+  let raisedHeight: number | undefined
   if (p.features.drawers && !height.fits) {
     const raised = Math.ceil((height.minFinalHeight + ul) * 8) / 8
     warnings.push(`Final height raised from ${r3(p.finalHeight)}" to ${r3(raised)}" so the drawers fit (face flush with the frame, 1" above each drawer, 1/4" each side).`)
+    raisedHeight = raised
     height = solveHeight({ ...heightIn, finalHeight: raised - ul })
   }
   if (height.message) warnings.push(height.message)
@@ -668,6 +672,7 @@ export function buildFloor(input: Params): Build {
     height,
     option,
     supportHeight: S,
+    raisedHeight,
     parts: finalParts,
     hardware,
     placements,
