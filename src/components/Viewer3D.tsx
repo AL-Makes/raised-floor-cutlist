@@ -182,7 +182,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
   const [hover, setHoverState] = useState<Hover | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const setHover = (h: Hover) => { window.clearTimeout(timer.current); setHoverState(h) }
-  const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHoverState(null), 250) }
+  const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHoverState(null), 700) }
   const keep = () => window.clearTimeout(timer.current)
   const voids = useMemo(() => findVoids(build), [build])
   const act = (h: Hover) => { onAdjust(h.kind, h.delta); setHoverState(null) }
@@ -264,15 +264,14 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
       )}
       {hover && (
         <Html position={hover.pos} center zIndexRange={[20, 0]}>
-          <button
-            className={hover.delta > 0 ? 'jbtn add' : 'jbtn del'}
-            title={hover.delta > 0 ? 'Add support here' : 'Delete this support'}
-            onPointerEnter={keep}
-            onPointerLeave={leave}
-            onClick={() => act(hover)}
-          >
-            {hover.delta > 0 ? '+' : '−'}
-          </button>
+          <div className="jhit" onPointerEnter={keep} onPointerLeave={leave} onClick={() => act(hover)}>
+            <button
+              className={hover.delta > 0 ? 'jbtn add' : 'jbtn del'}
+              title={hover.delta > 0 ? 'Add support here' : 'Delete this support'}
+            >
+              {hover.delta > 0 ? '+' : '−'}
+            </button>
+          </div>
         </Html>
       )}
       {opts.loadMap &&
