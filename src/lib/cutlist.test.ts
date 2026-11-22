@@ -355,8 +355,8 @@ describe('dragging walls and plywood drawers', () => {
     const b = buildFloor(drawerP())
     const sec = b.layout.sections[0]
     const hdr = b.placements.find((q) => q.kind === 'header' && q.sx > 4)!
-    const js = b.placements.filter((q) => q.kind === 'joist' && Math.abs(q.y - sec.rect.y) < 1e-6)
-    expect(js.length).toBe(sec.joistX.length - 2)
+    const js = b.placements.filter((q) => (q.kind === 'joist' || q.kind === 'rim') && Math.abs(q.y - sec.rect.y) < 1e-6 && q.sy > 10)
+    expect(js.length).toBe(sec.joistX.length)
     js.forEach((j) => expect(j.z + j.sz).toBeLessThanOrEqual(hdr.z + 1e-6))
     expect(b.placements.filter((q) => q.kind === 'header' && q.sx === 3.5 && q.y > sec.rect.y).length).toBe(js.length)
     expect(b.parts.some((i) => i.name.startsWith('Drawer support extra vertical web'))).toBe(true)
