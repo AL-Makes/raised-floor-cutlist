@@ -246,7 +246,7 @@ export function buildFloor(input: Params): Build {
     }
 
     const nJ = sec.joistX.length
-    const endL = sec.joistT[0]
+    const endL = sharedEdge ? 0 : sec.joistT[0]
     const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
     placements.push({ kind: 'rim', x: rect.x + endL, y: backY, z: bu, sx: innerW, sy: T, sz: depth })
@@ -259,10 +259,11 @@ export function buildFloor(input: Params): Build {
       member('Front rim (between end joists)', 1, innerW, 4)
     }
     sec.cols.forEach((col, ci) => {
+      const ext = sharedEdge && ci === 0 ? sec.joistT[0] : 0
       sec.colBlocks[ci].forEach((by, bk) => {
-        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth, ref: sec.colRows[ci]?.[0]?.drawer && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk, c: ci } })
-        member('Cross member', 1, col.w, 4)
-        deckScrewLen += col.w
+        placements.push({ kind: 'block', x: col.x - ext, y: by, z: bu, sx: col.w + ext, sy: T, sz: depth, ref: sec.colRows[ci]?.[0]?.drawer && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk, c: ci } })
+        member('Cross member', 1, col.w + ext, 4)
+        deckScrewLen += col.w + ext
       })
     })
   })
