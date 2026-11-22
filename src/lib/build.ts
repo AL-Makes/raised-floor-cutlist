@@ -353,8 +353,10 @@ export function buildFloor(input: Params): Build {
       const key = `${c.section}:${k}`
       sisterLen.set(key, (sisterLen.get(key) ?? 0) + c.l + T)
     }
+    if (!p.colAdjust?.[`${c.section}:${ci}`]) {
     placements.push({ kind: 'block', x: c.x, y: c.y + c.l / 2 - T / 2, z: bu, sx: c.w, sy: T, sz: depth })
-    member('Heavy-load cross block (mid-cell, drill 1-1/2" cable hole)', 1, c.w, 4)
+      member('Heavy-load cross block (mid-cell, drill 1-1/2" cable hole)', 1, c.w, 4)
+    }
     placements.push({ kind: 'service', x: c.x, y: c.y, z: 0, sx: c.w, sy: c.l, sz: 0.25, cell: c.index })
     cableHoles++
   })
