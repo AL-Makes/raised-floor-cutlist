@@ -388,11 +388,10 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
         </Html>
       )}
       {opts.loadMap &&
-        L.deck.visible &&
         build.layout.cells.map((c) => {
           const st = status.get(c.index) ?? 'ok'
-          const pl: Placement = { kind: 'deck', x: c.x, y: c.y, z: S + ply + 0.05, sx: c.w, sy: c.l, sz: 0.05 }
-          return <Box key={`lm${c.index}`} p={pl} color={STATUS_COLOR[st]} opacity={0.8} />
+          const pl: Placement = { kind: 'deck', x: c.x, y: c.y, z: S + ply + 0.05, sx: c.w, sy: c.l,           sz: 0.15 }
+                    return <Box key={`lm${c.index}`} p={pl} color={STATUS_COLOR[st]} opacity={0.75} />
         })}
       {L.tatami.visible &&
         mats.map((m, i) => {
