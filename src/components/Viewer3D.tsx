@@ -126,6 +126,7 @@ function Box({ p, color, opacity = 1, onOver, onOut, onDown, onClick }: { p: Pla
       onPointerOut={onOut}
       onPointerDown={onDown ? (e) => { e.stopPropagation(); onDown(e.point) } : undefined}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
+      userData={onClick ? { bin: true } : undefined}
       renderOrder={opacity < 1 ? 5 : 0}
     >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
@@ -298,7 +299,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, onSp
         <mesh
           key={v.id}
           position={[v.zone.x + v.zone.sx / 2, v.zone.z + v.zone.sz / 2, -(v.zone.y + v.zone.sy / 2)]}
-          onPointerOver={(e) => { e.stopPropagation(); setHover({ id: v.id, kind: v.kind, delta: 1, s: v.s, c: v.c, ghost: v.ghost, pos: [v.ghost.x + v.ghost.sx / 2, v.ghost.z + v.ghost.sz + 0.5, -(v.ghost.y + v.ghost.sy / 2)] }) }}
+          onPointerOver={(e) => { if (e.intersections.some((h) => h.object.userData.bin)) { setHoverState(null); return } e.stopPropagation(); setHover({ id: v.id, kind: v.kind, delta: 1, s: v.s, c: v.c, ghost: v.ghost, pos: [v.ghost.x + v.ghost.sx / 2, v.ghost.z + v.ghost.sz + 0.5, -(v.ghost.y + v.ghost.sy / 2)] }) }}
           onPointerOut={leave}
         >
           <boxGeometry args={[v.zone.sx, v.zone.sz, v.zone.sy]} />
