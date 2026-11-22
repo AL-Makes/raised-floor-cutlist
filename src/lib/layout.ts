@@ -86,7 +86,7 @@ export function buildLayout(p: Params): Layout {
   const cellMinX = bx + p.clearance + drawerExtraX
   const cellMinY = by + p.clearance
   const drawerLen = bt + (by + p.clearance + 2 * bt) + DRAWER_BACK_GAP
-  const binsAcross = (w: number) => Math.max(1, Math.floor((w - drawerExtraX + 1e-6) / (bx + p.clearance)))
+  const binsAcross = (w: number, extra = drawerExtraX) => Math.max(1, Math.floor((w - extra + 1e-6) / (bx + p.clearance)))
   const binsAlong = (l: number) => Math.max(1, Math.floor((l + 1e-6) / cellMinY))
 
   const sections: Section[] = []
@@ -146,8 +146,22 @@ export function buildLayout(p: Params): Layout {
     return [{ ...pc, rect: { ...r, x: x0, w: x1 - x0 } }, ...out]
   })
 
-  pieces.forEach(({ rect, plain, exact, fixed }, si) => {
-    const dx = divide(rect.w, cellMinX, dividerT, T, fixed ? 0 : p.joistAdjust + (p.secAdjust?.[si]?.x ?? 0))
+  // the drawer row is its own frame; its parallel joists are independent of the ones behind the cross joist that closes it
+  const split: typeof pieces = pieces.flatMap((pc) => {
+    const fr0 = geo.front
+    const isFront = drawers && !pc.plain && !pc.exact && !pc.fixed && !!fr0 && Math.abs(pc.rect.y - fr0.y) < 1e-6 && pc.rect.x >= fr0.x1 - 1e-6 && pc.rect.x + pc.rect.w <= fr0.x2 + 1e-6
+    const cut = drawerLen + T
+    if (!isFront || pc.rect.l - cut < cellMinY + 2 * T) return [pc]
+    return [
+      { ...pc, rect: { ...pc.rect, l: cut } },
+      { ...pc, rect: { ...pc.rect, y: pc.rect.y + cut, l: pc.rect.l - cut } },
+    ]
+  })
+  split.forEach(({ rect, plain, exact, fixed }, si) => {
+    const fr = geo.front
+    const isFrontSec = drawers && !plain && !exact && !fixed && !!fr && Math.abs(rect.y - fr.y) < 1e-6 && rect.x >= fr.x1 - 1e-6 && rect.x + rect.w <= fr.x2 + 1e-6
+    const cmx = isFrontSec ? cellMinX : bx + p.clearance
+    const dx = divide(rect.w, cmx, dividerT, T, fixed ? 0 : p.joistAdjust + (p.secAdjust?.[si]?.x ?? 0))
     const cols: Section['cols'] = []
     const ex = 0
     const nCols = exact ?? dx.n
@@ -280,8 +294,8 @@ export function buildLayout(p: Params): Layout {
       const end = rect.x + rect.w - T
       const base = [...joistX]
       for (let k = 1; k < last; k++) {
-        const lo = joistX[k - 1] + joistT[k - 1] + cellMinX
-        const hi = base[k + 1] - joistT[k] - cellMinX
+        const lo = joistX[k - 1] + joistT[k - 1] + cmx
+        const hi = base[k + 1] - joistT[k] - cmx
         joistX[k] = Math.min(Math.max(base[k] + (mv[`${si}:x:${k}`] ?? 0), lo), Math.max(lo, hi))
         applied[`${si}:x:${k}`] = joistX[k] - base[k]
       }
@@ -302,7 +316,7 @@ export function buildLayout(p: Params): Layout {
         const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer && !p.drawerOff?.[key] ? 'drawer' : 'bin'
         const isSvc = type === 'service'
         const needL = row.drawer ? drawerLen - 0.01 : cellMinY
-        const fitsBin = isSvc || (col.w >= cellMinX - 1e-6 && row.l >= needL - 1e-6)
+        const fitsBin = isSvc || (col.w >= (isFrontSec ? cellMinX : bx + p.clearance) - 1e-6 && row.l >= needL - 1e-6)
         cells.push({
           index: cells.length,
           key: `${si}:${ci}:${ri}`,
@@ -313,7 +327,7 @@ export function buildLayout(p: Params): Layout {
           l: row.l,
           type,
           fitsBin,
-          binsX: isSvc ? 0 : binsAcross(col.w),
+          binsX: isSvc ? 0 : binsAcross(col.w, isFrontSec ? drawerExtraX : 0),
           binsY: isSvc ? 0 : type === 'drawer' ? 1 : binsAlong(row.l),
           drawerBay: row.drawer && !isSvc,
         })

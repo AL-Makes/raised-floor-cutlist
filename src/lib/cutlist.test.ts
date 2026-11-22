@@ -323,6 +323,17 @@ describe('dragging walls and plywood drawers', () => {
     expect(sec.cols[ws.length - 1].x + ws[ws.length - 1] + sec.joistT[ws.length]).toBeCloseTo(sec.rect.x + sec.rect.w)
     ws.slice(1).forEach((w) => expect(w).toBeCloseTo(ws[1]))
   })
+  it('keeps the drawer row joists independent of the joists behind the cross joist', () => {
+    const b = buildFloor(drawerP())
+    const [front, rear] = b.layout.sections
+    expect(front.drawerFront).toBe(true)
+    expect(rear.drawerFront).toBe(false)
+    expect(rear.rect.y).toBeCloseTo(front.rect.y + front.rect.l)
+    expect(rear.joistX.length).not.toBe(front.joistX.length)
+    const area = b.placements.filter((q) => q.kind === 'deck' || q.kind === 'hatch').reduce((s, q) => s + q.sx * q.sy, 0)
+    const floor = b.layout.sections.reduce((s, x) => s + x.rect.w * x.rect.l, 0)
+    expect(area).toBeCloseTo(floor, 0)
+  })
   it('uses the board thickness for the drawer parts', () => {
     const b = buildFloor({ ...drawerP(), drawerBoardT: 0.5 })
     expect(b.parts.filter((x) => x.group === 'Drawers').every((x) => x.thickness === 0.5)).toBe(true)
