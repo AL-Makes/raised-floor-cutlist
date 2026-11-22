@@ -469,6 +469,13 @@ describe('filler service zones', () => {
     expect(one.layout.sections[0].colBlocks[0].length).toBe(base.layout.sections[0].colBlocks[0].length + 1)
     one.layout.sections.slice(1).forEach((s, i) => expect(s.blockY.length).toBe(base.layout.sections[i + 1].blockY.length))
   })
+  it('cross joists can be added and removed inside the filler (fixed) sections too', () => {
+    const base = buildFloor(defaultParams())
+    const si = base.layout.sections.findIndex((x) => x.fixed)
+    expect(si).toBeGreaterThanOrEqual(0)
+    const more = buildFloor({ ...defaultParams(), colAdjust: { [si + ':0']: 1 } })
+    expect(more.layout.sections[si].colBlocks[0].length).toBe(base.layout.sections[si].colBlocks[0].length + 1)
+  })
   it('deck under filler pieces matches them, is fixed and cannot be an access panel', () => {
     const b = buildFloor(defaultParams())
     expect(b.layout.fillers.length).toBeGreaterThan(0)

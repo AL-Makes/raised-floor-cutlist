@@ -194,6 +194,30 @@ export function buildLayout(p: Params): Layout {
     const f = geo.front
     const drawerFront0 =
       drawers && !plain && !!f && Math.abs(rect.y - f.y) < 1e-6 && rect.x >= f.x1 - 1e-6 && rect.x + rect.w <= f.x2 + 1e-6
+    const evenCells = (start: number, span: number, n: number) => {
+      const cell = (span - (n - 1) * T) / n
+      return Array.from({ length: n }, (_, j) => ({ y: start + j * (cell + T), l: cell }))
+    }
+    const tweak = (cells: { y: number; l: number }[], k: number) => {
+      let out = cells
+      const start = cells[0].y
+      const span = cells[cells.length - 1].y + cells[cells.length - 1].l - start
+      for (let i = 0; i < Math.abs(k); i++) {
+        if (k > 0) {
+          let w = 0
+          out.forEach((c, j) => { if (c.l > out[w].l) w = j })
+          if (out[w].l >= 2 * cellMinY + T - 1e-9) {
+            const half = (out[w].l - T) / 2
+            out = [...out.slice(0, w), { y: out[w].y, l: half }, { y: out[w].y + half + T, l: half }, ...out.slice(w + 1)]
+          } else out = evenCells(start, span, out.length + 1)
+        } else if (out.length > 1) {
+          let m = 0
+          for (let j = 0; j + 1 < out.length; j++) if (out[j].l + out[j + 1].l < out[m].l + out[m + 1].l) m = j
+          out = [...out.slice(0, m), { y: out[m].y, l: out[m].l + T + out[m + 1].l }, ...out.slice(m + 2)]
+        }
+      }
+      return out
+    }
     // rows between cross joists for one bay (column). The global count (adj) spaces joists evenly; a bay's own extra
     // joists are then added by splitting the widest cell (or removed by merging the narrowest pair), so the others stay put.
     const calcRows = (adj: number, extra = 0, col?: { x: number; w: number }) => {
@@ -201,30 +225,6 @@ export function buildLayout(p: Params): Layout {
       const drawerFront = drawerFront0 && !(col && overFiller(col.x, rect.y, col.w, drawerLen))
       const rows: Section['rows'] = []
       const blockY: number[] = []
-      const evenCells = (start: number, span: number, n: number) => {
-        const cell = (span - (n - 1) * T) / n
-        return Array.from({ length: n }, (_, j) => ({ y: start + j * (cell + T), l: cell }))
-      }
-      const tweak = (cells: { y: number; l: number }[], k: number) => {
-        let out = cells
-        const start = cells[0].y
-        const span = cells[cells.length - 1].y + cells[cells.length - 1].l - start
-        for (let i = 0; i < Math.abs(k); i++) {
-          if (k > 0) {
-            let w = 0
-            out.forEach((c, j) => { if (c.l > out[w].l) w = j })
-            if (out[w].l >= 2 * cellMinY + T - 1e-9) {
-              const half = (out[w].l - T) / 2
-              out = [...out.slice(0, w), { y: out[w].y, l: half }, { y: out[w].y + half + T, l: half }, ...out.slice(w + 1)]
-            } else out = evenCells(start, span, out.length + 1)
-          } else if (out.length > 1) {
-            let m = 0
-            for (let j = 0; j + 1 < out.length; j++) if (out[j].l + out[j + 1].l < out[m].l + out[m + 1].l) m = j
-            out = [...out.slice(0, m), { y: out[m].y, l: out[m].l + T + out[m + 1].l }, ...out.slice(m + 2)]
-          }
-        }
-        return out
-      }
       if (drawerFront) {
         let dLen = drawerLen
         const remaining = rect.l - T - dLen - T
@@ -288,6 +288,11 @@ export function buildLayout(p: Params): Layout {
       }
       rows.push({ y: start, l: rect.y + rect.l - T - start, drawer: false })
     }
+    const adjustFixed = (extra: number) => {
+      if (!extra) return { rows, blockY }
+      const out = tweak(rows.map((r) => ({ y: r.y, l: r.l })), extra)
+      return { rows: out.map((c) => ({ y: c.y, l: c.l, drawer: false })), blockY: out.slice(0, -1).map((c) => c.y + c.l) }
+    }
     const mv = p.moves ?? {}
     const applied: Record<string, number> = {}
     // manual joist moves: shift a joist, clamp so neighbours keep a full cell, then rebuild the cells between joists
@@ -310,7 +315,7 @@ export function buildLayout(p: Params): Layout {
     }
 
     // every bay between two main joists keeps its own cross joists, so adding or removing one never touches the neighbours
-    const colData = cols.map((col, ci) => (fixed ? { rows, blockY } : calcRows(p.crossAdjust, p.colAdjust?.[`${si}:${ci}`] ?? 0, col)))
+    const colData = cols.map((col, ci) => (fixed ? adjustFixed(p.colAdjust?.[`${si}:${ci}`] ?? 0) : calcRows(p.crossAdjust, p.colAdjust?.[`${si}:${ci}`] ?? 0, col)))
     sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront: drawerFront0, shareFront: shareFront.has(rect), exact: !!exact, fixed: !!fixed, applied })
     cols.forEach((col, ci) => {
       colData[ci].rows.forEach((row, ri) => {
