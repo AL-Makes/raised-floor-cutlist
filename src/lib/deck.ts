@@ -150,7 +150,7 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
       })
     if (!touching.length) continue
     const area = touching.reduce((s, t) => s + t.z.w * t.z.l, 0)
-    const wholeSection = Math.abs(area - rect.w * rect.l) < 1
+    const wholeSection = area > rect.w * rect.l * 0.95
     const anyService = touching.some((t) => o.serviceFillers.includes(t.fi))
 
     if (wholeSection && !anyService) {
