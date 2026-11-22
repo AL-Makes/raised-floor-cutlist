@@ -273,32 +273,35 @@ export function buildFloor(input: Params): Build {
     const endL = sharedEdge ? 0 : sec.joistT[0]
     const innerW = rect.w - endL - sec.joistT[nJ - 1]
     const backY = rect.y + rect.l - T
-    const runPieces = (): number[] => {
-      if (innerW <= MAX_RUN + 0.01) return [innerW]
-      const cuts = sec.joistX.slice(1, -1).map((jx, i) => jx + sec.joistT[i + 1] / 2 - (rect.x + endL))
-      const out: number[] = []
-      let start = 0
-      for (let i = 0; i < cuts.length; i++) {
-        const nextCut = cuts[i + 1] ?? innerW
-        if (nextCut - start > MAX_RUN + 0.01 && cuts[i] - start > 0.01) { out.push(cuts[i] - start); start = cuts[i] }
+    const runPieces = (): { x: number; len: number }[] => {
+      const x0 = rect.x + endL
+      const gaps = thruIdx.map((k) => [sec.joistX[k] - x0, sec.joistX[k] + sec.joistT[k] - x0])
+      const segs: number[][] = []
+      if (gaps.length) {
+        let st = 0
+        for (const g of gaps) { if (g[0] > st + 0.01) segs.push([st, g[0]]); st = g[1] }
+        if (innerW > st + 0.01) segs.push([st, innerW])
+      } else if (innerW <= MAX_RUN + 0.01) segs.push([0, innerW])
+      else {
+        const cuts = sec.joistX.slice(1, -1).map((jx, i) => jx + sec.joistT[i + 1] / 2 - x0)
+        let start = 0
+        for (let i = 0; i < cuts.length; i++) {
+          const nextCut = cuts[i + 1] ?? innerW
+          if (nextCut - start > MAX_RUN + 0.01 && cuts[i] - start > 0.01) { segs.push([start, cuts[i]]); start = cuts[i] }
+        }
+        segs.push([start, innerW])
       }
-      out.push(innerW - start)
-      return out
+      return segs.flatMap(([a, b]) => {
+        const nP = Math.max(1, Math.ceil((b - a) / MAX_RUN - 0.0001))
+        return Array.from({ length: nP }, (_, k) => ({ x: a + (k * (b - a)) / nP, len: (b - a) / nP }))
+      })
     }
     const splitRun = (name: string, pk: number, mk: (nm: string, q: number, len: number, pk: number) => void) => {
       const pcs = runPieces()
-      pcs.forEach((len) => mk(pcs.length > 1 ? name + ' (spliced over a joist)' : name, 1, len, pk))
+      pcs.forEach((pc) => mk(pcs.length > 1 ? name + ' (cut between joists)' : name, 1, pc.len, pk))
     }
     const pushRun = (kind: string, y: number, z: number, sy: number, sz: number) => {
-      let x = rect.x + endL
-      const pcs = runPieces()
-      pcs.forEach((len, i) => {
-        const g = 0
-        const a = i > 0 ? g : 0
-        const b = i < pcs.length - 1 ? g : 0
-        placements.push({ kind, x: x + a, y, z, sx: len - a - b, sy, sz } as never)
-        x += len
-      })
+      runPieces().forEach((pc) => placements.push({ kind, x: rect.x + endL + pc.x, y, z, sx: pc.len, sy, sz } as never))
     }
     pushRun('rim', backY, bu, T, depth)
     splitRun('Back rim (between end joists)', 4, member)

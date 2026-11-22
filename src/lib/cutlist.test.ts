@@ -591,3 +591,16 @@ describe('through joists', () => {
     expect(b.parts.some((x) => /drawer support cap/i.test(x.name))).toBe(false)
   })
 })
+
+describe('frame members never overlap', () => {
+  it.each([false, true])('drawers=%s', (drawers) => {
+    const p = { ...defaultParams(), floor: { shape: 'poly' as const, width: 136, length: 73, notchW: 36, notchL: 36, frontEdge: 0, poly: [{ x: 0, y: 0 }, { x: 136, y: 0 }, { x: 136, y: 73 }, { x: 0, y: 73 }] }, features: { ...defaultParams().features, drawers }, finalHeight: 20 }
+    const f = buildFloor(p).placements.filter((q) => ['rim', 'joist', 'block', 'header'].includes(q.kind))
+    let bad = 0
+    for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) {
+      const a = f[i], c = f[j]
+      if (Math.min(a.x + a.sx, c.x + c.sx) - Math.max(a.x, c.x) > 0.05 && Math.min(a.y + a.sy, c.y + c.sy) - Math.max(a.y, c.y) > 0.05 && Math.min(a.z + a.sz, c.z + c.sz) - Math.max(a.z, c.z) > 0.05) bad++
+    }
+    expect(bad).toBe(0)
+  })
+})
