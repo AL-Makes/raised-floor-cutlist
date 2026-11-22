@@ -3,14 +3,14 @@ import { floorPolygon } from './lib/geometry'
 import type { LayerKey } from './components/Viewer3D'
 import { LAYER_LABELS } from './components/Viewer3D'
 
-export const DEMO_MS = 36000
+export const DEMO_MS = 42000
 
 export const DEMO_CAPTIONS = [
   'Drag the walls to reshape the floor - corners stay square',
   'Pick any IKEA bin - the layout re-fits to its size',
   'Change the height - the frame and render update live',
   'Layers: switch them on, fade them out, see inside',
-  'Add drawers, then pull them out',
+  'Side panels on - add and remove drawers, pull them out',
   'Tatami layouts - swap a square mat for a lift table',
   'Lift table raised - this was just a demo',
 ]
@@ -155,6 +155,13 @@ export async function runDemo(ctx: DemoCtx) {
     }
 
     ctx.caption(4)
+    const sideCb = layerRow('side').querySelector<HTMLInputElement>('input[type=checkbox]')!
+    if (!sideCb.checked) {
+      await to(sideCb, 500)
+      await pulse()
+      sideCb.click()
+      await wait(600)
+    }
     const dr = [...document.querySelectorAll('label.check')].find((l) => l.textContent?.includes('Drawers on the front row'))!.querySelector<HTMLInputElement>('input')!
     await to(dr, 600)
     await pulse()
@@ -178,6 +185,13 @@ export async function runDemo(ctx: DemoCtx) {
     cur.classList.add('down')
     await tween(0.8, 0, 800, (v) => ctx.setPulls(Object.fromEntries(drawers.map((c) => [`d${c.index}`, reach(c.index) * v]))))
     cur.classList.remove('down')
+    await wait(300)
+    for (let i = 0; i < 2; i++) {
+      await to(dr, 500)
+      await pulse()
+      dr.click()
+      await wait(800)
+    }
     await wait(150)
 
     ctx.caption(5)

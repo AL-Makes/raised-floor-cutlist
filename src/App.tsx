@@ -105,7 +105,7 @@ export default function App() {
     const poly = [{ x: 0, y: 0 }, { x: 96, y: 0 }, { x: 96, y: 48 }, { x: 60, y: 48 }, { x: 60, y: 84 }, { x: 0, y: 84 }]
     setParams({ ...d, floor: { ...d.floor, shape: 'poly', poly, frontEdge: 0 }, binId: b.id, bin: { w: b.w, d: b.d, h: b.h }, finalHeight: 16 })
     const dv = defaultView()
-    setView({ ...dv, dims: true, layers: { ...dv.layers, deck: { ...dv.layers.deck, visible: false }, tatami: { ...dv.layers.tatami, visible: false } } })
+    setView({ ...dv, dims: true, layers: { ...dv.layers, deck: { ...dv.layers.deck, visible: false }, tatami: { ...dv.layers.tatami, visible: false }, side: { ...dv.layers.side, visible: false } } })
     setTab('3d')
     setLayersOpen(true)
     setDemo(0)
