@@ -220,21 +220,20 @@ export function buildFloor(input: Params): Build {
     const dCells = layout.cells.filter((c) => c.section === sec.index && c.type === 'drawer')
     const touches = (k: number) => dCells.some((c) => Math.abs(c.x + c.w - sec.joistX[k]) < 0.1 || Math.abs(c.x - (sec.joistX[k] + sec.joistT[k])) < 0.1)
     const drawerIdx = sec.drawerFront ? [0, ...inner, n - 1].filter((k) => !(k === 0 && sharedEdge) && touches(k)) : []
-    const dFront = sec.drawerFront ? frontT : 0
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       if (k === 0 && sharedEdge) return
       const t = sec.joistT[k]
       const drawerJoist = drawerIdx.includes(k)
-      const jy = drawerJoist || (rim && !sec.drawerFront) ? rect.y : rect.y + frontT
-      const jl = drawerJoist ? rect.l : rim ? rect.l - dFront : rect.l - frontT - T
+      const jy = drawerJoist || rim ? rect.y : rect.y + frontT
+      const jl = drawerJoist || rim ? rect.l : rect.l - frontT - T
       placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: drawerJoist ? depth - 1.5 : depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
       deckScrewLen += jl
     })
     const placedEnds = [0, n - 1].filter((k) => !(k === 0 && sharedEdge))
-    const rimLens = placedEnds.filter((k) => !drawerIdx.includes(k)).map(() => rect.l - dFront)
+    const rimLens = placedEnds.filter((k) => !drawerIdx.includes(k)).map(() => rect.l)
     const rimCount = placedEnds.length
     const divTotal = inner.length
     const mult = p.reinforce.doubleJoists ? 2 : 1
