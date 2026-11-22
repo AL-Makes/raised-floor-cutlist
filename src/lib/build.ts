@@ -216,26 +216,33 @@ export function buildFloor(input: Params): Build {
     const n = sec.joistX.length
     const frontT = sec.drawerFront ? 3.5 : sec.shareFront ? 0 : T
     const sharedEdge = layout.sections.filter((o) => o !== sec && Math.abs(o.joistX[o.joistX.length - 1] + o.joistT[o.joistT.length - 1] - sec.joistX[0]) < 0.05).reduce((a, o) => a + Math.max(0, Math.min(o.rect.y + o.rect.l, sec.rect.y + sec.rect.l) - Math.max(o.rect.y, sec.rect.y)), 0) >= sec.rect.l - 0.05
+    const rear = sec.drawerFront ? layout.sections.find((o) => o !== sec && o.shareFront && Math.abs(o.rect.y - (sec.rect.y + sec.rect.l)) < 0.1) : undefined
+    const front = sec.shareFront ? layout.sections.find((o) => o !== sec && o.drawerFront && Math.abs(o.rect.y + o.rect.l - sec.rect.y) < 0.1) : undefined
+    const endOf = (o: typeof sec, k: number) => (k === 0 ? o.joistX[0] : o.joistX[o.joistX.length - 1])
+    const endExtra = (k: number) => (rear && Math.abs(endOf(rear, k === 0 ? 0 : 1) - endOf(sec, k)) < 0.05 ? rear.rect.l : 0)
+    const endSkip = (k: number) => !!front && Math.abs(endOf(front, k === 0 ? 0 : 1) - endOf(sec, k)) < 0.05
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       if (k === 0 && sharedEdge) return
+      if (rim && endSkip(k)) return
       const t = sec.joistT[k]
       const drawerJoist = !rim && sec.drawerFront
       const jy = rim || drawerJoist ? rect.y : rect.y + frontT
-      const jl = rim ? rect.l : drawerJoist ? rect.l - T : rect.l - frontT - T
+      const jl = rim ? rect.l + endExtra(k) : drawerJoist ? rect.l - T : rect.l - frontT - T
       placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: drawerJoist ? depth - 1.5 : depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
       deckScrewLen += jl
     })
-    const rimCount = sharedEdge ? 1 : 2
+    const rimLens = [0, n - 1].filter((k) => !(k === 0 && sharedEdge) && !endSkip(k)).map((k) => rect.l + endExtra(k))
+    const rimCount = rimLens.length
     const divTotal = sec.joistX.length - 2
     const mult = p.reinforce.doubleJoists ? 2 : 1
     joistCount += rimCount + divTotal * mult
     crossLines += Math.max(0, ...sec.colBlocks.map((b) => b.length))
     supportPads += p.supportCount > 1 ? (rimCount + divTotal * mult) * p.supportCount : 0
     const jname = builtup ? 'Joist' : `Joist (${jointKey} on edge)`
-    member(jname, rimCount, rect.l)
+    rimLens.forEach((len) => member(jname, 1, len))
     if (divTotal > 0) member(jname + (sec.drawerFront ? ' (drawer support, front face to back rim)' : ' (interior, between front & back rims)'), divTotal * mult, sec.drawerFront ? rect.l - T : rect.l - frontT - T)
     if (sec.drawerFront && divTotal > 0) {
       const capL = rect.l - T - 3.5
