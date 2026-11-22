@@ -81,6 +81,8 @@ export interface Params {
   joistAdjust: number
   /** change in the number of cross joists (blocking rows) vs. the bin-driven count */
   crossAdjust: number
+  /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
+  moves: Record<string, number>
   tatamiPattern: TatamiPatternId
   /** thickness of the acoustic underlay (QEP natural cork is 6 mm, about 1/4") */
   underlayThickness: number
@@ -137,6 +139,8 @@ export interface Placement {
   sy: number
   sz: number
   cell?: number
+  /** movable joist: section, axis the joist is moved along, and index within the section */
+  ref?: { s: number; axis: 'x' | 'y'; k: number }
 }
 
 export type CellType = 'bin' | 'drawer'

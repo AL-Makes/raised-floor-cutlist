@@ -344,3 +344,15 @@ describe('motorized lift tables', () => {
     expect(drawers.every((c) => c.x + c.w <= 36.01 || c.x >= 71.99)).toBe(true)
   })
 })
+
+describe('manual joist moves', () => {
+  it('moving a cross joist changes only adjacent rows', () => {
+    const p = defaultParams()
+    const a = buildFloor(p).layout.sections[0]
+    const k = Math.floor(a.blockY.length / 2)
+    const b = buildFloor({ ...p, moves: { ['0:y:' + k]: 0.25 } }).layout.sections[0]
+    expect(b.blockY[k]).toBeCloseTo(a.blockY[k] + 0.25, 3)
+    expect(b.blockY.length).toBe(a.blockY.length)
+    b.blockY.forEach((y, i) => { if (i !== k) expect(y).toBeCloseTo(a.blockY[i], 3) })
+  })
+})

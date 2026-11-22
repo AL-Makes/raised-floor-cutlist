@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { CanvasTexture } from 'three'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
+import { CanvasTexture, Plane, Vector3 } from 'three'
 import { Edges, Html, OrbitControls } from '@react-three/drei'
 import type { Build } from '../lib/build'
 import type { Structural, Status } from '../lib/structural'
@@ -83,12 +83,44 @@ const STATUS_COLOR: Record<Status, string> = { ok: '#2ecc71', warn: '#f1c40f', f
 interface Hover { id: string; kind: 'joist' | 'block'; delta: 1 | -1; pos: [number, number, number]; ghost?: Placement }
 interface Void { id: string; kind: 'joist' | 'block'; zone: Placement; ghost: Placement }
 
-function Box({ p, color, opacity = 1, onOver, onOut }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void }) {
+interface Drag { ref: NonNullable<Placement['ref']>; start: number; base: number; planeY: number }
+
+function DragController({ drag, onMove, onEnd }: { drag: Drag | null; onMove: (key: string, v: number) => void; onEnd: () => void }) {
+  const { camera, gl, raycaster, controls } = useThree()
+  useEffect(() => {
+    if (!drag) return
+    const oc = controls as unknown as { enabled: boolean } | null
+    if (oc) oc.enabled = false
+    const plane = new Plane(new Vector3(0, 1, 0), -drag.planeY)
+    const hit = new Vector3()
+    const move = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect()
+      const ndc = { x: ((ev.clientX - r.left) / r.width) * 2 - 1, y: -((ev.clientY - r.top) / r.height) * 2 + 1 }
+      raycaster.setFromCamera(ndc as never, camera)
+      if (!raycaster.ray.intersectPlane(plane, hit)) return
+      const pos = drag.ref.axis === 'x' ? hit.x : -hit.z
+      const d = Math.round((pos - drag.start) * 8) / 8
+      onMove(`${drag.ref.s}:${drag.ref.axis}:${drag.ref.k}`, drag.base + d)
+    }
+    const up = () => onEnd()
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      if (oc) oc.enabled = true
+    }
+  }, [drag, camera, gl, raycaster, controls, onMove, onEnd])
+  return null
+}
+
+function Box({ p, color, opacity = 1, onOver, onOut, onDown }: { p: Placement; color: string; opacity?: number; onOver?: () => void; onOut?: () => void; onDown?: (pt: { x: number; y: number; z: number }) => void }) {
   return (
     <mesh
       position={[p.x + p.sx / 2, p.z + p.sz / 2, -(p.y + p.sy / 2)]}
       onPointerOver={onOver ? (e) => { e.stopPropagation(); onOver() } : undefined}
       onPointerOut={onOut}
+      onPointerDown={onDown ? (e) => { e.stopPropagation(); onDown(e.point) } : undefined}
       renderOrder={opacity < 1 ? 5 : 0}
     >
       <boxGeometry args={[p.sx, p.sz, p.sy]} />
@@ -178,8 +210,10 @@ function findVoids(build: Build): Void[] {
   return out
 }
 
-export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; units?: UnitSystem }) {
+export function Viewer3D({ build, structural, mats, opts, onAdjust, onMove, units = 'imperial' }: { build: Build; structural: Structural; mats: Mat[]; opts: ViewOptions; onAdjust: (kind: 'joist' | 'block', delta: number) => void; onMove: (key: string, v: number) => void; units?: UnitSystem }) {
   const [hover, setHoverState] = useState<Hover | null>(null)
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const endDrag = useMemo(() => () => setDrag(null), [])
   const timer = useRef<number | undefined>(undefined)
   const setHover = (h: Hover) => { window.clearTimeout(timer.current); setHoverState(h) }
   const leave = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setHoverState(null), 700) }
@@ -202,6 +236,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
       <ambientLight intensity={0.7} />
       <directionalLight position={[cx + 100, 250, 150]} intensity={1.1} />
       <OrbitControls target={[cx, S / 2, cz]} makeDefault />
+      <DragController drag={drag} onMove={onMove} onEnd={endDrag} />
       <gridHelper args={[span * 2.5, 20, '#888', '#ccc']} position={[cx, -0.05, cz]} />
       {front && (
         <mesh position={[(front.x1 + front.x2) / 2, 0.15, 3]}>
@@ -219,14 +254,22 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
         }
         const edit = p.kind === 'block'
         const id = `p${i}`
-        const color = hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'
-        const over = edit ? () => setHover({ id, kind: 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
+        const dragging = !!drag && !!p.ref && drag.ref.s === p.ref.s && drag.ref.axis === p.ref.axis && drag.ref.k === p.ref.k
+        const color = dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : COLORS[p.kind] ?? '#999'
+        const over = edit && !drag ? () => setHover({ id, kind: 'block', delta: -1, pos: [p.x + p.sx / 2, p.z + p.sz + 0.5, -(p.y + p.sy / 2)] }) : undefined
+        const down = p.ref
+          ? (pt: { x: number; y: number; z: number }) => {
+              setHoverState(null)
+              const r = p.ref!
+              setDrag({ ref: r, start: r.axis === 'x' ? pt.x : -pt.z, base: build.params.moves?.[`${r.s}:${r.axis}:${r.k}`] ?? 0, planeY: pt.y })
+            }
+          : undefined
         if (build.params.joistStyle === 'builtup' && (p.kind === 'joist' || p.kind === 'rim' || p.kind === 'block') && p.sz >= 3.2) {
           const bu = builtUp(p)
           return (
             <group key={i}>
-              {bu.chord.map((c, k) => <Box key={`c${k}`} p={c} color={color} opacity={layer.opacity} onOver={over} onOut={edit ? leave : undefined} />)}
-              {bu.web.map((w, k) => <Box key={`w${k}`} p={w} color={hover?.id === id ? '#e57373' : COLORS.web} opacity={layer.opacity} onOver={over} onOut={edit ? leave : undefined} />)}
+              {bu.chord.map((c, k) => <Box key={`c${k}`} p={c} color={color} opacity={layer.opacity} onOver={over} onOut={edit ? leave : undefined} onDown={down} />)}
+              {bu.web.map((w, k) => <Box key={`w${k}`} p={w} color={dragging ? '#2ecc71' : hover?.id === id ? '#e57373' : COLORS.web} opacity={layer.opacity} onOver={over} onOut={edit ? leave : undefined} onDown={down} />)}
             </group>
           )
         }
@@ -238,6 +281,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
             opacity={layer.opacity}
             onOver={over}
             onOut={edit ? leave : undefined}
+            onDown={down}
           />
         )
       })}

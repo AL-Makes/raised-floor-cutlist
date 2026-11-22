@@ -26,6 +26,8 @@ export interface Section {
   blockY: number[]
   /** true when the section's front edge (y = 0) carries drawers */
   drawerFront: boolean
+  /** true when main joist positions are dictated by drawer widths */
+  exact: boolean
 }
 
 export interface Layout {
@@ -179,7 +181,48 @@ export function buildLayout(p: Params): Layout {
       }
     }
 
-    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront })
+    const mv = p.moves ?? {}
+    // manual joist moves: shift a joist, clamp so neighbours keep a full cell, then rebuild the cells between joists
+    const lowK = drawerFront ? 1 : 0
+    if (blockY.some((_, k) => k >= lowK && mv[`${si}:y:${k}`])) {
+      const end = rect.y + rect.l - T
+      const base = [...blockY]
+      for (let k = lowK; k < blockY.length; k++) {
+        const prevEdge = k === 0 ? rect.y + T : blockY[k - 1] + T
+        const lo = prevEdge + cellMinY
+        const hi = (k + 1 < base.length ? base[k + 1] : end) - T - cellMinY
+        blockY[k] = Math.min(Math.max(base[k] + (mv[`${si}:y:${k}`] ?? 0), lo), Math.max(lo, hi))
+      }
+      rows.length = 0
+      let start = rect.y + T
+      if (drawerFront) {
+        rows.push({ y: rect.y, l: drawerLen, drawer: true })
+        start = blockY[0] + T
+      }
+      for (let k = drawerFront ? 1 : 0; k <= blockY.length; k++) {
+        const stop = k < blockY.length ? blockY[k] : end
+        rows.push({ y: start, l: stop - start, drawer: false })
+        start = stop + T
+      }
+    }
+    if (!exact && joistX.some((_, k) => k > 0 && k < joistX.length - 1 && mv[`${si}:x:${k}`])) {
+      const last = joistX.length - 1
+      const end = rect.x + rect.w - T
+      const base = [...joistX]
+      for (let k = 1; k < last; k++) {
+        const lo = joistX[k - 1] + joistT[k - 1] + cellMinX
+        const hi = base[k + 1] - joistT[k] - cellMinX
+        joistX[k] = Math.min(Math.max(base[k] + (mv[`${si}:x:${k}`] ?? 0), lo), Math.max(lo, hi))
+      }
+      joistX[last] = end
+      cols.length = 0
+      for (let k = 0; k < last; k++) {
+        const x = joistX[k] + joistT[k]
+        cols.push({ x, w: joistX[k + 1] - x })
+      }
+    }
+
+    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact })
     for (const row of rows) {
       for (const col of cols) {
         const type = row.drawer ? 'drawer' : 'bin'

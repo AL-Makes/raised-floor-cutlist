@@ -147,8 +147,10 @@ export default function App() {
                 </label>
                 </>)}
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d } : { ...q, crossAdjust: q.crossAdjust + d }))} />
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d) => setParams((q) => (kind === 'joist' ? { ...q, joistAdjust: q.joistAdjust + d, moves: {} } : { ...q, crossAdjust: q.crossAdjust + d, moves: {} }))} onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))} />
               <div className="hud">
+                {Object.keys(params.moves ?? {}).length > 0 && <button type="button" className="layertoggle" onClick={() => setParams((q) => ({ ...q, moves: {} }))}>Reset joist positions</button>}
+                Drag a joist to move it -
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf
               </div>
             </div>

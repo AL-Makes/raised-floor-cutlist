@@ -55,6 +55,7 @@ export function defaultParams(): Params {
     supportCount: 0,
     joistAdjust: 0,
     crossAdjust: 0,
+    moves: {},
     tatamiPattern: 'brick',
     tatamiAnchor: 'bl',
     tatamiLong: 72,
@@ -262,7 +263,7 @@ export function buildFloor(input: Params): Build {
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       const t = sec.joistT[k]
-      placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: rect.y, z: bu, sx: t, sy: rect.l, sz: depth })
+      placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: rect.y, z: bu, sx: t, sy: rect.l, sz: depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: rect.y, z: 0, sx: t, sy: rect.l, sz: bu })
       joistLf += rect.l / 12
       deckScrewLen += rect.l
@@ -294,13 +295,13 @@ export function buildFloor(input: Params): Build {
       member('Front rim (between end joists)', 1, innerW, 4)
     }
 
-    for (const by of sec.blockY) {
+    sec.blockY.forEach((by, bk) => {
       for (const col of sec.cols) {
-        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth })
+        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth, ref: sec.drawerFront && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk } })
         member('Cross member', 1, col.w, 4)
         deckScrewLen += col.w
       }
-    }
+    })
 
     const joistCenters = sec.joistX.map((x, k) => x + sec.joistT[k] / 2 - rect.x)
     const yCenters = [
