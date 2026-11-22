@@ -242,7 +242,7 @@ export function Viewer3D({ build, structural, mats, opts, onAdjust, units = 'imp
       })}
       {build.placements.map((p, i) => {
         if (!opts.dims || (p.kind !== 'bin' && p.kind !== 'drawer') || !L[layerOf(p.kind)].visible) return null
-        return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} onTop={L.deck.visible || L.tatami.visible} />
+        return <DimPlane key={`dim${i}`} p={p} y={p.z + p.sz + 0.04} units={units} onTop={false} />
       })}
       {voids.filter((v) => L[v.kind === 'joist' ? 'joists' : 'cross'].visible).map((v) => (
         <mesh
