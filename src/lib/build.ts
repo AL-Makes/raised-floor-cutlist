@@ -211,9 +211,10 @@ export function buildFloor(input: Params): Build {
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       const t = sec.joistT[k]
-      const jy = rim ? rect.y : rect.y + frontT
-      const jl = rim ? rect.l : rect.l - frontT - T
-      placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
+      const drawerJoist = !rim && sec.drawerFront
+      const jy = rim || drawerJoist ? rect.y : rect.y + frontT
+      const jl = rim ? rect.l : drawerJoist ? rect.l - T : rect.l - frontT - T
+      placements.push({ kind: rim ? 'rim' : 'joist', x: jx, y: jy, z: bu, sx: t, sy: jl, sz: drawerJoist ? depth - 1.5 : depth, ref: rim || sec.exact ? undefined : { s: sec.index, axis: 'x', k } })
       if (bu > 0) placements.push({ kind: 'buildup', x: jx, y: jy, z: 0, sx: t, sy: jl, sz: bu })
       joistLf += jl / 12
       deckScrewLen += jl
@@ -226,7 +227,16 @@ export function buildFloor(input: Params): Build {
     supportPads += p.supportCount > 1 ? (rimCount + divTotal * mult) * p.supportCount : 0
     const jname = builtup ? 'Joist' : `Joist (${jointKey} on edge)`
     member(jname, rimCount, rect.l)
-    if (divTotal > 0) member(jname + ' (interior, between front & back rims)', divTotal * mult, rect.l - frontT - T)
+    if (divTotal > 0) member(jname + (sec.drawerFront ? ' (drawer support, front face to back rim)' : ' (interior, between front & back rims)'), divTotal * mult, sec.drawerFront ? rect.l - T : rect.l - frontT - T)
+    if (sec.drawerFront && divTotal > 0) {
+      const capL = rect.l - T - 3.5
+      sec.joistX.forEach((jx, k) => {
+        if (k === 0 || k === n - 1) return
+        placements.push({ kind: 'header', x: jx + sec.joistT[k] / 2 - 1.75, y: rect.y + 3.5, z: S - 1.5, sx: 3.5, sy: capL, sz: 1.5 })
+      })
+      lumber('Frame', 'Drawer support cap (2x4 laid flat on top of each drawer support)', '2x4', divTotal * mult, capL, 3.5, 1.5, 'Screw down into the joist; carries the plywood above the drawers. The joist is cut 1-1/2" shorter in height under it', 4)
+      lumber('Frame', 'Drawer support extra vertical web (2x4)', '2x4', divTotal * mult, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, 'One extra web in each drawer support, near the front face, pocket-screwed to both chords', 4)
+    }
     for (const l of layers) {
       const qty = rimCount + divTotal * mult
       if (l.material.startsWith('ply-strip')) sheet('Frame', `Build-up strip (${l.name})`, l.t, qty, rect.l, 3.5, 'Glue + screw under each joist')

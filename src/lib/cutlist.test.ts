@@ -346,10 +346,20 @@ describe('dragging walls and plywood drawers', () => {
     expect(b.warnings.some((w) => /raised/i.test(w))).toBe(true)
     const d = boxes(b)[0]
     const f = b.placements.find((q) => q.kind === 'cutout')!
-    const hdr = b.placements.find((q) => q.kind === 'header')
+    const hdr = b.placements.find((q) => q.kind === 'header' && q.sx > 4)
     expect(hdr!.y).toBeCloseTo(d.y)
     expect(hdr!.z - (f.z + f.sz)).toBeGreaterThanOrEqual(0.5 - 1e-6)
     expect(hdr!.z - (d.z + d.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
+  })
+  it('drawer supports reach the front face under the header, with a 2x4 cap and one extra web', () => {
+    const b = buildFloor(drawerP())
+    const sec = b.layout.sections[0]
+    const hdr = b.placements.find((q) => q.kind === 'header' && q.sx > 4)!
+    const js = b.placements.filter((q) => q.kind === 'joist' && Math.abs(q.y - sec.rect.y) < 1e-6)
+    expect(js.length).toBe(sec.joistX.length - 2)
+    js.forEach((j) => expect(j.z + j.sz).toBeLessThanOrEqual(hdr.z + 1e-6))
+    expect(b.placements.filter((q) => q.kind === 'header' && q.sx === 3.5 && q.y > sec.rect.y).length).toBe(js.length)
+    expect(b.parts.some((i) => i.name.startsWith('Drawer support extra vertical web'))).toBe(true)
   })
   it('cuts the front fascia in joist-centre to joist-centre pieces, each with a drawer opening', () => {
     const b = buildFloor(drawerP())
