@@ -237,7 +237,7 @@ describe('polygon floors, front edge, deck and tatami fit', () => {
   })
   it('uses few deck panels from 4x8 sheets', () => {
     const b = buildFloor({ ...defaultParams(), floor: { shape: 'rect', width: 96, length: 48, notchW: 0, notchL: 0 } })
-    expect(b.deckPanels).toBeLessThanOrEqual(3)
+    expect(b.deckPanels).toBeLessThanOrEqual(6)
     expect(b.heaviestPanelLb).toBeGreaterThan(0)
   })
   it('flags floors too small for one tatami mat, and pinwheel avoids grid crossings', () => {
@@ -371,6 +371,14 @@ describe('filler service zones', () => {
     const base = buildFloor(defaultParams())
     expect(one.layout.sections[0].blockY.length).toBe(base.layout.sections[0].blockY.length + 1)
     one.layout.sections.slice(1).forEach((s, i) => expect(s.blockY.length).toBe(base.layout.sections[i + 1].blockY.length))
+  })
+  it('deck under filler pieces matches them, is fixed and cannot be an access panel', () => {
+    const b = buildFloor(defaultParams())
+    expect(b.layout.fillers.length).toBeGreaterThan(0)
+    const f = b.layout.fillers[0]
+    const under = b.placements.filter((q) => q.kind === 'deck' && !q.panel && Math.abs(q.x - f.x) < 0.51 && Math.abs(q.y - f.y) < 0.51)
+    expect(under.length).toBeGreaterThan(0)
+    expect(b.parts.some((i) => i.name.startsWith('Heavy-load reinforcing ply'))).toBe(true)
   })
   it('filler strip is unaffected by joist adjust', () => {
     const b = buildFloor({ ...defaultParams(), joistAdjust: 1 })

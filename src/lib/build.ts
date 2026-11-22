@@ -338,8 +338,24 @@ export function buildFloor(input: Params): Build {
       for (const pc of plan.pieces) {
         let parts: Rect[] = [{ x: rect.x + pc.x, y: rect.y + reg.y0 + pc.y, w: pc.w, l: pc.l }]
         for (const cut of (p.deckCuts ?? []).filter((c) => c.s === sec.index)) parts = parts.flatMap((r) => splitAt(r, cut.axis, cut.pos))
+        // deck panels are cut to match each filler piece exactly
+        for (const f of layout.fillers) {
+          for (const [axis, pos] of [['x', f.x], ['x', f.x + f.w], ['y', f.y], ['y', f.y + f.l]] as const)
+            parts = parts.flatMap((r) => splitAt(r, axis, pos))
+        }
         for (const r of parts) {
           const key = `${sec.index}:${r3(r.x)}:${r3(r.y)}`
+          const cx = r.x + r.w / 2
+          const cy = r.y + r.l / 2
+          const underFiller = layout.fillers.some((f) => cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.l)
+          if (underFiller) {
+            sheet('Deck', `Deck panel under filler (${r3(p.plyThickness)}" ply, fixed)`, p.plyThickness, 1, r.w, r.l, 'Same size as the filler piece above; screw down to joists and blocks, not accessible')
+            sheet('Deck reinforcement', `Heavy-load reinforcing ply under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l, 'Glue + screw a second layer for TV / TV stand loads; seams offset from the panel above')
+            deckPanels++
+            placements.push({ kind: 'deck', x: r.x, y: r.y, z: S, sx: r.w, sy: r.l, sz: p.plyThickness })
+            heaviest = Math.max(heaviest, r.w * r.l * p.plyThickness * PLY_LB_PER_IN3 * 2)
+            continue
+          }
           const access = accessSet.has(key)
           if (access) {
             accessCount++
