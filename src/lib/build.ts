@@ -259,6 +259,24 @@ export function buildFloor(input: Params): Build {
       lumber('Frame', 'Drawer support cap (2x4 laid flat on top of each drawer support)', '2x4', dTotal * mult, capL, 3.5, 1.5, 'Screw down into the joist; carries the plywood above the drawers. The joist is cut 1-1/2" shorter in height under it', 4)
       lumber('Frame', 'Drawer support extra vertical web (2x4)', '2x4', dTotal * mult, Math.max(0.5, S - 2 * CHORD_T), 3.5, 1.5, 'One extra web in each drawer support, near the front face, pocket-screwed to both chords', 4)
     }
+    if (sec.drawerFront) {
+      const frames: { x: number; w: number }[] = []
+      for (let k = 0; k < n - 1; k++) {
+        const x0 = sec.joistX[k] + sec.joistT[k]
+        const w = sec.joistX[k + 1] - x0
+        if (w > 0.5 && !dCells.some((c) => Math.abs(c.x - x0) < 0.1)) frames.push({ x: x0, w })
+      }
+      const vh = Math.max(0.5, S - 1.5 - 1.5)
+      frames.forEach((fr) => {
+        placements.push({ kind: 'web', x: fr.x, y: rect.y, z: bu, sx: fr.w, sy: 3.5, sz: 1.5 })
+        placements.push({ kind: 'web', x: fr.x, y: rect.y, z: bu + 1.5, sx: 1.5, sy: 3.5, sz: vh })
+        placements.push({ kind: 'web', x: fr.x + fr.w - 1.5, y: rect.y, z: bu + 1.5, sx: 1.5, sy: 3.5, sz: vh })
+      })
+      if (frames.length) {
+        lumber('Frame', 'Front frame bottom rail (2x4 laid flat, under the front header over a non-drawer bay)', '2x4', frames.length, frames.reduce((a, x) => a + x.w, 0) / frames.length, 3.5, 1.5, 'Hangs between the supports; screw into the support faces', 4)
+        lumber('Frame', 'Front frame vertical (2x4, at each end of a non-drawer bay front)', '2x4', frames.length * 2, vh, 3.5, 1.5, 'Two verticals plus the bottom rail and the header make a closed frame', 4)
+      }
+    }
     for (const l of layers) {
       const qty = rimCount + divTotal * mult
       if (l.material.startsWith('ply-strip')) sheet('Frame', `Build-up strip (${l.name})`, l.t, qty, rect.l, 3.5, 'Glue + screw under each joist')

@@ -125,6 +125,7 @@ export interface Part {
 }
 
 export type PlacementKind =
+  | 'web'
   | 'lift'
   | 'service'
   | 'joist'

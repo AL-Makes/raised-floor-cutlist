@@ -596,7 +596,7 @@ describe('drawer supports and header', () => {
 describe('frame members never overlap', () => {
   it.each([false, true])('drawers=%s', (drawers) => {
     const p = { ...defaultParams(), floor: { shape: 'poly' as const, width: 136, length: 73, notchW: 36, notchL: 36, frontEdge: 0, poly: [{ x: 0, y: 0 }, { x: 136, y: 0 }, { x: 136, y: 73 }, { x: 0, y: 73 }] }, features: { ...defaultParams().features, drawers }, finalHeight: 20 }
-    const f = buildFloor(p).placements.filter((q) => ['rim', 'joist', 'block', 'header'].includes(q.kind))
+    const f = buildFloor(p).placements.filter((q) => ['rim', 'joist', 'block', 'header', 'web'].includes(q.kind))
     let bad = 0
     for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) {
       const a = f[i], c = f[j]
@@ -617,7 +617,7 @@ describe('joists not touching a drawer', () => {
     const capsOne = one.parts.filter((x) => /drawer support cap/i.test(x.name)).reduce((a, x) => a + x.qty, 0)
     expect(capsOne).toBe(2)
     expect(capsOne).toBeLessThan(capsAll)
-    const f = one.placements.filter((q) => ['rim', 'joist', 'block', 'header'].includes(q.kind))
+    const f = one.placements.filter((q) => ['rim', 'joist', 'block', 'header', 'web'].includes(q.kind))
     let bad = 0
     for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) {
       const a = f[i], c = f[j]
