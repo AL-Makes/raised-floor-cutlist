@@ -49,9 +49,9 @@ export function joistCapacityPsf(thickness: number, depth: number, span: number,
 }
 
 /** Crowd and furniture the raised floor is expected to carry. */
-export const SCENARIO = { sqftPerPerson: 5, personLb: 200, tvLb: 60, standLb: 120 }
+export const SCENARIO = { sqftPerPerson: 15, personLb: 200, tvLb: 60, standLb: 120 }
 
-/** TV and stand are always assumed; people = 1 per 5 sq ft of floor area, plus the user's adjustment. */
+/** TV and stand are always assumed; people = 1 per 15 sq ft of floor area, plus the user's adjustment. */
 export function crowdScenario(b: Build) {
   const area = b.geometry.rects.reduce((a, r) => a + r.w * r.l, 0) / 144
   const auto = Math.max(1, Math.ceil(area / SCENARIO.sqftPerPerson))

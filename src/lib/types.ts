@@ -71,7 +71,7 @@ export interface Params {
   joistStyle: 'solid' | 'builtup'
   /** centre-to-centre spacing of the vertical webs in built-up joists, inches */
   webOc: number
-  /** people added to (or removed from) the automatic crowd of 1 per 5 sq ft */
+  /** people added to (or removed from) the automatic crowd of 1 per 15 sq ft */
   peopleAdj: number
   maxSpacing: number
   features: Features

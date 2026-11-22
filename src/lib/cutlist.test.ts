@@ -736,10 +736,10 @@ describe('drawer clearance', () => {
 })
 
 describe('crowd scenario', () => {
-  it('is 1 person per 5 sq ft plus adjustment', () => {
+  it('is 1 person per 15 sq ft plus adjustment', () => {
     const d = defaultParams()
     const mk = (peopleAdj: number) => buildFloor({ ...d, floor: { shape: 'rect', width: 120, length: 60 } as never, peopleAdj })
-    expect(crowdScenario(mk(0)).people).toBe(Math.ceil(50 / 5))
-    expect(crowdScenario(mk(-3)).people).toBe(7)
+    expect(crowdScenario(mk(0)).people).toBe(Math.ceil(50 / 15))
+    expect(crowdScenario(mk(-3)).people).toBe(1)
   })
 })
