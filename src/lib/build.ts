@@ -215,7 +215,7 @@ export function buildFloor(input: Params): Build {
     const { rect } = sec
     const n = sec.joistX.length
     const frontT = sec.drawerFront ? 3.5 : sec.shareFront ? 0 : T
-    const sharedEdge = layout.sections.some((o) => o !== sec && Math.abs(o.joistX[o.joistX.length - 1] + o.joistT[o.joistT.length - 1] - sec.joistX[0]) < 0.05 && o.rect.y <= sec.rect.y + 0.05 && o.rect.y + o.rect.l >= sec.rect.y + sec.rect.l - 0.05)
+    const sharedEdge = layout.sections.filter((o) => o !== sec && Math.abs(o.joistX[o.joistX.length - 1] + o.joistT[o.joistT.length - 1] - sec.joistX[0]) < 0.05).reduce((a, o) => a + Math.max(0, Math.min(o.rect.y + o.rect.l, sec.rect.y + sec.rect.l) - Math.max(o.rect.y, sec.rect.y)), 0) >= sec.rect.l - 0.05
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
       if (k === 0 && sharedEdge) return
