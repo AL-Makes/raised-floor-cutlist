@@ -369,23 +369,38 @@ export function buildFloor(input: Params): Build {
       if (!p.trimSides[e.side]) continue
       const th = 0.75
       const fullH = S + p.plyThickness + p.tatamiThickness / 2
-      const note = e.isFront && p.features.drawers
-        ? '3/4" plywood, ONE continuous front panel; fix to each drawer face, cut a hand hold at each drawer'
+      const faces = e.isFront && p.features.drawers
+        ? placements.filter((q) => q.kind === 'drawerFace' && Math.abs(q.y - e.y1) < 0.01).sort((m, n) => m.x - n.x)
+        : []
+      const cuts = faces.map((q) => ({ x0: q.x - 0.5, x1: q.x + q.sx + 0.5, top: q.z + q.sz + 0.5 }))
+      const note = cuts.length
+        ? `3/4" plywood, ONE continuous front panel. Cut ${cuts.length} drawer opening(s), each ${r3(cuts[0].x1 - cuts[0].x0)}" wide x ${r3(cuts[0].top)}" tall from the bottom edge (1/2" beyond each side and 1/2" above the drawer face)`
         : '3/4" plywood, ripped to cover frame + deck edge'
       sheet('Edge trim', `Side panel - ${e.side}`, th, 1, e.length, fullH, note)
       const horiz = e.y1 === e.y2
-      placements.push({
-        kind: 'trim',
-        x: horiz ? Math.min(e.x1, e.x2) : e.side === 'left' ? e.x1 - th : e.x1,
-        y: horiz ? (e.side === 'front' ? e.y1 - th : e.y1) : Math.min(e.y1, e.y2),
+      const base = {
+        kind: 'trim' as const,
         z: 0,
         sx: horiz ? e.length : th,
         sy: horiz ? th : e.length,
         sz: fullH,
-      })
+        x: horiz ? Math.min(e.x1, e.x2) : e.side === 'left' ? e.x1 - th : e.x1,
+        y: horiz ? (e.side === 'front' ? e.y1 - th : e.y1) : Math.min(e.y1, e.y2),
+      }
+      if (!cuts.length) {
+        placements.push(base)
+        continue
+      }
+      let cursor = base.x
+      const end = base.x + base.sx
+      for (const c of cuts) {
+        if (c.x0 > cursor + 1e-6) placements.push({ ...base, x: cursor, sx: c.x0 - cursor })
+        if (c.top < fullH - 1e-6) placements.push({ ...base, x: c.x0, sx: c.x1 - c.x0, z: c.top, sz: fullH - c.top })
+        cursor = Math.max(cursor, c.x1)
+      }
+      if (end > cursor + 1e-6) placements.push({ ...base, x: cursor, sx: end - cursor })
     }
   }
-
   const liftZones = p.liftTables.map((l) => ({ x: l.x, y: l.y, w: p.tatamiShort, l: p.tatamiShort }))
   if (liftZones.length) {
     const hit = (q: { x: number; y: number; sx: number; sy: number }, z: Rect) =>

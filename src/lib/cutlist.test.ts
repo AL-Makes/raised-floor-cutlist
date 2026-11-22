@@ -309,6 +309,18 @@ describe('dragging walls and ready-made drawers', () => {
     expect(hdr!.z - (f.z + f.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
     expect(hdr!.z - (d.z + d.sz)).toBeGreaterThanOrEqual(1 - 1e-6)
   })
+  it('cuts a front fascia opening 1/2" beyond each side and above every drawer face', () => {
+    const base = defaultParams()
+    const b = buildFloor({ ...base, features: { ...base.features, drawers: true, edgeTrim: true }, drawerKind: 'ikea' as const })
+    const faces = b.placements.filter((q) => q.kind === 'drawerFace')
+    const trims = b.placements.filter((q) => q.kind === 'trim' && q.sy < 1 && q.z + q.sz > 0 && Math.abs(q.y + q.sy - faces[0].y) < 1e-6)
+    expect(faces.length).toBeGreaterThan(0)
+    const f = faces[0]
+    const mid = f.x + f.sx / 2
+    expect(trims.some((t) => t.x < mid && t.x + t.sx > mid && t.z >= f.z + f.sz + 0.5 - 1e-6)).toBe(true)
+    expect(trims.some((t) => t.z < 1 && t.x < mid && t.x + t.sx > mid)).toBe(false)
+    expect(trims.some((t) => t.z < 1 && t.x + t.sx > f.x - 0.5 + 0.01 && t.x < f.x + f.sx + 0.5 - 0.01)).toBe(false)
+  })
   it('sizes joist spacing from an IKEA rolling box and drops the drawer cut parts', () => {
     const base = defaultParams()
     const p = { ...base, finalHeight: 20, features: { ...base.features, drawers: true }, drawerKind: 'ikea' as const, rollingBox: { id: 'x', w: 24, d: 36, h: 8 } }
