@@ -141,7 +141,7 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
 
       <section>
         <h3>4. Features</h3>
-        <Check label="Drawers on the front row" checked={p.features.drawers} onChange={(v) => upd({ features: { ...p.features, drawers: v }, heightOption: 0 })} hint="Plywood drawers on casters along the front; see Drawer design below" />
+        <Check label="Drawers on the front row" checked={p.features.drawers} onChange={(v) => upd(v ? { features: { ...p.features, drawers: v }, heightOption: 0 } : { features: { ...p.features, drawers: v }, heightOption: 0, joistAdjust: 0, crossAdjust: 0, secAdjust: {}, colAdjust: {}, fixedCounts: {}, moves: {}, drawerOff: {}, clearance: Math.max(p.clearance, 2) })} hint="Plywood drawers on casters along the front; see Drawer design below" />
         <Check label="Fascia edge trim" checked={p.features.edgeTrim} onChange={(v) => upd({ features: { ...p.features, edgeTrim: v } })} />
         {p.features.edgeTrim && (
           <div className="inline">

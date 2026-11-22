@@ -41,7 +41,7 @@ export function defaultParams(): Params {
     binId: 'samla-22',
     bin: { w: mmToIn(390), d: mmToIn(280), h: mmToIn(280) },
     binLongAlongJoists: false,
-    clearance: 0.5,
+    clearance: 2,
     joistStyle: 'builtup',
     drawerBoardT: 0.75,
     casterH: 2,
