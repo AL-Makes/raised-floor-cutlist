@@ -147,10 +147,13 @@ export default function App() {
                 </label>
                 </>)}
               </div>
-              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d, s) => setParams((q) => {
-                const cur = q.secAdjust?.[s] ?? { x: 0, y: 0 }
-                const nx = kind === 'joist' ? { ...cur, x: cur.x + d } : { ...cur, y: cur.y + d }
-                return { ...q, secAdjust: { ...q.secAdjust, [s]: nx }, moves: {} }
+              <Viewer3D build={build} structural={structural} mats={matsNoLift} opts={view} units={units} onAdjust={(kind, d, s, c) => setParams((q) => {
+                if (kind === 'joist') {
+                  const cur = q.secAdjust?.[s] ?? { x: 0, y: 0 }
+                  return { ...q, secAdjust: { ...q.secAdjust, [s]: { ...cur, x: cur.x + d } }, moves: {} }
+                }
+                const key = `${s}:${c}`
+                return { ...q, colAdjust: { ...q.colAdjust, [key]: (q.colAdjust?.[key] ?? 0) + d }, moves: {} }
               })}               onMove={(key, v) => setParams((q) => ({ ...q, moves: { ...q.moves, [key]: v } }))} />
               <div className="hud">
                 {structural.cells.length} cells - frame {build.supportHeight.toFixed(2)}" - weakest {Math.round(structural.minPsf)} psf

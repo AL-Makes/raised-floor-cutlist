@@ -184,7 +184,7 @@ export function analyze(b: Build): Structural {
     }
   }
 
-  const maxCross = Math.max(0, ...b.layout.sections.map((s) => (s.blockY.length ? s.rect.l / (s.blockY.length + 1) : s.rect.l)))
+  const maxCross = Math.max(0, ...b.layout.sections.flatMap((s) => s.colBlocks.map((cb) => s.rect.l / (cb.length + 1))))
   if (b.option && b.option.depth / 1.5 > 2 && maxCross > 96) {
     issues.push({ severity: 'warn', text: `Cross joists are ${Math.round(maxCross)}" apart; deep joists over 96" unbraced can roll. Add a cross joist row.` })
     tryAdd('bridge', 'Add one more cross joist row for bridging.', (q) => ({ ...q, crossAdjust: q.crossAdjust + 1 }))

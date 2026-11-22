@@ -345,15 +345,18 @@ describe('motorized lift tables', () => {
   })
 })
 
-describe('manual joist moves', () => {
-  it('moving a cross joist changes only adjacent rows', () => {
+describe('per-bay cross joists', () => {
+  it('adding or removing a cross joist only changes its own bay; main joists stay continuous', () => {
     const p = defaultParams()
     const a = buildFloor(p).layout.sections[0]
-    const k = Math.floor(a.blockY.length / 2)
-    const b = buildFloor({ ...p, moves: { ['0:y:' + k]: 0.25 } }).layout.sections[0]
-    expect(b.blockY[k]).toBeCloseTo(a.blockY[k] + 0.25, 3)
-    expect(b.blockY.length).toBe(a.blockY.length)
-    b.blockY.forEach((y, i) => { if (i !== k) expect(y).toBeCloseTo(a.blockY[i], 3) })
+    for (const d of [1, -1]) {
+      const b = buildFloor({ ...p, colAdjust: { '0:1': d } })
+      const s = b.layout.sections[0]
+      expect(s.colBlocks[1].length).toBe(a.colBlocks[1].length + d)
+      s.colBlocks.forEach((cb, i) => { if (i !== 1) expect(cb).toEqual(a.colBlocks[i]) })
+      expect(s.joistX).toEqual(a.joistX)
+      b.layout.sections.slice(1).forEach((o, i) => expect(o.colBlocks).toEqual(buildFloor(p).layout.sections[i + 1].colBlocks))
+    }
   })
 })
 
@@ -367,9 +370,9 @@ describe('filler service zones', () => {
     expect(b.placements.some((x) => x.kind === 'service')).toBe(true)
   })
   it('added joists never land inside a filler strip', () => {
-    const one = buildFloor({ ...defaultParams(), secAdjust: { 0: { x: 0, y: 1 } } })
+    const one = buildFloor({ ...defaultParams(), colAdjust: { '0:0': 1 } })
     const base = buildFloor(defaultParams())
-    expect(one.layout.sections[0].blockY.length).toBe(base.layout.sections[0].blockY.length + 1)
+    expect(one.layout.sections[0].colBlocks[0].length).toBe(base.layout.sections[0].colBlocks[0].length + 1)
     one.layout.sections.slice(1).forEach((s, i) => expect(s.blockY.length).toBe(base.layout.sections[i + 1].blockY.length))
   })
   it('deck under filler pieces matches them, is fixed and cannot be an access panel', () => {

@@ -23,8 +23,11 @@ export interface Section {
   joistT: number[]
   cols: { x: number; w: number }[]
   rows: { y: number; l: number; drawer: boolean }[]
-  /** y of the bottom edge of each block line between rows */
+  /** y of the bottom edge of each block line between rows, for the section default */
   blockY: number[]
+  /** rows / block lines of each bay (column) between main joists */
+  colRows: { y: number; l: number; drawer: boolean }[][]
+  colBlocks: number[][]
   /** true when the section's front edge (y = 0) carries drawers */
   drawerFront: boolean
   /** true when main joist positions are dictated by drawer widths */
@@ -189,35 +192,39 @@ export function buildLayout(p: Params): Layout {
     const f = geo.front
     const drawerFront =
       drawers && !plain && !!f && Math.abs(rect.y - f.y) < 1e-6 && rect.x >= f.x1 - 1e-6 && rect.x + rect.w <= f.x2 + 1e-6
-    const rows: Section['rows'] = []
-    const blockY: number[] = []
-    if (drawerFront) {
-      let dLen = drawerLen
-      const remaining = rect.l - T - dLen - T
-      const fitRows = Math.max(0, Math.floor((remaining + T) / (cellMinY + T) + 1e-9))
-      const nRows = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + p.crossAdjust + (p.secAdjust?.[si]?.y ?? 0)) : 0
-      if (nRows === 0) {
-        dLen = rect.l - T
-        rows.push({ y: rect.y, l: dLen, drawer: true })
+    // rows between cross joists for one bay (column); each bay can carry its own count
+    const calcRows = (adj: number) => {
+      const rows: Section['rows'] = []
+      const blockY: number[] = []
+      if (drawerFront) {
+        let dLen = drawerLen
+        const remaining = rect.l - T - dLen - T
+        const fitRows = Math.max(0, Math.floor((remaining + T) / (cellMinY + T) + 1e-9))
+        const nRows = remaining > 0 ? Math.max(fitRows > 0 ? 1 : 0, fitRows + adj) : 0
+        if (nRows === 0) {
+          dLen = rect.l - T
+          rows.push({ y: rect.y, l: dLen, drawer: true })
+        } else {
+          rows.push({ y: rect.y, l: dLen, drawer: true })
+          blockY.push(rect.y + dLen)
+          const cellY = (remaining - (nRows - 1) * T) / nRows
+          for (let j = 0; j < nRows; j++) {
+            const y = rect.y + dLen + T + j * (cellY + T)
+            rows.push({ y, l: cellY, drawer: false })
+            if (j < nRows - 1) blockY.push(y + cellY)
+          }
+        }
       } else {
-        rows.push({ y: rect.y, l: dLen, drawer: true })
-        blockY.push(rect.y + dLen)
-        const cellY = (remaining - (nRows - 1) * T) / nRows
-        for (let j = 0; j < nRows; j++) {
-          const y = rect.y + dLen + T + j * (cellY + T)
-          rows.push({ y, l: cellY, drawer: false })
-          if (j < nRows - 1) blockY.push(y + cellY)
+        const dy = divide(rect.l, cellMinY, T, T, adj)
+        for (let j = 0; j < dy.n; j++) {
+          const y = rect.y + T + j * (dy.cell + T)
+          rows.push({ y, l: dy.cell, drawer: false })
+          if (j < dy.n - 1) blockY.push(y + dy.cell)
         }
       }
-    } else {
-      const dy = divide(rect.l, cellMinY, T, T, fixed ? 0 : p.crossAdjust + (p.secAdjust?.[si]?.y ?? 0))
-      for (let j = 0; j < dy.n; j++) {
-        const y = rect.y + T + j * (dy.cell + T)
-        rows.push({ y, l: dy.cell, drawer: false })
-        if (j < dy.n - 1) blockY.push(y + dy.cell)
-      }
+      return { rows, blockY }
     }
-
+    const { rows, blockY } = calcRows(fixed ? 0 : p.crossAdjust)
     if (fixed) {
       // under inaccessible filler: exactly one joist along each filler edge (running front to back), cross blocks only where panels meet
       const fs = fillers.filter((f) => Math.min(f.x + f.w, rect.x + rect.w) - Math.max(f.x, rect.x) > 0.5 && Math.min(f.y + f.l, rect.y + rect.l) - Math.max(f.y, rect.y) > 0.5)
@@ -254,29 +261,6 @@ export function buildLayout(p: Params): Layout {
     const mv = p.moves ?? {}
     const applied: Record<string, number> = {}
     // manual joist moves: shift a joist, clamp so neighbours keep a full cell, then rebuild the cells between joists
-    const lowK = drawerFront ? 1 : 0
-    if (!fixed && blockY.some((_, k) => k >= lowK && mv[`${si}:y:${k}`])) {
-      const end = rect.y + rect.l - T
-      const base = [...blockY]
-      for (let k = lowK; k < blockY.length; k++) {
-        const prevEdge = k === 0 ? rect.y + T : blockY[k - 1] + T
-        const lo = prevEdge + cellMinY
-        const hi = (k + 1 < base.length ? base[k + 1] : end) - T - cellMinY
-        blockY[k] = Math.min(Math.max(base[k] + (mv[`${si}:y:${k}`] ?? 0), lo), Math.max(lo, hi))
-        applied[`${si}:y:${k}`] = blockY[k] - base[k]
-      }
-      rows.length = 0
-      let start = rect.y + T
-      if (drawerFront) {
-        rows.push({ y: rect.y, l: drawerLen, drawer: true })
-        start = blockY[0] + T
-      }
-      for (let k = drawerFront ? 1 : 0; k <= blockY.length; k++) {
-        const stop = k < blockY.length ? blockY[k] : end
-        rows.push({ y: start, l: stop - start, drawer: false })
-        start = stop + T
-      }
-    }
     if (!exact && !fixed && joistX.some((_, k) => k > 0 && k < joistX.length - 1 && mv[`${si}:x:${k}`])) {
       const last = joistX.length - 1
       const end = rect.x + rect.w - T
@@ -295,9 +279,11 @@ export function buildLayout(p: Params): Layout {
       }
     }
 
-    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, drawerFront, exact: !!exact, fixed: !!fixed, applied })
-    rows.forEach((row, ri) => {
-      cols.forEach((col, ci) => {
+    // every bay between two main joists keeps its own cross joists, so adding or removing one never touches the neighbours
+    const colData = cols.map((_, ci) => (fixed ? { rows, blockY } : calcRows(p.crossAdjust + (p.colAdjust?.[`${si}:${ci}`] ?? 0))))
+    sections.push({ index: si, rect, joistX, joistT, cols, rows, blockY, colRows: colData.map((c) => c.rows), colBlocks: colData.map((c) => c.blockY), drawerFront, exact: !!exact, fixed: !!fixed, applied })
+    cols.forEach((col, ci) => {
+      colData[ci].rows.forEach((row, ri) => {
         const type: Cell['type'] = overFiller(col.x, row.y, col.w, row.l) ? 'service' : row.drawer ? 'drawer' : 'bin'
         const isSvc = type === 'service'
         const needL = row.drawer ? drawerLen - 0.01 : cellMinY

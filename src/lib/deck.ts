@@ -121,7 +121,9 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
   for (const sec of layout.sections) {
     const { rect } = sec
     const xs = sec.joistX.map((x, k) => x + sec.joistT[k] / 2)
-    const ys = [rect.y + T / 2, ...sec.blockY.map((y) => y + T / 2), rect.y + rect.l - T / 2]
+    // a seam across several bays needs a cross joist in every one of them, so only shared lines count
+    const shared = sec.blockY.filter((y) => sec.colBlocks.every((cb) => cb.some((v) => Math.abs(v - y) < 0.01)))
+    const ys = [rect.y + T / 2, ...shared.map((y) => y + T / 2), rect.y + rect.l - T / 2]
 
     // a filler whose edge has no joist under it grows out to the nearest joist, so seams never fall over thin air and no area is left uncovered
     const snap = (lo: number, hi: number, cs: number[], a: number, b: number) => {
@@ -160,7 +162,7 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
 
     // 1. the mat area: lift-out panels, with the drawer front row planned on its own
     if (!sec.fixed) {
-      const cutY = sec.drawerFront && sec.blockY.length ? sec.blockY[0] + T / 2 - rect.y : 0
+      const cutY = sec.drawerFront && shared.length ? shared[0] + T / 2 - rect.y : 0
       const regions: Rect[] = cutY > 0
         ? [{ x: rect.x, y: rect.y, w: rect.w, l: cutY }, { x: rect.x, y: rect.y + cutY, w: rect.w, l: rect.l - cutY }]
         : [rect]

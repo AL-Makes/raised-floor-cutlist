@@ -85,6 +85,8 @@ export interface Params {
   fillerAccess?: number[]
   /** per-section extra joists (x = main, y = cross), added on top of the global adjusts */
   secAdjust?: Record<number, { x: number; y: number }>
+  /** per-bay extra cross joists, keyed section:column; main joists stay continuous */
+  colAdjust?: Record<string, number>
   /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
   moves: Record<string, number>
   tatamiPattern: TatamiPatternId
@@ -145,7 +147,7 @@ export interface Placement {
   sz: number
   cell?: number
   /** movable joist: section, axis the joist is moved along, and index within the section */
-  ref?: { s: number; axis: 'x' | 'y'; k: number }
+  ref?: { s: number; axis: 'x' | 'y'; k: number; c?: number }
 }
 
 export type CellType = 'bin' | 'drawer' | 'service'

@@ -214,7 +214,7 @@ export function buildFloor(input: Params): Build {
     const divTotal = sec.joistX.length - 2
     const mult = p.reinforce.doubleJoists ? 2 : 1
     joistCount += rimCount + divTotal * mult
-    crossLines += sec.blockY.length
+    crossLines += Math.max(0, ...sec.colBlocks.map((b) => b.length))
     supportPads += p.supportCount > 1 ? (rimCount + divTotal * mult) * p.supportCount : 0
     member(builtup ? 'Joist' : `Joist (${jointKey} on edge)`, rimCount + divTotal * mult, rect.l)
     for (const l of layers) {
@@ -237,12 +237,12 @@ export function buildFloor(input: Params): Build {
       member('Front rim (between end joists)', 1, innerW, 4)
     }
 
-    sec.blockY.forEach((by, bk) => {
-      for (const col of sec.cols) {
-        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth, ref: sec.drawerFront && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk } })
+    sec.cols.forEach((col, ci) => {
+      sec.colBlocks[ci].forEach((by, bk) => {
+        placements.push({ kind: 'block', x: col.x, y: by, z: bu, sx: col.w, sy: T, sz: depth, ref: sec.drawerFront && bk === 0 ? undefined : { s: sec.index, axis: 'y', k: bk, c: ci } })
         member('Cross member', 1, col.w, 4)
         deckScrewLen += col.w
-      }
+      })
     })
   })
 
