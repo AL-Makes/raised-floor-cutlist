@@ -50,7 +50,7 @@ export const defaultView = (): ViewOptions => ({
 })
 
 function layerOf(kind: string): LayerKey {
-  if (kind === 'deck') return 'deck'
+  if (kind === 'deck' || kind === 'hatch') return 'deck'
   if (kind === 'trim' || kind === 'drawerFace') return 'side'
   if (kind === 'joist' || kind === 'buildup') return 'joists'
   if (kind === 'block') return 'cross'
@@ -68,6 +68,7 @@ const COLORS: Record<string, string> = {
   buildup: '#8f6b3a',
   header: '#a87c45',
   deck: '#e9d9b4',
+  hatch: '#9ccf8f',
   service: '#e0a030',
   drawer: '#9fb8c8',
   drawerFace: '#7da2bd',

@@ -81,6 +81,8 @@ export interface Params {
   joistAdjust: number
   /** change in the number of cross joists (blocking rows) vs. the bin-driven count */
   crossAdjust: number
+  /** indices into layout.fillers whose deck is cut at a joist to make a maintenance lift-out */
+  fillerAccess?: number[]
   /** per-section extra joists (x = main, y = cross), added on top of the global adjusts */
   secAdjust?: Record<number, { x: number; y: number }>
   /** manual joist moves in inches from the auto-spaced position, keyed `${section}:${'x'|'y'}:${index}` */
@@ -125,6 +127,7 @@ export type PlacementKind =
   | 'underlay'
   | 'header'
   | 'deck'
+  | 'hatch'
   | 'drawer'
   | 'drawerFace'
   | 'bin'

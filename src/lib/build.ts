@@ -220,6 +220,7 @@ export function buildFloor(input: Params): Build {
   let joistLf = 0
   let deckScrewLen = 0
   let deckPanels = 0
+  let accessCount = 0
   let heaviest = 0
   let joistCount = 0
   let crossLines = 0
@@ -341,16 +342,36 @@ export function buildFloor(input: Params): Build {
         for (const r of parts) {
           const cx = r.x + r.w / 2
           const cy = r.y + r.l / 2
-          const underFiller = layout.fillers.some((f) => cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.l)
-          if (underFiller) {
-            sheet('Deck', `Deck panel under filler (${r3(p.plyThickness)}" ply, fixed)`, p.plyThickness, 1, r.w, r.l, 'Same size as the filler piece above; screw down to joists and blocks, not accessible')
-            sheet('Deck reinforcement', `Heavy-load reinforcing ply under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l, 'Glue + screw a second layer for TV / TV stand loads; seams offset from the panel above')
-            deckPanels++
-            placements.push({ kind: 'deck', x: r.x, y: r.y, z: S, sx: r.w, sy: r.l, sz: p.plyThickness })
-            heaviest = Math.max(heaviest, r.w * r.l * p.plyThickness * PLY_LB_PER_IN3 * 2)
+          const fi = layout.fillers.findIndex((f) => cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.l)
+          if (fi >= 0) {
+            const service = (p.fillerAccess ?? []).includes(fi)
+            let pieces: { r: Rect; lift: boolean }[] = [{ r, lift: false }]
+            if (service) {
+              const cands: { axis: 'x' | 'y'; pos: number }[] = [
+                ...sec.joistX.map((x, k) => ({ axis: 'x' as const, pos: x + sec.joistT[k] / 2 })),
+                ...sec.blockY.map((y) => ({ axis: 'y' as const, pos: y + T / 2 })),
+              ].filter((c) => (c.axis === 'x' ? c.pos > r.x + 0.5 && c.pos < r.x + r.w - 0.5 : c.pos > r.y + 0.5 && c.pos < r.y + r.l - 0.5))
+              const mid = (c: { axis: 'x' | 'y'; pos: number }) => Math.abs(c.pos - (c.axis === 'x' ? cx : cy))
+              const best = cands.sort((a, b) => mid(a) - mid(b))[0]
+              const halves = best ? splitAt(r, best.axis, best.pos) : [r]
+              const small = halves.length === 2 ? (halves[0].w * halves[0].l <= halves[1].w * halves[1].l ? 0 : 1) : 0
+              pieces = halves.map((h, k) => ({ r: h, lift: k === small }))
+            }
+            for (const { r: q, lift } of pieces) {
+              if (lift) {
+                sheet('Deck', `Maintenance lift-out under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, q.w - 0.25, q.l - 0.25, 'Cut at the joist; not screwed down, lifts out for cable / power access. 1/8" clearance, finger pull')
+                accessCount++
+              } else {
+                sheet('Deck', `Deck panel under filler (${r3(p.plyThickness)}" ply, fixed)`, p.plyThickness, 1, q.w, q.l, 'Same size as the filler piece above; screw down to joists and blocks, not accessible')
+                deckPanels++
+              }
+              sheet('Deck reinforcement', `Heavy-load reinforcing ply under filler (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, q.w, q.l, 'Glue + screw a second layer for TV / TV stand loads; seams offset from the panel above')
+              placements.push({ kind: lift ? 'hatch' : 'deck', x: q.x, y: q.y, z: S, sx: q.w, sy: q.l, sz: p.plyThickness })
+              heaviest = Math.max(heaviest, q.w * q.l * p.plyThickness * PLY_LB_PER_IN3 * 2)
+            }
             continue
           }
-          sheet('Deck', `Deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l)
+          sheet('Deck', `Accessible deck panel (${r3(p.plyThickness)}" ply)`, p.plyThickness, 1, r.w, r.l, 'Under the tatami mats; lifts out to reach the bins / drawers below')
           deckPanels++
           placements.push({ kind: 'deck', x: r.x, y: r.y, z: S, sx: r.w, sy: r.l, sz: p.plyThickness })
           heaviest = Math.max(heaviest, r.w * r.l * p.plyThickness * PLY_LB_PER_IN3)
@@ -548,6 +569,7 @@ export function buildFloor(input: Params): Build {
   if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `Needs about ${LIFT_DEPTH}" of depth below the deck for the retracted table and motor, plus a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
   if (p.features.acousticStrips && joistLf) hardware.push({ name: 'Acoustic isolation tape / underlay strip', qty: Math.ceil(joistLf), unit: 'ft', notes: 'Under every joist, rims included' })
+  if (accessCount) hardware.push({ name: 'Recessed finger pulls', qty: accessCount, unit: 'pcs' })
   if (serviceCells.length) hardware.push({ name: 'Cable pass-through grommets 1-1/2"', qty: cableHoles, unit: 'pcs', notes: 'Drill through joists / blocks to form a continuous cable chase from wall outlets to TV stand, table and heater' })
   if (serviceCells.length) hardware.push({ name: 'Cable clips / surface raceway', qty: serviceCells.length * 2, unit: 'pcs', notes: 'Keep cables off the slab; leave heater clearance' })
   if (height.options.length) {

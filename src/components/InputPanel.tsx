@@ -105,6 +105,21 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
           <LenInput label="Tatami thickness" units={units} value={p.tatamiThickness} min={0.25} onChange={(v) => upd({ tatamiThickness: v, heightOption: 0 })} />
         </div>
         <div className="note">Fascia edge trim rises to half the tatami thickness above the plywood.</div>
+        {build.layout.fillers.length > 0 && (
+          <>
+            <div className="note">Under tatami mats the plywood is an accessible lift-out panel. Under filler pieces it is fixed and reinforced; tick one to cut it at a joist for a maintenance entry (power cords).</div>
+            {build.layout.fillers.map((fl, i) => (
+              <label key={i} className="check">
+                <input
+                  type="checkbox"
+                  checked={(p.fillerAccess ?? []).includes(i)}
+                  onChange={(e) => upd({ fillerAccess: e.target.checked ? [...(p.fillerAccess ?? []), i] : (p.fillerAccess ?? []).filter((k) => k !== i) })}
+                />
+                Filler {i + 1} ({formatLength(fl.w, units)} x {formatLength(fl.l, units)}): cut at joist for service access
+              </label>
+            ))}
+          </>
+        )}
         <div className={`note ${h.fits ? 'okc' : 'failc'}`}>
           Frame height needed: <b>{formatLength(h.target, units)}</b> (bins need {formatLength(h.required, units)}).
           {!h.fits && <> Raise the final height to at least <b>{formatLength(h.minFinalHeight, units)}</b>.</>}

@@ -380,6 +380,14 @@ describe('filler service zones', () => {
     expect(under.length).toBeGreaterThan(0)
     expect(b.parts.some((i) => i.name.startsWith('Heavy-load reinforcing ply'))).toBe(true)
   })
+  it('cutting a filler at its joist makes one maintenance lift-out; mats stay accessible', () => {
+    const base = buildFloor(defaultParams())
+    const acc = buildFloor({ ...defaultParams(), fillerAccess: [0] })
+    expect(base.placements.filter((q) => q.kind === 'hatch').length).toBe(0)
+    expect(acc.placements.filter((q) => q.kind === 'hatch').length).toBeGreaterThan(0)
+    expect(acc.parts.some((x) => x.name.startsWith('Maintenance lift-out'))).toBe(true)
+    expect(base.parts.some((x) => x.name.startsWith('Accessible deck panel'))).toBe(true)
+  })
   it('filler strip is unaffected by joist adjust', () => {
     const b = buildFloor({ ...defaultParams(), joistAdjust: 1 })
     for (const f of b.layout.fillers) {
