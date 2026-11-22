@@ -353,7 +353,7 @@ export function buildFloor(input: Params): Build {
       const key = `${c.section}:${k}`
       sisterLen.set(key, (sisterLen.get(key) ?? 0) + c.l + T)
     }
-    if (!p.colAdjust?.[`${c.section}:${ci}`]) {
+    if (!(p.colAdjust?.[`${c.section}:${ci}`] ?? 0)) {
     placements.push({ kind: 'block', x: c.x, y: c.y + c.l / 2 - T / 2, z: bu, sx: c.w, sy: T, sz: depth })
       member('Heavy-load cross block (mid-cell, drill 1-1/2" cable hole)', 1, c.w, 4)
     }

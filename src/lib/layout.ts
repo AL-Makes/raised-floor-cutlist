@@ -289,8 +289,8 @@ export function buildLayout(p: Params): Layout {
       rows.push({ y: start, l: rect.y + rect.l - T - start, drawer: false })
     }
     const adjustFixed = (extra: number) => {
-      if (!extra) return { rows, blockY }
-      const out = tweak(rows.map((r) => ({ y: r.y, l: r.l })), extra)
+      if (extra <= 0) return { rows, blockY }
+      const out = tweak(rows.map((r) => ({ y: r.y, l: r.l })), extra + 1)
       return { rows: out.map((c) => ({ y: c.y, l: c.l, drawer: false })), blockY: out.slice(0, -1).map((c) => c.y + c.l) }
     }
     const mv = p.moves ?? {}

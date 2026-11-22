@@ -473,8 +473,12 @@ describe('filler service zones', () => {
     const base = buildFloor(defaultParams())
     const si = base.layout.sections.findIndex((x) => x.fixed)
     expect(si).toBeGreaterThanOrEqual(0)
-    const more = buildFloor({ ...defaultParams(), colAdjust: { [si + ':0']: 1 } })
-    expect(more.layout.sections[si].colBlocks[0].length).toBe(base.layout.sections[si].colBlocks[0].length + 1)
+    const mid = (b: ReturnType<typeof buildFloor>) => b.placements.filter((q) => q.kind === 'block' && q.x === base.layout.sections[si].cols[0].x && q.y > base.layout.sections[si].rect.y && q.y < base.layout.sections[si].rect.y + base.layout.sections[si].rect.l).length
+    const cnt = (k: number) => mid(buildFloor({ ...defaultParams(), colAdjust: { [si + ':0']: k } }))
+    expect(cnt(1)).toBe(cnt(0) + 1)
+    expect(cnt(2)).toBe(cnt(0) + 2)
+    expect(cnt(-1)).toBe(cnt(0) - 1)
+    expect(cnt(-2)).toBe(cnt(-1))
   })
   it('deck under filler pieces matches them, is fixed and cannot be an access panel', () => {
     const b = buildFloor(defaultParams())
