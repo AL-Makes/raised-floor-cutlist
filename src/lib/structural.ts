@@ -49,8 +49,16 @@ export function joistCapacityPsf(thickness: number, depth: number, span: number,
 }
 
 /** Crowd and furniture the raised floor is expected to carry. */
-export const SCENARIO = { people: 6, personLb: 200, tvLb: 60, standLb: 120 }
-export const SCENARIO_LB = SCENARIO.people * SCENARIO.personLb + SCENARIO.tvLb + SCENARIO.standLb
+export const SCENARIO = { sqftPerPerson: 5, personLb: 200, tvLb: 60, standLb: 120 }
+
+/** TV and stand are always assumed; people = 1 per 5 sq ft of floor area, plus the user's adjustment. */
+export function crowdScenario(b: Build) {
+  const area = b.geometry.rects.reduce((a, r) => a + r.w * r.l, 0) / 144
+  const auto = Math.max(1, Math.ceil(area / SCENARIO.sqftPerPerson))
+  const people = Math.max(0, auto + (b.params.peopleAdj || 0))
+  const lb = people * SCENARIO.personLb + SCENARIO.tvLb + SCENARIO.standLb
+  return { area, auto, people, lb, psf: lb / Math.max(area, 1) }
+}
 
 /**
  * Largest web spacing (in, even steps, 8-24) for built-up joists. The plywood bears on the top 2x4 chord, which is only 1-1/2" thick
@@ -60,7 +68,7 @@ export function maxWebOc(b: Build): number {
   const p = b.params
   const allow = (FB_LUMBER / 1.5) * ((3.5 * 1.5 * 1.5) / 6)
   const trib = b.layout.cellMinX + b.layout.dividerT
-  const w = (p.designLoadPsf / 144) * trib
+  const w = (Math.max(p.designLoadPsf, crowdScenario(b).psf) / 144) * trib
   const sUniform = Math.sqrt((8 * allow) / Math.max(w, 1e-6))
   const sPoint = (4 * allow) / (Math.max(p.pointLoadLb, 250) * 0.5)
   const s = Math.min(24, sUniform, sPoint)

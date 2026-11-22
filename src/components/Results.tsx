@@ -1,5 +1,5 @@
 import { buildFloor, type Build } from '../lib/build'
-import { maxWebOc, SCENARIO, SCENARIO_LB, type Structural } from '../lib/structural'
+import { crowdScenario, maxWebOc, SCENARIO, type Structural } from '../lib/structural'
 import { matSchedule, type TatamiArrangement } from '../lib/tatami'
 import { estimateWeight } from '../lib/weight'
 import { formatLength, type UnitSystem } from '../lib/units'
@@ -95,15 +95,14 @@ export function CutListTab({ build, mats, units }: { build: Build; mats: TatamiA
   )
 }
 
-export function LoadTab({ s, build, apply, mats, units, onWebOc }: { s: Structural; build: Build; apply: (id: string) => void; onWebOc: (n: number) => void; mats: TatamiArrangement['mats']; units: UnitSystem }) {
+export function LoadTab({ s, build, apply, mats, units, onWebOc, onPeople }: { onPeople: (n: number) => void; s: Structural; build: Build; apply: (id: string) => void; onWebOc: (n: number) => void; mats: TatamiArrangement['mats']; units: UnitSystem }) {
   const p = build.params
   const w = estimateWeight(build, mats)
   const builtup = p.joistStyle === 'builtup'
   const recWeb = maxWebOc(build)
   const curWeb = p.webOc > 0 ? p.webOc : 16
   const recWeight = builtup && recWeb !== curWeb ? estimateWeight(buildFloor({ ...p, webOc: recWeb }), mats).total : w.total
-  const area = build.geometry.rects.reduce((a, r) => a + r.w * r.l, 0) / 144
-  const crowdPsf = SCENARIO_LB / Math.max(area, 1)
+  const cs = crowdScenario(build)
   const wt = (lb: number) => (units === 'metric' ? `${Math.round(lb * 0.45359)} kg` : `${Math.round(lb)} lb`)
   return (
     <div className="tab">
@@ -115,7 +114,10 @@ export function LoadTab({ s, build, apply, mats, units, onWebOc }: { s: Structur
         <>
           <h3>Vertical web optimizer</h3>
           <p>
-            Design case: {SCENARIO.people} people ({SCENARIO.personLb} lb each) + TV ({SCENARIO.tvLb} lb) + TV stand ({SCENARIO.standLb} lb) = <b>{SCENARIO_LB} lb</b>, about {Math.round(crowdPsf)} psf if spread over the whole floor (design target {p.designLoadPsf} psf, {p.pointLoadLb} lb point load).
+            Design case: TV ({SCENARIO.tvLb} lb) + TV stand ({SCENARIO.standLb} lb) always, plus 1 person ({SCENARIO.personLb} lb) per {SCENARIO.sqftPerPerson} sq ft of floor ({Math.round(cs.area)} sq ft = {cs.auto} people).
+          </p>
+          <p>
+            Designed for <b>{cs.people} people</b>{p.peopleAdj !== 0 && <> ({p.peopleAdj > 0 ? '+' : ''}{p.peopleAdj})</>}: <button className="small" onClick={() => onPeople(p.peopleAdj - 1)} disabled={cs.people <= 0}>- person</button> <button className="small" onClick={() => onPeople(p.peopleAdj + 1)}>+ person</button> = <b>{Math.round(cs.lb)} lb</b>, about {Math.round(cs.psf)} psf spread over the whole floor (design target {p.designLoadPsf} psf, {p.pointLoadLb} lb point load).
           </p>
           <p>
             Webs are now <b>{curWeb}"</b> apart. Most spacing the plywood-bearing 2x4 chord allows: <b>{recWeb}"</b>.

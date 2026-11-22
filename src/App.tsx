@@ -251,6 +251,7 @@ export default function App() {
           {tab === 'load' && (
             <LoadTab
               onWebOc={(n) => setParams((q) => ({ ...q, webOc: n }))}
+               onPeople={(n) => setParams((q) => ({ ...q, peopleAdj: n }))}
               mats={mats}
               units={units}
               s={structural}

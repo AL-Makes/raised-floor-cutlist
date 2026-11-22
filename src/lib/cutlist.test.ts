@@ -4,7 +4,7 @@ import { closeOutline, moveCorner, moveEdge, normalizeFloor, setEdgeLength, vali
 import { solveHeight } from './height'
 import { buildLayout, divide, floorRects } from './layout'
 import { planLumber, planSheets } from './optimize'
-import { analyze, maxWebOc, plyCapacity } from './structural'
+import { analyze, crowdScenario, maxWebOc, plyCapacity } from './structural'
 import { matSchedule, suggestTatami } from './tatami'
 import { estimateWeight } from './weight'
 import { formatInches, parseImperial, parseLength } from './units'
@@ -732,5 +732,14 @@ describe('drawer clearance', () => {
     const box = b.placements.filter((q) => q.kind === 'drawer' && q.sz > 3)
     expect(box.length).toBeGreaterThan(0)
     for (const q of box) expect(b.supportHeight - (q.z + q.sz)).toBeCloseTo(6, 5)
+  })
+})
+
+describe('crowd scenario', () => {
+  it('is 1 person per 5 sq ft plus adjustment', () => {
+    const d = defaultParams()
+    const mk = (peopleAdj: number) => buildFloor({ ...d, floor: { shape: 'rect', width: 120, length: 60 } as never, peopleAdj })
+    expect(crowdScenario(mk(0)).people).toBe(Math.ceil(50 / 5))
+    expect(crowdScenario(mk(-3)).people).toBe(7)
   })
 })

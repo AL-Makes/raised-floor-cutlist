@@ -54,6 +54,7 @@ export function defaultParams(): Params {
     reinforce: { doubleJoists: false },
     heightOption: 0,
     webOc: WEB_OC,
+    peopleAdj: 0,
     designLoadPsf: 40,
     pointLoadLb: 300,
     supportCount: 0,
