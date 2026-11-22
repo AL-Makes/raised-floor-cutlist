@@ -208,8 +208,10 @@ export function buildFloor(input: Params): Build {
     const { rect } = sec
     const n = sec.joistX.length
     const frontT = sec.drawerFront ? 3.5 : sec.shareFront ? 0 : T
+    const sharedEdge = layout.sections.some((o) => o !== sec && Math.abs(o.joistX[o.joistX.length - 1] + o.joistT[o.joistT.length - 1] - sec.joistX[0]) < 0.05 && o.rect.y <= sec.rect.y + 0.05 && o.rect.y + o.rect.l >= sec.rect.y + sec.rect.l - 0.05)
     sec.joistX.forEach((jx, k) => {
       const rim = k === 0 || k === n - 1
+      if (k === 0 && sharedEdge) return
       const t = sec.joistT[k]
       const drawerJoist = !rim && sec.drawerFront
       const jy = rim || drawerJoist ? rect.y : rect.y + frontT
@@ -219,7 +221,7 @@ export function buildFloor(input: Params): Build {
       joistLf += jl / 12
       deckScrewLen += jl
     })
-    const rimCount = 2
+    const rimCount = sharedEdge ? 1 : 2
     const divTotal = sec.joistX.length - 2
     const mult = p.reinforce.doubleJoists ? 2 : 1
     joistCount += rimCount + divTotal * mult
