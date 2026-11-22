@@ -404,35 +404,20 @@ export function buildFloor(input: Params): Build {
       if (!p.trimSides[e.side]) continue
       const th = 0.75
       const fullH = S + p.plyThickness
-      sheet('Edge trim', `Side panel - ${e.side}`, th, 1, e.length, fullH, '3/4" plywood, ripped to cover frame + deck edge')
+      const note = e.isFront && p.features.drawers
+        ? '3/4" plywood, ONE continuous front panel; fix to each drawer face, cut a hand hold at each drawer'
+        : '3/4" plywood, ripped to cover frame + deck edge'
+      sheet('Edge trim', `Side panel - ${e.side}`, th, 1, e.length, fullH, note)
       const horiz = e.y1 === e.y2
-      const trimAt = (a: number, b: number, z: number, h: number) =>
-        placements.push({
-          kind: 'trim',
-          x: horiz ? a : e.side === 'left' ? e.x1 - th : e.x1,
-          y: horiz ? (e.side === 'front' ? e.y1 - th : e.y1) : a,
-          z,
-          sx: horiz ? b - a : th,
-          sy: horiz ? th : b - a,
-          sz: h,
-        })
-      const lo = horiz ? Math.min(e.x1, e.x2) : Math.min(e.y1, e.y2)
-      const hi = lo + e.length
-      const faces = e.isFront && p.features.drawers ? placements.filter((q) => q.kind === 'drawerFace') : []
-      if (!faces.length) {
-        trimAt(lo, hi, 0, fullH)
-      } else {
-        // Drawer fronts stay visible: full-height trim only beside them, a header strip above them.
-        const spans = faces.map((f) => [f.x - 0.125, f.x + f.sx + 0.125] as const).sort((a, b) => a[0] - b[0])
-        const top = Math.max(...faces.map((f) => f.z + f.sz)) + 0.125
-        let cur = lo
-        for (const [a, b] of spans) {
-          if (a - cur > 0.01) trimAt(cur, a, 0, fullH)
-          cur = Math.max(cur, b)
-        }
-        if (hi - cur > 0.01) trimAt(cur, hi, 0, fullH)
-        trimAt(lo, hi, top, Math.max(0.1, fullH - top))
-      }
+      placements.push({
+        kind: 'trim',
+        x: horiz ? Math.min(e.x1, e.x2) : e.side === 'left' ? e.x1 - th : e.x1,
+        y: horiz ? (e.side === 'front' ? e.y1 - th : e.y1) : Math.min(e.y1, e.y2),
+        z: 0,
+        sx: horiz ? e.length : th,
+        sy: horiz ? th : e.length,
+        sz: fullH,
+      })
     }
   }
 
