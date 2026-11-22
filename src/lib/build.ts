@@ -4,7 +4,7 @@ import { insetForTrim, normalizeFloor, type FloorGeometry, type PolyEdge } from 
 import { CHORD_T, solveHeight, type HeightOption, type HeightSolution } from './height'
 import { buildLayout, DRAWER_BACK_GAP, DRAWER_SIDE_GAP, WEB_OC, type Layout } from './layout'
 import { planLumber, planSheets, type LumberPlan, type SheetPlan } from './optimize'
-import { planPlywood } from './deck'
+import { planPlywood, snapSeams } from './deck'
 import { tatamiFit } from './tatami'
 import type { FloorSpec, Params, Part, Placement, Rect } from './types'
 
@@ -349,9 +349,21 @@ export function buildFloor(input: Params): Build {
   }
 
   const deck = planPlywood(layout, { sheetL: p.sheetL, sheetW: p.sheetW, serviceFillers: p.fillerAccess ?? [] })
-  unsupportedSeams.push(...deck.unsupported)
-  const ply = p.plyThickness
-  for (const q of deck.panels) {
+  // a sheet seam that would land between supports gets its own backing block so every panel edge sits on a support centre
+  const seamBlocks = new Map<string, number>()
+  for (const u of deck.unsupported) {
+    const sec = layout.sections[u.section]
+    if (!sec) { unsupportedSeams.push(u); continue }
+    const r = sec.rect
+    const k = `${u.axis}${Math.round(u.pos * 4)}`
+    if (seamBlocks.has(k)) continue
+    seamBlocks.set(k, 1)
+    if (u.axis === 'y') placements.push({ kind: 'block', x: r.x + T, y: u.pos - T / 2, z: bu, sx: r.w - 2 * T, sy: T, sz: depth })
+    else placements.push({ kind: 'block', x: u.pos - T / 2, y: r.y + T, z: bu, sx: T, sy: r.l - 2 * T, sz: depth })
+    member('Plywood seam backing block', 1, (u.axis === 'y' ? r.w : r.l) - 2 * T, 4)
+  }  const ply = p.plyThickness
+  const supportsNow = placements.filter((q) => q.kind === 'joist' || q.kind === 'block' || q.kind === 'rim' || q.kind === 'buildup').map((q) => ({ x: q.x, y: q.y, w: q.sx, l: q.sy }))
+  for (const q of snapSeams(deck.panels, supportsNow)) {
     const lift = q.kind === 'lift'
     if (q.kind === 'accessible') {
       sheet('Deck', `Accessible deck panel (${r3(ply)}" ply)`, ply, 1, q.w, q.l, 'Under the tatami mats; lifts out to reach the bins / drawers below. Edges on joist centrelines')

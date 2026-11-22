@@ -224,3 +224,64 @@ export function planPlywood(layout: Layout, o: { sheetL: number; sheetW: number;
   }
   return { panels, unsupported }
 }
+
+/**
+ * Move every seam between two panels onto the centre of the support (or touching group of supports, e.g. the two rims
+ * where sections meet) running underneath it, so both panels bear on half its width.
+ */
+export function snapSeams<P extends Rect>(panels: P[], supports: Rect[]): P[] {
+  const out = panels.map((p) => ({ ...p }))
+  const targets = new Map<string, number>()
+  const span = new Map<string, [number, number]>()
+  const key = (axis: 'x' | 'y', pos: number) => `${axis}:${Math.round(pos * 20)}`
+  const lo = (r: Rect, axis: 'x' | 'y') => (axis === 'x' ? r.x : r.y)
+  const sz = (r: Rect, axis: 'x' | 'y') => (axis === 'x' ? r.w : r.l)
+  for (const axis of ['x', 'y'] as const) {
+    const other = axis === 'x' ? 'y' : 'x'
+    const best = new Map<string, number>()
+    for (const a of out) {
+      const pos = lo(a, axis) + sz(a, axis)
+      for (const b of out) {
+        if (b === a || Math.abs(lo(b, axis) - pos) > 0.05) continue
+        const a0 = Math.max(lo(a, other), lo(b, other))
+        const a1 = Math.min(lo(a, other) + sz(a, other), lo(b, other) + sz(b, other))
+        if (a1 - a0 < 1) continue
+        const mid = (a0 + a1) / 2
+        // supports running along the seam (they are longer along `other` than across)
+        const run = supports.filter((s) => sz(s, other) >= sz(s, axis) && mid >= lo(s, other) - 0.01 && mid <= lo(s, other) + sz(s, other) + 0.01)
+        let u0 = pos
+        let u1 = pos
+        const found = run.some((s) => pos >= lo(s, axis) - 0.01 && pos <= lo(s, axis) + sz(s, axis) + 0.01)
+        if (!found) continue
+        for (let g = 0; g < 8; g++) {
+          for (const s of run) {
+            if (lo(s, axis) <= u1 + 0.05 && lo(s, axis) + sz(s, axis) >= u0 - 0.05) {
+              u0 = Math.min(u0, lo(s, axis))
+              u1 = Math.max(u1, lo(s, axis) + sz(s, axis))
+            }
+          }
+        }
+        // along one seam line the unions can differ (a double rim in one stretch, a single in another): use what they all share
+        const k = key(axis, pos)
+        const prev = span.get(k)
+        const n0 = prev ? Math.max(prev[0], u0) : u0
+        const n1 = prev ? Math.min(prev[1], u1) : u1
+        const ok = n1 - n0 > 0.5
+        span.set(k, ok ? [n0, n1] : prev ?? [u0, u1])
+        targets.set(k, (span.get(k)![0] + span.get(k)![1]) / 2)
+        best.set(k, 1)
+      }
+    }
+    for (const p of out) {
+      const hi = lo(p, axis) + sz(p, axis)
+      const tHi = targets.get(key(axis, hi))
+      const tLo = targets.get(key(axis, lo(p, axis)))
+      const nlo = tLo !== undefined ? tLo : lo(p, axis)
+      const nhi = tHi !== undefined ? tHi : hi
+      if (nhi - nlo < 1) continue
+      if (axis === 'x') { p.x = nlo; p.w = nhi - nlo } else { p.y = nlo; p.l = nhi - nlo }
+    }
+    void other
+  }
+  return out
+}

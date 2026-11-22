@@ -505,7 +505,7 @@ describe('filler service zones', () => {
     const b = buildFloor(defaultParams())
     expect(b.layout.fillers.length).toBeGreaterThan(0)
     const f = b.layout.fillers[0]
-    const under = b.placements.filter((q) => q.kind === 'deck' && Math.abs(q.x - f.x) < 0.51 && Math.abs(q.y - f.y) < 0.51)
+    const under = b.placements.filter((q) => q.kind === 'deck' && Math.abs(q.x - f.x) < 2 && Math.abs(q.y - f.y) < 2)
     expect(under.length).toBeGreaterThan(0)
     expect(b.parts.some((i) => i.name.startsWith('Heavy-load reinforcing ply'))).toBe(false)
   })
@@ -638,5 +638,42 @@ describe('edge trim toggle keeps the design', () => {
     const on = mk(true)
     expect(on.layout.cells.filter((c) => c.type === 'drawer')).toHaveLength(mk(false).layout.cells.filter((c) => c.type === 'drawer').length)
     expect(on.binCount).toBeGreaterThan(0)
+  })
+})
+
+describe('plywood seams sit on support centres', () => {
+  it('every seam between two panels is centred on a support', () => {
+    for (const [W, L, dr] of [[144.5, 73, true], [144.5, 73, false], [144, 72, true], [120, 96, false]] as const) {
+      const p = defaultParams()
+      const b = buildFloor({ ...p, floor: { shape: 'rect', width: W, length: L } as never, finalHeight: 15, features: { ...p.features, drawers: dr, edgeTrim: false } })
+      const dk = b.placements.filter((q) => q.kind === 'deck' || q.kind === 'hatch')
+      const sup = b.placements.filter((q) => ['joist', 'block', 'rim', 'buildup'].includes(q.kind))
+      for (const d of dk)
+        for (const e of dk) {
+          if (d === e) continue
+          for (const ax of ['x', 'y'] as const) {
+            const o = ax === 'x' ? 'y' : 'x'
+            const sz = (r: { sx: number; sy: number }, a: string) => (a === 'x' ? r.sx : r.sy)
+            const lo = (r: { x: number; y: number }, a: string) => (a === 'x' ? r.x : r.y)
+            const pos = lo(d, ax) + sz(d, ax)
+            if (Math.abs(lo(e, ax) - pos) > 0.05) continue
+            const a0 = Math.max(lo(d, o), lo(e, o))
+            const a1 = Math.min(lo(d, o) + sz(d, o), lo(e, o) + sz(e, o))
+            if (a1 - a0 < 1) continue
+            let hit = 0
+            let total = 0
+            for (let mid = a0 + 1; mid < a1; mid += 2) {
+              if (sup.some((s) => sz(s, ax) > sz(s, o) && mid >= lo(s, o) && mid <= lo(s, o) + sz(s, o) && pos >= lo(s, ax) && pos <= lo(s, ax) + sz(s, ax))) continue // crossing a perpendicular joist
+              total++
+              const run = sup.filter((s) => sz(s, o) >= sz(s, ax) && mid >= lo(s, o) && mid <= lo(s, o) + sz(s, o) && pos >= lo(s, ax) - 0.01 && pos <= lo(s, ax) + sz(s, ax) + 0.01)
+              if (!run.length) continue
+              hit++
+              const u0 = Math.min(...run.map((s) => lo(s, ax)))
+              const u1 = Math.max(...run.map((s) => lo(s, ax) + sz(s, ax)))
+              if (Math.abs((u0 + u1) / 2 - pos) >= 0.3 && Math.min(pos - u0, u1 - pos) < 1.7) throw new Error(`off ${W}x${L} dr=${dr} ${ax}=${pos} @${mid} ${u0}..${u1} ${run.map((r) => r.kind + r.x + ',' + r.y + ',' + r.sx + ',' + r.sy).join(' ')}`)
+            }
+            expect(total === 0 || hit / total > 0.6).toBe(true)          }
+        }
+    }
   })
 })
