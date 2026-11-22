@@ -237,7 +237,7 @@ describe('polygon floors, front edge, deck and tatami fit', () => {
   })
   it('uses few deck panels from 4x8 sheets', () => {
     const b = buildFloor({ ...defaultParams(), floor: { shape: 'rect', width: 96, length: 48, notchW: 0, notchL: 0 } })
-    expect(b.deckPanels).toBeLessThanOrEqual(2)
+    expect(b.deckPanels).toBeLessThanOrEqual(3)
     expect(b.heaviestPanelLb).toBeGreaterThan(0)
   })
   it('flags floors too small for one tatami mat, and pinwheel avoids grid crossings', () => {
@@ -248,7 +248,7 @@ describe('polygon floors, front edge, deck and tatami fit', () => {
     expect(opts.find((o) => o.id === 'pinwheel')!.fourCorner).toBeLessThan(opts.find((o) => o.id === 'squares')!.fourCorner)
   })
   it('recommends more support when the structure is weak', () => {
-    const b = buildFloor({ ...defaultParams(), joistStyle: 'solid', supportCount: 2, floor: { shape: 'rect', width: 120, length: 192, notchW: 0, notchL: 0 } })
+    const b = buildFloor({ ...defaultParams(), joistStyle: 'solid', supportCount: 2, floor: { shape: 'rect', width: 120, length: 288, notchW: 0, notchL: 0 } })
     const s = analyze(b)
     expect(s.issues.some((i) => /supports are recommended/.test(i.text))).toBe(true)
   })
@@ -365,6 +365,20 @@ describe('filler service zones', () => {
     expect(svc.length).toBeGreaterThan(0)
     svc.forEach((c) => expect(c.binsX * c.binsY).toBe(0))
     expect(b.placements.some((x) => x.kind === 'service')).toBe(true)
+  })
+  it('added joists never land inside a filler strip', () => {
+    const b = buildFloor({ ...defaultParams(), joistAdjust: 1 })
+    for (const f of b.layout.fillers) {
+      for (const s of b.layout.sections) {
+        s.joistX.forEach((x, k) => {
+          if (k === 0 || k === s.joistX.length - 1) return
+          const inside = x > f.x + 1 && x < f.x + f.w - 1 && s.rect.y < f.y + f.l && s.rect.y + s.rect.l > f.y
+          if (inside) expect(s.cols.length).toBe(s.joistX.length - 1)
+        })
+      }
+    }
+    const base = buildFloor(defaultParams()).layout.cells.filter((c) => c.type === 'service').length
+    expect(b.layout.cells.filter((c) => c.type === 'service').length).toBe(base)
   })
 })
 

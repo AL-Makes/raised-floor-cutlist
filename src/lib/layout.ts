@@ -121,7 +121,7 @@ export function buildLayout(p: Params): Layout {
   })
   // Ready-made drawers sit snug between joists (clearance split evenly each side), so the cells are exactly one
   // box wide. Leftover width becomes a plain bin section if it is big enough, otherwise it widens the end joists.
-  const pieces: { rect: Rect; plain: boolean; exact?: number }[] = liftPieces.flatMap((pc) => {
+  const pieces0: { rect: Rect; plain: boolean; exact?: number; fixed?: boolean }[] = liftPieces.flatMap((pc) => {
     if (!ready || pc.plain || !onFrontRow(pc.rect)) return [pc]
     const r = pc.rect
     const nFit = Math.max(1, Math.floor((r.w - 2 * T + dividerT) / (cellMinX + dividerT) + 1e-9))
@@ -138,8 +138,35 @@ export function buildLayout(p: Params): Layout {
     return [{ ...pc, exact: n }]
   })
 
-  pieces.forEach(({ rect, plain, exact }, si) => {
-    const dx = divide(rect.w, cellMinX, dividerT, T, p.joistAdjust)
+  // A plywood filler strip running the full depth of a section gets its own section, so added joists only
+  // subdivide the bin area and never land under the filler.
+  const pieces: { rect: Rect; plain: boolean; exact?: number; fixed?: boolean }[] = pieces0.flatMap((pc) => {
+    if (pc.exact || pc.plain) return [pc]
+    let r = pc.rect
+    const inside = fillers.filter((f) => f.x >= r.x - 0.5 && f.x + f.w <= r.x + r.w + 0.5 && f.y >= r.y - 0.5 && f.y + f.l <= r.y + r.l + 0.5)
+    const out: { rect: Rect; plain: boolean; fixed?: boolean }[] = []
+    const back = inside.filter((f) => f.y + f.l >= r.y + r.l - 0.5)
+    if (back.length && back.reduce((s, f) => s + f.w, 0) >= r.w - 0.5) {
+      const y0 = Math.min(...back.map((f) => f.y))
+      if (y0 - r.y >= cellMinY + 2 * T) {
+        out.push({ rect: { ...r, y: y0, l: r.y + r.l - y0 }, plain: false, fixed: true })
+        r = { ...r, l: y0 - r.y }
+      }
+    }
+    const sideSpan = (edgeX: number) => inside.filter((f) => Math.abs(f.x - edgeX) < 0.5 && f.y < r.y + r.l - 0.5)
+    const sides = (fs: Rect[]) => (fs.length && fs.reduce((s, f) => s + Math.min(f.y + f.l, r.y + r.l) - Math.max(f.y, r.y), 0) >= r.l - 0.5 ? Math.max(...fs.map((f) => f.w)) : 0)
+    const lw = sides(sideSpan(r.x))
+    const rw = sides(inside.filter((f) => Math.abs(f.x + f.w - (r.x + r.w)) < 0.5 && f.y < r.y + r.l - 0.5))
+    let x0 = r.x
+    let x1 = r.x + r.w
+    if (lw) { out.push({ rect: { ...r, w: lw }, plain: false, fixed: true }); x0 += lw }
+    if (rw) { out.push({ rect: { ...r, x: r.x + r.w - rw, w: rw }, plain: false, fixed: true }); x1 -= rw }
+    if (!out.length || x1 - x0 < cellMinX + 2 * T) return [pc]
+    return [{ ...pc, rect: { ...r, x: x0, w: x1 - x0 } }, ...out]
+  })
+
+  pieces.forEach(({ rect, plain, exact, fixed }, si) => {
+    const dx = divide(rect.w, cellMinX, dividerT, T, fixed ? 0 : p.joistAdjust)
     const cols: Section['cols'] = []
     const ex = 0
     const nCols = exact ?? dx.n
@@ -181,7 +208,7 @@ export function buildLayout(p: Params): Layout {
         }
       }
     } else {
-      const dy = divide(rect.l, cellMinY, T, T, p.crossAdjust)
+      const dy = divide(rect.l, cellMinY, T, T, fixed ? 0 : p.crossAdjust)
       for (let j = 0; j < dy.n; j++) {
         const y = rect.y + T + j * (dy.cell + T)
         rows.push({ y, l: dy.cell, drawer: false })
