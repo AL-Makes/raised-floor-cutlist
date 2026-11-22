@@ -403,7 +403,7 @@ export function buildFloor(input: Params): Build {
     for (const e of floorEdges(p.floor)) {
       if (!p.trimSides[e.side]) continue
       const th = 0.75
-      const fullH = S + p.plyThickness
+      const fullH = S + p.plyThickness + p.tatamiThickness / 2 + ul
       const note = e.isFront && p.features.drawers
         ? '3/4" plywood, ONE continuous front panel; fix to each drawer face, cut a hand hold at each drawer'
         : '3/4" plywood, ripped to cover frame + deck edge'
@@ -413,7 +413,7 @@ export function buildFloor(input: Params): Build {
         kind: 'trim',
         x: horiz ? Math.min(e.x1, e.x2) : e.side === 'left' ? e.x1 - th : e.x1,
         y: horiz ? (e.side === 'front' ? e.y1 - th : e.y1) : Math.min(e.y1, e.y2),
-        z: 0,
+        z: -ul,
         sx: horiz ? e.length : th,
         sy: horiz ? th : e.length,
         sz: fullH,

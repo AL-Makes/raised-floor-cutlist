@@ -102,8 +102,9 @@ export function InputPanel({ p, set, units, build }: { p: Params; set: (f: (p: P
         <LenInput label="Final height (slab to top of tatami)" units={units} value={p.finalHeight} min={2} onChange={(v) => upd({ finalHeight: v, heightOption: 0 })} />
         <div className="grid2">
           <LenInput label="Plywood thickness" units={units} value={p.plyThickness} min={0.25} onChange={(v) => upd({ plyThickness: v, heightOption: 0 })} />
-          <LenInput label="Tatami thickness" units={units} value={p.tatamiThickness} onChange={(v) => upd({ tatamiThickness: v, heightOption: 0 })} />
+          <LenInput label="Tatami thickness" units={units} value={p.tatamiThickness} min={0.25} onChange={(v) => upd({ tatamiThickness: v, heightOption: 0 })} />
         </div>
+        <div className="note">Fascia edge trim rises to half the tatami thickness above the plywood.</div>
         <div className={`note ${h.fits ? 'okc' : 'failc'}`}>
           Frame height needed: <b>{formatLength(h.target, units)}</b> (bins need {formatLength(h.required, units)}).
           {!h.fits && <> Raise the final height to at least <b>{formatLength(h.minFinalHeight, units)}</b>.</>}
