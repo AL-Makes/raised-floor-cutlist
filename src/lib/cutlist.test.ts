@@ -317,6 +317,11 @@ describe('dragging walls and plywood drawers', () => {
     expect(boxes(b)).toHaveLength(boxes(all).length - 1)
     expect(b.placements.filter((q) => q.kind === 'cutout')).toHaveLength(boxes(all).length - 1)
     expect(b.placements.some((q) => q.kind === 'bin' && q.cell === bays[0].index)).toBe(true)
+    const sec = b.layout.sections[0]
+    const ws = sec.cols.map((c) => c.w)
+    expect(ws[0]).toBeLessThan(ws[1])
+    expect(sec.cols[ws.length - 1].x + ws[ws.length - 1] + sec.joistT[ws.length]).toBeCloseTo(sec.rect.x + sec.rect.w)
+    ws.slice(1).forEach((w) => expect(w).toBeCloseTo(ws[1]))
   })
   it('uses the board thickness for the drawer parts', () => {
     const b = buildFloor({ ...drawerP(), drawerBoardT: 0.5 })

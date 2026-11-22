@@ -154,12 +154,23 @@ export function buildLayout(p: Params): Layout {
     const cellW = exact ? (rect.w - 2 * T - (exact - 1) * dividerT) / exact : dx.cell
     const joistX: number[] = [rect.x]
     const joistT: number[] = [T + ex]
+    // a front bay without a drawer only needs whole bins; the drawer bays take up the rest so joist spacing stays even
+    const f1 = geo.front
+    const isFront = drawers && !plain && !exact && !!f1 && Math.abs(rect.y - f1.y) < 1e-6 && rect.x >= f1.x1 - 1e-6 && rect.x + rect.w <= f1.x2 + 1e-6
+    const offs = Array.from({ length: nCols }, (_, i) => isFront && !!p.drawerOff?.[`${si}:${i}:0`])
+    const k = offs.filter(Boolean).length
+    const offW = Math.max(1, Math.floor((cellW + 1e-6) / (bx + p.clearance))) * (bx + p.clearance)
+    const useOff = k > 0 && k < nCols && offW < cellW
+    const onW = useOff ? (rect.w - 2 * T - (nCols - 1) * dividerT - k * offW) / (nCols - k) : cellW
+    let xx = rect.x + T + ex
     for (let i = 0; i < nCols; i++) {
-      const x = rect.x + T + ex + i * (cellW + dividerT)
-      cols.push({ x, w: cellW })
+      const w = useOff && offs[i] ? offW : onW
+      cols.push({ x: xx, w })
+      xx += w
       if (i < nCols - 1) {
-        joistX.push(x + cellW)
+        joistX.push(xx)
         joistT.push(dividerT)
+        xx += dividerT
       }
     }
     joistX.push(rect.x + rect.w - T - ex)
