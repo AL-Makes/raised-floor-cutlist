@@ -355,10 +355,10 @@ describe('dragging walls and plywood drawers', () => {
     const b = buildFloor(drawerP())
     const sec = b.layout.sections[0]
     const hdr = b.placements.find((q) => q.kind === 'header' && q.sx > 4)!
-    const js = b.placements.filter((q) => (q.kind === 'joist' || q.kind === 'rim') && Math.abs(q.y - sec.rect.y) < 1e-6 && q.sy > 10)
+    const js = b.placements.filter((q) => (q.kind === 'joist' || q.kind === 'rim') && Math.abs(q.y - sec.rect.y) < 1e-6 && q.sy > 10 && q.x >= sec.rect.x - 1e-6 && q.x < sec.rect.x + sec.rect.w - 1e-6)
     expect(js.length).toBe(sec.joistX.length)
     js.forEach((j) => expect(j.z + j.sz).toBeLessThanOrEqual(hdr.z + 1e-6))
-    expect(b.placements.filter((q) => q.kind === 'header' && q.sx === 3.5 && q.y > sec.rect.y).length).toBe(js.length)
+    expect(b.placements.filter((q) => q.kind === 'header' && q.sx === 3.5 && q.y > sec.rect.y && q.y < sec.rect.y + 5 && q.x >= sec.rect.x - 1e-6 && q.x < sec.rect.x + sec.rect.w - 1e-6).length).toBe(js.length)
     expect(b.parts.some((i) => i.name.startsWith('Drawer support extra vertical web'))).toBe(true)
   })
   it('cuts the front fascia in joist-centre to joist-centre pieces, each with a drawer opening', () => {
