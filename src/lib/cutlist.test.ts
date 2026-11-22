@@ -411,11 +411,11 @@ describe('motorized lift tables', () => {
     expect(mat.sx).toBeCloseTo(36, 2)
     expect(mat.sy).toBeCloseTo(36, 2)
     expect(mat.z).toBeCloseTo(top.z + top.sz, 2)
-    const filler = liftParts.find((q) => Math.abs(q.sx - 6) < 0.01 && Math.abs(q.z - (col.z + col.sz)) < 0.01)!
+    const filler = liftParts.find((q) => Math.abs(q.sx - 12) < 0.01 && Math.abs(q.sy - 12) < 0.01 && Math.abs(q.z - (col.z + col.sz)) < 0.01)!
     expect(filler).toBeDefined()
     expect(filler.z + filler.sz).toBeCloseTo(top.z, 2)
     expect(lifted.parts.some((x) => x.name.includes('Lift column base plate'))).toBe(true)
-    expect(lifted.parts.some((x) => x.name.includes('Lift column top filler blocking'))).toBe(true)
+    expect(lifted.parts.some((x) => x.name.includes('Lift column top filler'))).toBe(true)
     expect(lifted.hardware.some((h) => h.name.includes('Motorized lift table'))).toBe(true)
     expect(lifted.parts.some((x) => x.name.includes('Lift pocket frame'))).toBe(true)
     expect(lifted.placements.some((q) => q.kind === 'bin' && q.x < 72 && q.x + q.sx > 36 && q.y < 72 && q.y + q.sy > 36)).toBe(false)

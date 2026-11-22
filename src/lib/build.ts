@@ -14,6 +14,7 @@ const LIFT_DEPTH = 12.4 // compressed column height
 const LIFT_BASE_T = 0.75 // 3/4" plywood base plate under the motorized column
 const LIFT_TRAVEL = 16.5
 const LIFT_COL = 6 // column footprint, square
+const LIFT_FILLER_COL = 12 // 12" x 12" filler column between the compacted column top and the table top
 
 function subtractRect(q: Placement, z: Rect): Placement[] {
   const out: Placement[] = []
@@ -579,10 +580,12 @@ export function buildFloor(input: Params): Build {
       const colTop = LIFT_BASE_T + LIFT_DEPTH
       next.push({ kind: 'lift', x: cx0, y: cy0, z: LIFT_BASE_T, sx: LIFT_COL, sy: LIFT_COL, sz: LIFT_DEPTH, lift: zi })
       next.push({ kind: 'lift', x: cx0 + 0.25, y: cy0 + 0.25, z: LIFT_BASE_T, sx: LIFT_COL - 0.5, sy: LIFT_COL - 0.5, sz: LIFT_DEPTH, lift: zi })
-      // filler/blocking between the compacted column top and the underside of the plywood table top (matching the deck layer at z = S)
+      // 12x12" filler column between the compacted column top and the underside of the plywood table top (height determined by overall structure height)
       const gapH = S - colTop
       if (gapH > 0.01) {
-        next.push({ kind: 'lift', x: cx0, y: cy0, z: colTop, sx: LIFT_COL, sy: LIFT_COL, sz: gapH, lift: zi })
+        const fx0 = z.x + (z.w - LIFT_FILLER_COL) / 2
+        const fy0 = z.y + (z.l - LIFT_FILLER_COL) / 2
+        next.push({ kind: 'lift', x: fx0, y: fy0, z: colTop, sx: LIFT_FILLER_COL, sy: LIFT_FILLER_COL, sz: gapH, lift: zi })
         riserBlocks++
         riserH = gapH
       }
@@ -593,7 +596,7 @@ export function buildFloor(input: Params): Build {
     }
     placements.splice(0, placements.length, ...next)
     if (riserBlocks) {
-      member('Lift column top filler blocking (2x4)', riserBlocks * 2, riserH, 4)
+      member(`Lift column top filler (${LIFT_FILLER_COL}" x ${LIFT_FILLER_COL}" column, 2x4)`, riserBlocks * 4, riserH, 4)
     }
     member('Lift pocket frame (side, along joists)', sides, p.tatamiShort, 4)
     member('Lift pocket frame (end, across)', ends, p.tatamiShort + 2 * T, 4)
@@ -633,7 +636,7 @@ export function buildFloor(input: Params): Build {
   }
   if (joistLf) hardware.push({ name: 'Construction adhesive tubes', qty: Math.max(1, Math.ceil(joistLf / 25)), unit: 'tubes' })
   if (casters) hardware.push({ name: `Caster wheels, ${r3(p.casterH)}" tall overall (your own)`, qty: casters, unit: 'pcs', notes: '4 per drawer; screw to the underside of the drawer bottom' })
-  if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `${LIFT_COL}" x ${LIFT_COL}" column, ${LIFT_DEPTH}" compressed, ${LIFT_TRAVEL}" travel. Bolts onto a ${r3(p.tatamiShort)}" x ${r3(p.tatamiShort)}" x ${r3(LIFT_BASE_T)}" plywood base plate; top filler blocking bridges the column top to the underside of the plywood table top. Needs a power feed and control` })
+  if (liftZones.length) hardware.push({ name: `Motorized lift table, ${r3(p.tatamiShort)}" square (electric, purchased)`, qty: liftZones.length, unit: 'pcs', notes: `${LIFT_COL}" x ${LIFT_COL}" column, ${LIFT_DEPTH}" compressed, ${LIFT_TRAVEL}" travel. Bolts onto a ${r3(p.tatamiShort)}" x ${r3(p.tatamiShort)}" x ${r3(LIFT_BASE_T)}" plywood base plate; a ${LIFT_FILLER_COL}" x ${LIFT_FILLER_COL}" top filler column bridges the column top to the underside of the plywood table top. Needs a power feed and control` })
   if (drawerCells.length) hardware.push({ name: 'Drawer pulls', qty: drawerCells.length, unit: 'pcs' })
   const smallBins = placements.filter((q) => q.kind === 'bin' && q.split)
   if (smallBins.length) hardware.push({ name: `Smaller bins, about ${r3(smallBins[0].sx)}" x ${r3(smallBins[0].sy)}" x ${r3(p.bin.h)}" (purchased; sized to fit)`, qty: smallBins.length, unit: 'pcs', notes: 'Split bins: pick the nearest standard size that fits each half' })
